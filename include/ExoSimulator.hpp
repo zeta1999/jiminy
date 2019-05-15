@@ -11,8 +11,13 @@
 #include <string>
 
 #include <boost/numeric/odeint.hpp>
-#include <boost/numeric/odeint/iterator/const_step_iterator.hpp>
-// #include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
+#include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
+
+#include "pinocchio/multibody/model.hpp"
+#include "pinocchio/parsers/urdf.hpp"
+#include "pinocchio/algorithm/joint-configuration.hpp"
+#include "pinocchio/algorithm/kinematics.hpp"
+#include "pinocchio/algorithm/aba.hpp"
 
 using namespace boost::numeric::odeint;
 using namespace std;
@@ -32,7 +37,7 @@ public:
 
 	typedef struct
 	{
-		double jointFriction = 0;
+		vector<double> frictionViscous{100,100,100,100,20,20,100,100,100,100,20,20};
 	} modelOptions_t;
 
 	typedef struct
@@ -51,10 +56,12 @@ protected:
 public:
 	//Constructor & destructor
 	ExoSimulator(const string urdfPath,
-	             function<void(const double* /*x*/,
+	             function<void(const double /*t*/,
+	                           const double* /*x*/,
 	                                 double* /*u*/)> controller);
 	ExoSimulator(const string urdfPath,
-	             function<void(const double* /*x*/,
+	             function<void(const double /*t*/,
+	                           const double* /*x*/,
 	                                 double* /*u*/)> controller,
 	             const modelOptions_t options);
 	~ExoSimulator(void);
@@ -72,29 +79,34 @@ public:
 	                  const simulationOptions_t &options);
 	//Accessors
 	string getUrdfPath(void);
-	void setUrdfPath(const string &urdfPath);
+	ExoSimulator::result_t setUrdfPath(const string &urdfPath);
 
 	modelOptions_t getModelOptions(void);
-	void setModelOptions(const modelOptions_t &options);
-
-	log_t getLog(void);
+	ExoSimulator::result_t setModelOptions(const modelOptions_t &options);
 ////////////////Protected methods/////////////////
 protected:
 void dynamicsCL(const state_t &x,
                       state_t &xDot,
                 const double t);
-
+void internalDynamics(const Eigen::VectorXd &q,
+                      const Eigen::VectorXd &dq,
+                            Eigen::VectorXd &u);
 ////////////////Public attributes/////////////////
 public:
-	log_t log_;
+	log_t log;
 
 //////////////Protected attributes////////////////
 protected:
 	string urdfPath_;
-
-	function<void(const double* /*x*/,
+	function<void(const double /*t*/,
+	              const double* /*x*/,
 	                    double* /*u*/)> controller_;
 	modelOptions_t options_;
+	pinocchio::Model model_;
+   pinocchio::Data data_;
+   uint32_t nx_;
+   uint32_t nu_;
+   uint32_t nq_;
 };
 
 #endif //end of #ifndef EXO_SIMULATOR_sH

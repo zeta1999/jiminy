@@ -1,0 +1,757 @@
+<?xml version="1.0"?>
+<!-- This file has been generated using freeze_urdf_joints script to adjust some joints.
+Option joint_to_freeze_value was:
+{
+ "AdjustableRightSagittalHipJoint":0.008060078603670775,
+ "AdjustableLeftSagittalHipJoint":0.008060078603670775,
+ "AdjustableLeftSagittalKneeJoint":0.042,
+ "AdjustableRightSagittalKneeJoint":0.042
+}
+-->
+<!--
+    Total height of the person is: 1.81 m.
+    Total mass of the person is: 78.2 kg.
+    Total mass of the system is: 152.624781189 kg.
+    Patient offset from exoskeleton is: 0.0 m.
+-->
+<robot name="v5-2">
+  <joint name="RightMetatarsusJoint" type="fixed">
+    <origin xyz="0.103820450224 0.0 -0.277176498549" rpy="1.58358451956e-18 0.663225115758 -1.8092540875e-33"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightMetatarsus"/>
+  </joint>
+  <joint name="LeftFrontalHipJoint" type="revolute">
+    <origin xyz="0.0 0.089 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <parent link="PelvisLink"/>
+    <child link="LeftFrontalHipLink"/>
+    <limit effort="350.0" lower="-0.174532925199" upper="0.296705972839" velocity="2.61799387799"/>
+  </joint>
+  <joint name="LeftExternalToeJoint" type="fixed">
+    <origin xyz="0.0958866654432 0.0357999999769 -0.24686660045" rpy="5.0054690685e-15 0.663225115758 6.86835455008e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftExternalToe"/>
+  </joint>
+  <joint name="LeftHenkeAnkleJoint" type="revolute">
+    <origin xyz="0.0 0.0 0.0" rpy="-2.978350228e-17 -0.663225115758 0.0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <parent link="LeftSagittalAnkleLink"/>
+    <child link="LeftHenkeAnkleLink"/>
+    <limit effort="82.0" lower="-0.314159265359" upper="0.314159265359" velocity="5.24"/>
+  </joint>
+  <joint name="LeftInternalHeelJoint" type="fixed">
+    <origin xyz="-0.140988505509 -0.0358010933644 -0.0617994341085" rpy="5.0054690685e-15 0.663225115758 6.86835455008e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftInternalHeel"/>
+  </joint>
+  <joint name="LeftTransverseHipJoint" type="revolute">
+    <origin xyz="-0.135 0.169 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="0.0 0.0 1.0"/>
+    <parent link="LeftFrontalHipLink"/>
+    <child link="LeftTransverseHipLink"/>
+    <limit effort="180.0" lower="-0.174532925199" upper="0.349065850399" velocity="4.18879020479"/>
+  </joint>
+  <joint name="RightSagittalKneeJoint" type="revolute">
+    <origin xyz="2.37357116643e-16 -0.000982276487141 -0.412" rpy="-2.82796112163e-18 -1.83423275819e-28 1.65504327773e-28"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="RightSagittalHipLink"/>
+    <child link="RightSagittalKneeLink"/>
+    <limit effort="219.0" lower="0.0" upper="1.91986217719" velocity="4.18879020479"/>
+  </joint>
+  <joint name="LeftToeJoint" type="revolute">
+    <origin xyz="0.120631831589 0.0 -0.254503323737" rpy="1.17526109493e-17 0.663225115758 -3.52223310261e-17"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftToeLink"/>
+    <limit effort="1000.0" lower="-1.57079632679" upper="1.57079632679" velocity="1000.0"/>
+  </joint>
+  <joint name="RightFrontalHipJoint" type="revolute">
+    <origin xyz="0.0 -0.089 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <parent link="PelvisLink"/>
+    <child link="RightFrontalHipLink"/>
+    <limit effort="350.0" lower="-0.296705972839" upper="0.174532925199" velocity="2.61799387799"/>
+  </joint>
+  <joint name="PelvisIMUJoint" type="fixed">
+    <origin xyz="-0.16444732206 -0.014625 0.194795" rpy="-1.57079632679 -2.96204033523e-16 1.57079632679"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="PelvisLink"/>
+    <child link="PelvisIMU"/>
+  </joint>
+  <joint name="LeftExternalHeelJoint" type="fixed">
+    <origin xyz="-0.140988191423 0.0358005266474 -0.0617996794993" rpy="5.0054690685e-15 0.663225115758 6.86835455008e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftExternalHeel"/>
+  </joint>
+  <joint name="RightExternalHeelJoint" type="fixed">
+    <origin xyz="-0.140988505509 -0.0358010933644 -0.0617994341085" rpy="-1.82430889353e-15 0.663225115758 -1.58500489617e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightExternalHeel"/>
+  </joint>
+  <joint name="RightSagittalAnkleJoint" type="revolute">
+    <origin xyz="0.0 0.169418968161 -0.40300012974" rpy="-1.04083408559e-16 -1.46279691175e-17 -0.13962634016"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="RightSagittalKneeLink"/>
+    <child link="RightSagittalAnkleLink"/>
+    <limit effort="184.0" lower="-0.279252680319" upper="0.157079632679" velocity="3.14"/>
+  </joint>
+  <joint name="ThoraxIMUJoint" type="fixed">
+    <origin xyz="-0.14 0.0 0.5" rpy="0.0 1.57079632679 0.0"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="PelvisLink"/>
+    <child link="ThoraxIMU"/>
+  </joint>
+  <joint name="LeftSagittalAnkleJoint" type="revolute">
+    <origin xyz="0.0 -0.169418968161 -0.403" rpy="0.0 -0.0 0.13962634016"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="LeftSagittalKneeLink"/>
+    <child link="LeftSagittalAnkleLink"/>
+    <limit effort="184.0" lower="-0.279252680319" upper="0.157079632679" velocity="3.14"/>
+  </joint>
+  <joint name="LeftSagittalKneeJoint" type="revolute">
+    <origin xyz="1.18659970394e-16 0.000982276487141 -0.412" rpy="2.82796112163e-18 1.16200934121e-28 -2.05977408211e-28"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="LeftSagittalHipLink"/>
+    <child link="LeftSagittalKneeLink"/>
+    <limit effort="219.0" lower="0.0" upper="1.91986217719" velocity="4.18879020479"/>
+  </joint>
+  <joint name="RightTibiaIMUJoint" type="fixed">
+    <origin xyz="-0.115680137433 0.0715975226629 -0.347475062462" rpy="-1.57079632679 5.39543769849e-16 2.63677968348e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightSagittalKneeLink"/>
+    <child link="RightTibiaIMU"/>
+  </joint>
+  <joint name="LeftSagittalHipJoint" type="revolute">
+    <origin xyz="0.135 0.0 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="LeftTransverseHipLink"/>
+    <child link="LeftSagittalHipLink"/>
+    <limit effort="219.0" lower="-2.00712863979" upper="0.261799387799" velocity="4.18879020479"/>
+  </joint>
+  <joint name="SittingPointJoint" type="fixed">
+    <origin xyz="-0.173617 0.0 -0.076" rpy="0.0 0.0 0.0"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="PelvisLink"/>
+    <child link="SittingPoint"/>
+  </joint>
+  <joint name="RightSagittalHipJoint" type="revolute">
+    <origin xyz="0.135 0.0 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="RightTransverseHipLink"/>
+    <child link="RightSagittalHipLink"/>
+    <limit effort="219.0" lower="-2.00712863979" upper="0.261799387799" velocity="4.18879020479"/>
+  </joint>
+  <joint name="LeftHeelJoint" type="fixed">
+    <origin xyz="-0.172316470811 0.0 -0.0614346911968" rpy="1.17526109493e-17 0.663225115758 -3.52223310261e-17"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftHeel"/>
+  </joint>
+  <joint name="RightToeJoint" type="revolute">
+    <origin xyz="0.120631831589 0.0 -0.254503323737" rpy="1.58358451956e-18 0.663225115758 -1.8092540875e-33"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightToeLink"/>
+    <limit effort="1000.0" lower="-1.57079632679" upper="1.57079632679" velocity="1000.0"/>
+  </joint>
+  <joint name="RightTransverseHipJoint" type="revolute">
+    <origin xyz="-0.135 -0.169 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="0.0 0.0 1.0"/>
+    <parent link="RightFrontalHipLink"/>
+    <child link="RightTransverseHipLink"/>
+    <limit effort="180.0" lower="-0.349065850399" upper="0.174532925199" velocity="4.18879020479"/>
+  </joint>
+  <joint name="LeftTibiaIMUJoint" type="fixed">
+    <origin xyz="-0.14092 -0.0714975226618 -0.347475" rpy="-1.57079632679 -1.39625851732e-16 3.14159265359"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftSagittalKneeLink"/>
+    <child link="LeftTibiaIMU"/>
+  </joint>
+  <joint name="LeftSoleJoint" type="fixed">
+    <origin xyz="-0.0951195809312 0.0 -0.121747511671" rpy="1.17526109493e-17 0.663225115758 -3.52223310261e-17"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftSole"/>
+  </joint>
+  <joint name="RightHeelJoint" type="fixed">
+    <origin xyz="-0.172316470811 0.0 -0.0614346911968" rpy="1.58358451956e-18 0.663225115758 -1.8092540875e-33"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightHeel"/>
+  </joint>
+  <joint name="LeftMetatarsusJoint" type="fixed">
+    <origin xyz="0.103820450224 0.0 -0.277176498549" rpy="1.17526109493e-17 0.663225115758 -3.52223310261e-17"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftMetatarsus"/>
+  </joint>
+  <joint name="RightHenkeAnkleJoint" type="revolute">
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 -0.663225115758 6.73695650048e-18"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <parent link="RightSagittalAnkleLink"/>
+    <child link="RightHenkeAnkleLink"/>
+    <limit effort="82.0" lower="-0.314159265359" upper="0.314159265359" velocity="5.24"/>
+  </joint>
+  <joint name="RightSoleJoint" type="fixed">
+    <origin xyz="-0.0951195809312 0.0 -0.121747511671" rpy="1.58358451956e-18 0.663225115758 -1.8092540875e-33"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightSole"/>
+  </joint>
+  <joint name="RightInternalToeJoint" type="fixed">
+    <origin xyz="0.0958866654432 0.0357999999769 -0.24686660045" rpy="-1.82430889353e-15 0.663225115758 -1.58500489617e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightInternalToe"/>
+  </joint>
+  <joint name="LeftInternalToeJoint" type="fixed">
+    <origin xyz="0.0958882624132 -0.0357996134412 -0.246867848139" rpy="5.0054690685e-15 0.663225115758 6.86835455008e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="LeftHenkeAnkleLink"/>
+    <child link="LeftInternalToe"/>
+  </joint>
+  <joint name="RightInternalHeelJoint" type="fixed">
+    <origin xyz="-0.140988191423 0.0358005266475 -0.0617996794993" rpy="-1.82430889353e-15 0.663225115758 -1.58500489617e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightInternalHeel"/>
+  </joint>
+  <joint name="RightExternalToeJoint" type="fixed">
+    <origin xyz="0.0958882624132 -0.0357996134412 -0.246867848139" rpy="-1.82430889353e-15 0.663225115758 -1.58500489617e-15"/>
+    <axis xyz="0.0 0.0 0.0"/>
+    <parent link="RightHenkeAnkleLink"/>
+    <child link="RightExternalToe"/>
+  </joint>
+  <link name="RightInternalToe"/>
+  <link name="LeftInternalToe"/>
+  <link name="LeftFrontalHipLink">
+    <inertial>
+      <origin xyz="-0.18659896551 0.0906388739961 0.0185668674535" rpy="0.0 0.0 0.0"/>
+      <mass value="4.58624498098"/>
+      <inertia ixx="0.0387726804479" ixy="-0.0128790100034" ixz="-0.00381275432458" iyy="0.0158692999985" iyz="-0.00691913537636" izz="0.0441326445733"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftFrontalHipLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftFrontalHipLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightExternalToe"/>
+  <link name="LeftTibiaIMU"/>
+  <link name="RightSagittalHipLink">
+    <inertial>
+      <origin xyz="0.0133628613487 0.0486053407972 -0.196509065345" rpy="0.0 0.0 0.0"/>
+      <mass value="16.4261500865"/>
+      <inertia ixx="0.3623326822094377" ixy="0.011271460404066399" ixz="0.0023429164983012796" iyy="0.3597750004103663" iyz="0.007338227990256802" izz="0.06472059818259761"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightSagittalHipLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.776470588235 0.756862745098 0.737254901961 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightSagittalHipLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="LeftSagittalHipLink">
+    <inertial>
+      <origin xyz="0.0133723269544 -0.0486063967745 -0.196486647207" rpy="0.0 0.0 0.0"/>
+      <mass value="16.4265777815"/>
+      <inertia ixx="0.3623887121880667" ixy="-0.01116885845631036" ixz="0.0023720179049505482" iyy="0.3598924293574708" iyz="-0.007386940681234713" izz="0.06463217215934035"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftSagittalHipLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftSagittalHipLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightSagittalKneeLink">
+    <inertial>
+      <origin xyz="-0.0470032287302 0.101995405328 -0.216581670535" rpy="0.0 0.0 0.0"/>
+      <mass value="13.2528800245"/>
+      <inertia ixx="0.2861207269552005" ixy="0.023689838460346255" ixz="-0.06791805075871127" iyy="0.3121829983170504" iyz="0.03851321905474734" izz="0.10739899119471814"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightSagittalKneeLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightSagittalKneeLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightHenkeAnkleLink">
+    <inertial>
+      <origin xyz="-0.00691028034307 -0.0219149613839 -0.128921643283" rpy="0.0 0.0 0.0"/>
+      <mass value="3.28900864776"/>
+      <inertia ixx="0.040220634198779845" ixy="0.005612362390828701" ixz="0.018490370318981705" iyy="0.06355149949455711" iyz="-0.0014628272201815454" izz="0.03461769595371244"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightHenkeAnkleLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightHenkeAnkleLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="LeftHeel"/>
+  <link name="LeftMetatarsus"/>
+  <link name="LeftInternalHeel"/>
+  <link name="PelvisIMU"/>
+  <link name="LeftTransverseHipLink">
+    <inertial>
+      <origin xyz="0.0693483479128 -0.0122439400604 -2.62328666277e-05" rpy="0.0 0.0 0.0"/>
+      <mass value="3.6238166807"/>
+      <inertia ixx="0.00496088298888" ixy="0.0026101386171" ixz="-0.000153502228957" iyy="0.0207247274055" iyz="2.24387592161e-05" izz="0.0214591079057"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftTransverseHipLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftTransverseHipLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightSole"/>
+  <link name="LeftExternalHeel"/>
+  <link name="LeftExternalToe"/>
+  <link name="LeftToeLink">
+    <inertial>
+      <origin xyz="-0.02 -1.38777878078e-17 -0.011478077725" rpy="0.0 0.0 0.0"/>
+      <mass value="0.00114328757461"/>
+      <inertia ixx="2.48859416752e-08" ixy="-8.27180612553e-25" ixz="-1.14955427648e-22" iyy="2.48859416752e-08" iyz="1.18494814448e-22" izz="2.75895161296e-09"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftToeLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.776470588235 0.756862745098 0.737254901961 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftToeLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="SittingPoint"/>
+  <link name="RightTibiaIMU"/>
+  <link name="LeftSagittalAnkleLink">
+    <inertial>
+      <origin xyz="-0.0449170771783 0.0536419434585 -0.0397198303664" rpy="0.0 0.0 0.0"/>
+      <mass value="1.67925414462"/>
+      <inertia ixx="0.00462371044676" ixy="-0.00217464900438" ixz="-0.00171350754123" iyy="0.00424175269932" iyz="-0.00157887983149" izz="0.00539595922129"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftSagittalAnkleLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftSagittalAnkleLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="LeftSagittalKneeLink">
+    <inertial>
+      <origin xyz="-0.0469026288121 -0.102237884137 -0.216661306438" rpy="0.0 0.0 0.0"/>
+      <mass value="13.253801315"/>
+      <inertia ixx="0.2861645571416313" ixy="-0.023688151739532447" ixz="-0.0670527218566108" iyy="0.3114289248514416" iyz="-0.03889925707303318" izz="0.10722878035458282"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftSagittalKneeLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.776470588235 0.756862745098 0.737254901961 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftSagittalKneeLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="ThoraxIMU"/>
+  <link name="RightTransverseHipLink">
+    <inertial>
+      <origin xyz="0.0693460626877 0.0122440516362 -2.60687545504e-05" rpy="0.0 0.0 0.0"/>
+      <mass value="3.62380778529"/>
+      <inertia ixx="0.00495472910934" ixy="-0.00261016946883" ixz="-0.00017044714059" iyy="0.0207236490658" iyz="-2.24971426872e-05" izz="0.0214642012568"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightTransverseHipLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightTransverseHipLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightSagittalAnkleLink">
+    <inertial>
+      <origin xyz="-0.0449171467267 -0.0536419999351 -0.0397197928819" rpy="0.0 0.0 0.0"/>
+      <mass value="1.67925622757"/>
+      <inertia ixx="0.00462369586191" ixy="0.00217464938756" ixz="-0.00171350659237" iyy="0.00424176214999" iyz="0.0015788772309" izz="0.00539595229202"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightSagittalAnkleLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightSagittalAnkleLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="LeftHenkeAnkleLink">
+    <inertial>
+      <origin xyz="-0.00691030736471 0.0217560704097 -0.128921678851" rpy="0.0 0.0 0.0"/>
+      <mass value="3.28900863403"/>
+      <inertia ixx="0.04024346097817705" ixy="-0.0055923203176476075" ixz="0.01849037742075425" iyy="0.06355148978672626" iyz="0.0014336291239683437" izz="0.03464050385763902"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftHenkeAnkleLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="LeftHenkeAnkleLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="PelvisLink">
+    <inertial>
+      <origin xyz="-0.0383831669308 0.000143794631608 0.281434541418" rpy="0.0 0.0 0.0"/>
+      <mass value="66.9060645102"/>
+      <inertia ixx="4.688284327589564" ixy="0.0012838937394358953" ixz="-0.32705663863559525" iyy="4.52514496038097" iyz="-0.0010462682916273142" izz="0.9497085883730917"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="PelvisLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="PelvisLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightInternalHeel"/>
+  <link name="LeftSole"/>
+  <link name="RightHeel"/>
+  <link name="RightFrontalHipLink">
+    <inertial>
+      <origin xyz="-0.186589819565 -0.090593998923 0.0187746971847" rpy="0.0 0.0 0.0"/>
+      <mass value="4.58662379492"/>
+      <inertia ixx="0.0388268025834" ixy="0.0128810527533" ixz="-0.00386383337106" iyy="0.0159441970363" iyz="0.00698300263973" izz="0.0441183390211"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightFrontalHipLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightFrontalHipLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightMetatarsus"/>
+  <link name="RightToeLink">
+    <inertial>
+      <origin xyz="-0.02 9.71445146547e-17 -0.011478077725" rpy="0.0 0.0 0.0"/>
+      <mass value="0.00114328757461"/>
+      <inertia ixx="2.48859416752e-08" ixy="8.47182452057e-39" ixz="-1.61580903549e-22" iyy="2.48859416752e-08" iyz="1.60397227811e-23" izz="2.75895161296e-09"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightToeLink.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.776470588235 0.756862745098 0.737254901961 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="RightToeLink.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="RightExternalHeel"/>
+  <gazebo><plugin filename="libwdc_simulation.so" name="wanderbrainPlugin"/>
+  </gazebo>
+  <gazebo reference="PelvisLink"><material>Gazebo/Orange</material>
+    <sensor name="PelvisIMU" type="imu">
+      <visualize>true</visualize>
+      <always_on>true</always_on>
+      <update_rate>1000</update_rate>
+    </sensor>
+    <sensor name="ThoraxIMU" type="imu">
+      <visualize>true</visualize>
+      <always_on>true</always_on>
+      <update_rate>1000</update_rate>
+    </sensor>
+  </gazebo>
+  <gazebo reference="RightFrontalHipLink"><material>Gazebo/Green</material>
+  </gazebo>
+  <gazebo reference="RightTransverseHipLink"><material>Gazebo/Blue</material>
+  </gazebo>
+  <gazebo reference="RightSagittalHipLink"><material>Gazebo/Yellow</material>
+  </gazebo>
+  <gazebo reference="RightSagittalKneeLink"><material>Gazebo/Red</material>
+    <sensor name="RightTibiaIMU" type="imu">
+      <visualize>true</visualize>
+      <always_on>true</always_on>
+      <update_rate>1000</update_rate>
+    </sensor>
+  </gazebo>
+  <gazebo reference="RightSagittalAnkleLink"><material>Gazebo/Turquoise</material>
+  </gazebo>
+  <gazebo reference="RightHenkeAnkleLink"><material>Gazebo/Purple</material>
+    <kp>1000000.0</kp>
+    <kd>2000.0</kd>
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>1.0</maxVel>
+    <minDepth>0.00</minDepth>
+    <sensor name="RightFootContact" type="contact">
+      <visualize>true</visualize>
+      <always_on>true</always_on>
+      <update_rate>1000</update_rate>
+      <contact>
+        <collision>RightHenkeAnkleLink_collision</collision>
+      </contact>
+    </sensor>
+  </gazebo>
+  <gazebo reference="RightToeLink"><material>Gazebo/Gold</material>
+  </gazebo>
+  <gazebo reference="LeftFrontalHipLink"><material>Gazebo/Green</material>
+  </gazebo>
+  <gazebo reference="LeftTransverseHipLink"><material>Gazebo/Blue</material>
+  </gazebo>
+  <gazebo reference="LeftSagittalHipLink"><material>Gazebo/Yellow</material>
+  </gazebo>
+  <gazebo reference="LeftSagittalKneeLink"><material>Gazebo/Red</material>
+    <sensor name="LeftTibiaIMU" type="imu">
+      <visualize>true</visualize>
+      <always_on>true</always_on>
+      <update_rate>1000</update_rate>
+    </sensor>
+  </gazebo>
+  <gazebo reference="LeftSagittalAnkleLink"><material>Gazebo/Turquoise</material>
+  </gazebo>
+  <gazebo reference="LeftHenkeAnkleLink"><material>Gazebo/Purple</material>
+    <kp>1000000.0</kp>
+    <kd>2000.0</kd>
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>1.0</maxVel>
+    <minDepth>0.00</minDepth>
+    <sensor name="LeftFootContact" type="contact">
+      <visualize>true</visualize>
+      <always_on>true</always_on>
+      <update_rate>1000</update_rate>
+      <contact>
+        <collision>LeftHenkeAnkleLink_collision</collision>
+      </contact>
+    </sensor>
+  </gazebo>
+  <gazebo reference="LeftToeLink"><material>Gazebo/Gold</material>
+  </gazebo>
+  <transmission name="RightFrontalHipTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="RightFrontalHipJoint"/>
+    <actuator name="RightFrontalHipMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="RightTransverseHipTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="RightTransverseHipJoint"/>
+    <actuator name="RightTransverseHipMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="RightSagittalHipTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="RightSagittalHipJoint"/>
+    <actuator name="RightSagittalHipMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="RightSagittalKneeTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="RightSagittalKneeJoint"/>
+    <actuator name="RightSagittalKneeMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="RightSagittalAnkleTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="RightSagittalAnkleJoint"/>
+    <actuator name="RightSagittalAnkleMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="RightHenkeAnkleTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="RightHenkeAnkleJoint"/>
+    <actuator name="RightHenkeAnkleMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="LeftFrontalHipTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="LeftFrontalHipJoint"/>
+    <actuator name="LeftFrontalHipMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="LeftTransverseHipTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="LeftTransverseHipJoint"/>
+    <actuator name="LeftTransverseHipMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="LeftSagittalHipTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="LeftSagittalHipJoint"/>
+    <actuator name="LeftSagittalHipMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="LeftSagittalKneeTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="LeftSagittalKneeJoint"/>
+    <actuator name="LeftSagittalKneeMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="LeftSagittalAnkleTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="LeftSagittalAnkleJoint"/>
+    <actuator name="LeftSagittalAnkleMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="LeftHenkeAnkleTransmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="LeftHenkeAnkleJoint"/>
+    <actuator name="LeftHenkeAnkleMotor">
+      <hardwareInterface>EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1.0</mechanicalReduction>
+    </actuator>
+  </transmission>
+</robot>
