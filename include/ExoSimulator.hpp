@@ -37,7 +37,21 @@ public:
 
 	typedef struct
 	{
-		vector<double> frictionViscous{100,100,100,100,20,20,100,100,100,100,20,20};
+		double frictionViscous = 0.8;
+		double frictionDry = 1.0;
+		double dryFictionVelEps = 1.0e-3;
+		double stiffness = 5.0e5;
+		double damping = 5.0e3;
+	} contactOptions_t;
+
+	typedef struct
+	{
+		double frictionViscous[12] = {100,100,100,100,20,20,100,100,100,100,20,20};
+		double frictionDry[12] = {10,10,10,10,2,2,10,10,10,10,2,2};
+		double dryFictionVelEps = 1.0e-3;
+		contactOptions_t contact;
+		double gravity[3] = {0,0,-9.81};
+
 	} modelOptions_t;
 
 	typedef struct
@@ -63,7 +77,7 @@ public:
 	             function<void(const double /*t*/,
 	                           const double* /*x*/,
 	                                 double* /*u*/)> controller,
-	             const modelOptions_t options);
+	             const modelOptions_t &options);
 	~ExoSimulator(void);
 
 	//Functions
@@ -91,6 +105,14 @@ void dynamicsCL(const state_t &x,
 void internalDynamics(const Eigen::VectorXd &q,
                       const Eigen::VectorXd &dq,
                             Eigen::VectorXd &u);
+void contactDynamics(const Eigen::VectorXd &q,
+                     const Eigen::VectorXd &dq,
+                           Eigen::VectorXd &Fext);
+double saturateSoft(const double in,
+                    const double mi,
+                    const double ma,
+                    const double r);
+
 ////////////////Public attributes/////////////////
 public:
 	log_t log;

@@ -51,9 +51,12 @@ int main(int argc, char *argv[])
 	double t0 = 0;
 	double tend = 5;
 	double dt = 0.001;
-	ExoSimulator::simulationOptions_t opts;
-	opts.tolRel = 1.0e-6;
-	opts.tolAbs = 1.0e-6;
+	ExoSimulator::simulationOptions_t simOpts;
+	simOpts.tolRel = 1.0e-6;
+	simOpts.tolAbs = 1.0e-6;
+	ExoSimulator::modelOptions_t modelOpts;
+	modelOpts.dryFictionVelEps = 1.0e-2;
+	modelOpts.gravity[2] = 9.81;
 
 	// Urdf
 	string urdfPath = getexepath();
@@ -61,12 +64,12 @@ int main(int argc, char *argv[])
 	cout << "URDF path: "<< urdfPath << endl;
 
 	// Instanciate simulator
-	ExoSimulator exoSim(urdfPath,controller);
+	ExoSimulator exoSim(urdfPath,controller,modelOpts);
 
 	// Run simulation
 	CustomTimer timer;
 	tic(&timer);
-	exoSim.simulate(x0,t0,tend,dt,opts);
+	exoSim.simulate(x0,t0,tend,dt,simOpts);
 	toc(&timer);
 
 	// Retreive log

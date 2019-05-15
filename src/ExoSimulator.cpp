@@ -18,7 +18,7 @@ ExoSimulator::ExoSimulator(const string urdfPath,
                            function<void(const double /*t*/,
                                          const double* /*x*/,
 		                                         double* /*u*/)> controller,
-                           const ExoSimulator::modelOptions_t options):
+                           const ExoSimulator::modelOptions_t &options):
 log(),
 urdfPath_(urdfPath),
 controller_(controller),
@@ -81,6 +81,7 @@ ExoSimulator::result_t ExoSimulator::simulate(const state_t &x0,
 
 	uint64_t i = 0;
 	double t = t0;
+	data_ = pinocchio::Data(model_);
 	for(auto it = itBegin; it!=itEnd; it++)
 	{
 		log[i][0] = t;
@@ -101,7 +102,6 @@ ExoSimulator::result_t ExoSimulator::setUrdfPath(const string &urdfPath)
 {
 	urdfPath_ = urdfPath;
 	pinocchio::urdf::buildModel(urdfPath,model_);
-	data_ = pinocchio::Data(model_);
 	nq_ = model_.nq-2;
 	if(nq_!=12)
 	{
@@ -110,7 +110,6 @@ ExoSimulator::result_t ExoSimulator::setUrdfPath(const string &urdfPath)
 	}
 	nx_ = nq_*2 + 12;
 	nu_ = model_.nv-2;
-
 	return ExoSimulator::result_t::SUCCESS;
 }
 
@@ -122,7 +121,8 @@ ExoSimulator::modelOptions_t ExoSimulator::getModelOptions(void)
 ExoSimulator::result_t ExoSimulator::setModelOptions(const ExoSimulator::modelOptions_t &options)
 {
 	options_ = options;
-
+	Eigen::Map<Eigen::VectorXd> g(options_.gravity,3);
+	model_.gravity = g;
 	return ExoSimulator::result_t::SUCCESS;
 }
 
@@ -181,6 +181,63 @@ void ExoSimulator::internalDynamics(const Eigen::VectorXd &q,
 	// Joint friction
 	for(uint32_t i = 0; i<nu_; i++)
 	{
-		u(i) = -options_.frictionViscous[i]*dq(i);
+		u(i) = -options_.frictionViscous[i]*dq(i) - options_.frictionDry[i]*saturateSoft(dq(i)/options_.dryFictionVelEps,-1.0,1.0,0.7) ;
 	}
+
+	// Joint bounds
+}
+
+void ExoSimulator::contactDynamics(const Eigen::VectorXd &q,
+                                   const Eigen::VectorXd &dq,
+                                         Eigen::VectorXd &Fext)
+{
+
+}
+
+double ExoSimulator::saturateSoft(const double in,
+                                  const double mi,
+                                  const double ma,
+                                  const double r)
+{
+	double uc, range, middle, bevelL, bevelXc, bevelYc, bevelStart, bevelStop, out;
+	const double alpha = M_PI/8;
+	const double beta = M_PI/4;
+
+	range = ma - mi;
+	middle = (ma+mi)/2;
+	uc = 2*(in-middle)/range;
+
+	bevelL = r*tan(alpha);
+	bevelStart = 1-cos(beta)*bevelL;
+	bevelStop = 1+bevelL;
+	bevelXc = bevelStop;
+	bevelYc = 1 - r;
+
+	if(uc>=bevelStop)
+	{
+		out = ma;
+	}
+	else if(uc<=-bevelStop)
+	{
+		out = mi;
+	}
+	else if(uc<=bevelStart && uc>=-bevelStart)
+	{
+		out = in;
+	}
+	else if(uc>bevelStart)
+	{
+		out = sqrt(r*r - (uc-bevelXc)*(uc-bevelXc)) + bevelYc;
+		out = 0.5*out*range + middle;
+	}
+	else if(uc<-bevelStart)
+	{
+		out = -sqrt(r*r - (uc+bevelXc)*(uc+bevelXc)) - bevelYc;
+		out = 0.5*out*range + middle;
+	}
+	else
+	{
+		out = in;			
+	}
+	return out;
 }
