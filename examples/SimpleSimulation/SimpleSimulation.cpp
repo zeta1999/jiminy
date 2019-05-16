@@ -10,7 +10,7 @@
 
 using namespace std;
 
-const uint32_t nx_ = 36;
+const uint32_t nx_ = 37;
 const uint32_t nu_ = 12;
 
 string getexepath(void)
@@ -23,12 +23,12 @@ string getexepath(void)
 }
 
 void controller(const double t,
-                const double* x,
-                      double* u)
+                const Eigen::VectorXd &x,
+                      Eigen::VectorXd &u)
 {
-	for(uint32_t i=0; i<nu_; i++)
+	for(uint32_t i=0; i<u.rows(); i++)
 	{
-		u[i] = 0.0;
+		u(i) = 0.0;
 	}
 }
 
@@ -47,16 +47,17 @@ int main(int argc, char *argv[])
 	myfile << setprecision(10);
 
 	// Simulation options
-	ExoSimulator::state_t x0(nx_,0.0);
+	Eigen::VectorXd x0 = Eigen::VectorXd::Zero(nx_);
+	x0(3) = 1.0;
 	double t0 = 0;
-	double tend = 5;
+	double tend = 1;
 	double dt = 0.001;
 	ExoSimulator::simulationOptions_t simOpts;
 	simOpts.tolRel = 1.0e-6;
 	simOpts.tolAbs = 1.0e-6;
 	ExoSimulator::modelOptions_t modelOpts;
 	modelOpts.dryFictionVelEps = 1.0e-2;
-	modelOpts.gravity[2] = 9.81;
+	// modelOpts.gravity(2) = 9.81;
 
 	// Urdf
 	string urdfPath = getexepath();
