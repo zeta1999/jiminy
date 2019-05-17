@@ -3,33 +3,16 @@
 ExoSimulator::ExoSimulator(const string urdfPath,
                            function<void(const double /*t*/,
                                          const Eigen::VectorXd &/*x*/,
-		                                         Eigen::VectorXd &/*u*/)> controller):
-log(),
-urdfPath_(urdfPath),
-controller_(controller),
-options_(),
-model_(),
-data_(model_),
-nq_(19),
-ndq_(18),
-nx_(nq_+ndq_),
-nu_(12),
-nqFull_(21),
-ndqFull_(20),
-nxFull_(nq_+ndq_),
-nuFull_(14),
-tesc_(true)
-{
-	setUrdfPath(urdfPath);
-	modelOptions_t options;
-	setModelOptions(options);
-	checkCtrl();
-}
+                                         const Eigen::MatrixXd &/*optoforces*/,
+                                               Eigen::VectorXd &/*u*/)> controller):
+ExoSimulator(urdfPath,controller,modelOptions_t())
+{}
 
 ExoSimulator::ExoSimulator(const string urdfPath,
                            function<void(const double /*t*/,
                                          const Eigen::VectorXd &/*x*/,
-		                                         Eigen::VectorXd &/*u*/)> controller,
+                                         const Eigen::MatrixXd &/*optoforces*/,
+                                               Eigen::VectorXd &/*u*/)> controller,
                            const ExoSimulator::modelOptions_t &options):
 log(),
 urdfPath_(urdfPath),
@@ -45,7 +28,15 @@ nqFull_(21),
 ndqFull_(20),
 nxFull_(nq_+ndq_),
 nuFull_(ndqFull_),
-tesc_(true)
+tesc_(true),
+contactFramesNames_{string("LeftExternalToe"),
+                    string("LeftInternalToe"),                    
+                    string("LeftExternalHeel"),
+                    string("LeftInternalHeel"),
+                    string("RightInternalToe"),
+                    string("RightExternalToe"),
+                    string("RightInternalHeel"),
+                    string("RightExternalHeel")}
 {
 	setUrdfPath(urdfPath);
 	setModelOptions(options);
@@ -136,6 +127,19 @@ void ExoSimulator::setUrdfPath(const string &urdfPath)
 		cout << "Error - ExoSimulator::setUrdfPath - Urdf not recognized." << endl;
 		tesc_ = false;
 	}
+
+	for(uint32_t i =0; i<contactFramesNames_.size(); i++)
+	{
+		if(!model_.existFrame(contactFramesNames_[i]))
+		{
+			cout << "Error - ExoSimulator::setUrdfPath - Frame '" << contactFramesNames_[i] << "' not found in urdf." << endl;
+			tesc_ = false;	
+			return;		
+		}
+		contactFramesIdx_.push_back(model_.getFrameId(contactFramesNames_[i]));
+	}
+
+	
 }
 
 ExoSimulator::modelOptions_t ExoSimulator::getModelOptions(void)
@@ -164,32 +168,25 @@ void ExoSimulator::dynamicsCL(const state_t &x,
 	Eigen::VectorXd uWithFF = Eigen::VectorXd::Zero(ndq_);
 	Eigen::VectorXd uInternal = Eigen::VectorXd::Zero(ndq_);
 
-	xDotEig.head(3) = dq.head(3);
-	Eigen::Vector3d omega = dq.segment(3,3);
-	Eigen::Vector4d quat = q.segment(3,4);
-	quat.normalize();
+	// Compute quaternion derivative
+	const Eigen::Vector3d omega = dq.segment<3>(3);
+	Eigen::Vector4d quatVec = q.segment<4>(3);
+	quatVec.normalize();
+	const Eigen::Quaterniond quat(quatVec(0),quatVec(1),quatVec(2),quatVec(3));
 	Eigen::Matrix<double,4,4> quat2quatDot;
 	quat2quatDot << 0        , omega(0), omega(1), omega(2),
 	                -omega(0),        0,-omega(2), omega(1),
 	                -omega(1), omega(2),        0,-omega(0),
 	                -omega(2), -omega(1), omega(0),       0;
-	quat2quatDot*=(-0.5);
-	Eigen::Vector4d quatDot = quat2quatDot*quat;
-	xDotEig.segment(3,4) = quatDot;
-	xDotEig.segment(7,nq_-7) = dq.tail(ndq_-6);
-
-	controller_(t,xEig,u);
-	uWithFF.tail(ndq_-6) = u;
-
-	internalDynamics(q,dq,uInternal);
-	uWithFF+=uInternal;
+	quat2quatDot*=-0.5;
+	const Eigen::Vector4d quatDot = quat2quatDot*quatVec;
 
 	// Put quaternion in [x y z w] order
 	Eigen::VectorXd qPinocchio = q;
-	qPinocchio.segment(3,3) = quat.tail<3>();
-	qPinocchio(6) = quat(0);
+	qPinocchio.segment<3>(3) = quatVec.tail<3>();
+	qPinocchio(6) = quatVec(0);
 
-	// Specific to wandercraft urdf
+	// Stuf Specific to wandercraft urdf
 	Eigen::VectorXd qFull(nqFull_);
 	Eigen::VectorXd dqFull(ndqFull_);
 	Eigen::VectorXd ddqFull(ndqFull_);
@@ -205,52 +202,45 @@ void ExoSimulator::dynamicsCL(const state_t &x,
 	dqFull(12) = 0.0;
 	dqFull(19) = 0.0;
 
+	// Compute foot contact forces
+	pinocchio::forwardKinematics(model_, data_, qFull, dqFull);
+	pinocchio::framesForwardKinematics(model_, data_);
+	Eigen::Matrix<double,3,8> optoforces = Eigen::Matrix<double,3,8>::Zero();
+	pinocchio::container::aligned_vector<pinocchio::Force> fext(model_.joints.size(),pinocchio::Force::Zero());
+	for(uint32_t i = 0; i<contactFramesIdx_.size(); i++)
+	{
+		const int32_t parentIdx = model_.frames[contactFramesIdx_[i]].parent;
+		const pinocchio::Force fFrame(contactDynamics(contactFramesIdx_[i]));
+		optoforces.block<3,1>(0,i) = fFrame.linear();
+		fext[parentIdx] += fFrame;
+	}
+
+	// Compute control input
+	controller_(t,xEig,optoforces,u);
+	uWithFF.tail(ndq_-6) = u;
+
+	// Compute internal dynamics
+	internalDynamics(q,dq,uInternal);
+	uWithFF+=uInternal;
+
+	// Stuf Specific to wandercraft urdf
 	uFull.head<12>() = uWithFF.head<12>();
 	uFull.segment<6>(13) = uWithFF.tail<6>();
 	uFull(12) = 0.0;
 	uFull(19) = 0.0;
 
-	ddqFull = pinocchio::aba(model_, data_, qFull, dqFull, uFull);
+	// Compute dynamics
+	ddqFull = pinocchio::aba(model_, data_, qFull, dqFull, uFull, fext);
 
+	// Stuf Specific to wandercraft urdf
 	ddq.head<12>() = ddqFull.head<12>();
 	ddq.tail<6>() = ddqFull.segment<6>(13);
 
+	// Fill up xDot
+	xDotEig.head<3>() = quat.toRotationMatrix()*dq.head<3>();
+	xDotEig.segment<4>(3) = quatDot;
+	xDotEig.segment(7,nq_-7) = dq.tail(ndq_-6);
 	xDotEig.segment(nq_,ndq_) = ddq;
-
-	// cout << "t: " << t << endl;
-
-	// cout << "x:" << endl;
-	// cout << xEig.transpose() << endl;
-
-	// cout << "q:" << endl;
-	// cout << q.transpose() << endl;
-
-	// cout << "dq:" << endl;
-	// cout << dq.transpose() << endl;
-
-	// cout << "u:" << endl;
-	// cout << u.transpose() << endl;
-
-	// cout << "uWithFF:" << endl;
-	// cout << uWithFF.transpose() << endl;
-
-	// cout << "uFull:" << endl;
-	// cout << uFull.transpose() << endl;
-
-	// cout << "qFull:" << endl;
-	// cout << qFull.transpose() << endl;
-
-	// cout << "dqFull:" << endl;
-	// cout << dqFull.transpose() << endl;
-
-	// cout << "ddqFull:" << endl;
-	// cout << ddqFull.transpose() << endl;
-
-	// cout << "ddq:" << endl;
-	// cout << ddq.transpose() << endl;
-
-	// cout << "xDotEig:" << endl;
-	// cout << xDotEig.transpose() << endl << endl;
 }
 
 void ExoSimulator::internalDynamics(const Eigen::VectorXd &q,
@@ -263,15 +253,77 @@ void ExoSimulator::internalDynamics(const Eigen::VectorXd &q,
 		u(i+6) = -options_.frictionViscous(i)*dq(i+6) - options_.frictionDry(i)*saturateSoft(dq(i+6)/options_.dryFictionVelEps,-1.0,1.0,0.7) ;
 	}
 
-	// u(0) = 10.0;
 	// Joint bounds
 }
 
-void ExoSimulator::contactDynamics(const Eigen::VectorXd &q,
-                                   const Eigen::VectorXd &dq,
-                                         Eigen::VectorXd &Fext)
+ExoSimulator::Vector6d ExoSimulator::contactDynamics(const int32_t &frameId)
 {
+	Eigen::Matrix4d tformFrame = data_.oMf[frameId].toHomogeneousMatrix();
+	Eigen::Vector3d posFrame = tformFrame.topRightCorner<3,1>();
 
+	Vector6d fextLocal = Vector6d::Zero();
+
+	if(posFrame(2)<0.0)
+	{
+		// Get various transformations
+		Eigen::Matrix4d tformFrame2Jt = model_.frames[frameId].placement.toHomogeneousMatrix();
+		Eigen::Vector3d fextInWorld(0.0,0.0,0.0);
+		Eigen::Vector3d posFrameJoint = tformFrame2Jt.topRightCorner<3,1>();
+		pinocchio::Motion motionFrame = pinocchio::getFrameVelocity(model_,data_,frameId);
+		Eigen::Vector3d vFrameInWorld = tformFrame.topLeftCorner<3,3>()*motionFrame.linear();
+
+		// Compute normal force
+		double damping = 0;
+		if(vFrameInWorld(2)<0)
+		{
+			damping = -options_.contact.damping*vFrameInWorld(2);
+		}
+		fextInWorld(2) = -options_.contact.stiffness*posFrame(2) + damping;
+
+		// Compute frcition force
+		Eigen::Vector2d vxy = vFrameInWorld.head<2>();
+		double vNorm = vxy.norm();
+		double fricCoeff;
+		if(vNorm>options_.contact.dryFictionVelEps)
+		{
+			if(vNorm<1.5*options_.contact.dryFictionVelEps)
+			{
+				fricCoeff = -2.0*vNorm*(options_.contact.frictionDry - options_.contact.frictionViscous)/options_.contact.dryFictionVelEps + 3.0*options_.contact.frictionDry - 2.0*options_.contact.frictionViscous;
+			}
+			else
+			{
+				fricCoeff = options_.contact.frictionViscous;
+			}
+			// fricCoeff = options_.contact.frictionViscous;
+		}
+		else
+		{
+			fricCoeff = vNorm*options_.contact.frictionDry/options_.contact.dryFictionVelEps;
+			// fricCoeff = vNorm*options_.contact.frictionViscous/options_.contact.dryFictionVelEps;
+		}
+		fextInWorld.head<2>() = -vxy*fricCoeff*fextInWorld(2);
+		// fextInWorld.head<2>() = -vxy*fricCoeff;
+
+		// Express forces at parent joint frame origin
+		fextLocal.head<3>() = tformFrame2Jt.topLeftCorner<3,3>()*tformFrame.topLeftCorner<3,3>().transpose()*fextInWorld;
+		fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>()).eval();
+
+		// Add blending factor
+		double blendingFactor = (-posFrame(2)/options_.contact.transitionEps);
+		if(blendingFactor>1.0)
+			blendingFactor = 1.0;
+		fextLocal*=blendingFactor;
+	}
+
+	// cout << "Frame Name: " << model_.frames[frameId].name << endl;
+	// cout << "Frame Id: " << frameId << endl;
+	// cout << "tformFrame2Jt: " << endl << tformFrame2Jt << endl << endl;
+	// cout << "vFrame: " << endl << vFrame << endl << endl;
+	// cout << "posFrame: " << endl << posFrame << endl<< endl ;
+	// cout << "fext: " << endl << fext << endl<< endl ;
+	// cout << "fextLocal: " << endl << fextLocal << endl<< endl ;
+
+	return fextLocal;
 }
 
 double ExoSimulator::saturateSoft(const double in,
@@ -326,8 +378,9 @@ void ExoSimulator::checkCtrl(void)
 {
 	Eigen::VectorXd u = Eigen::VectorXd::Zero(nu_);
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(nx_);
+	Eigen::Matrix<double,3,8> optoforces = Eigen::Matrix<double,3,8>::Zero();
 
-	controller_(0.0,x,u);
+	controller_(0.0,x,optoforces,u);
 
 	if(u.rows()!=nu_)
 	{

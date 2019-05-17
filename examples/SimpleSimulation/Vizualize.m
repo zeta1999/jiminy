@@ -23,4 +23,4 @@ log = [log(:,1),log(:,9:8+12),log(:,2:8)];
 clear opts N
 
 %%
-ExoTools.visualizeExoSimulink(log,0.380,0.403,'asIs')
+ExoTools.visualizeExoSimulink(log,0.412,0.403,'asIs')

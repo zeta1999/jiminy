@@ -15,8 +15,9 @@
 
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/parsers/urdf.hpp"
-// #include "pinocchio/algorithm/kinematics.hpp"
+#include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/aba.hpp"
+#include "pinocchio/algorithm/frames.hpp"
 
 using namespace boost::numeric::odeint;
 using namespace std;
@@ -45,6 +46,7 @@ public:
 		double dryFictionVelEps = 1.0e-3;
 		double stiffness = 5.0e5;
 		double damping = 5.0e3;
+		double transitionEps = 1.0e-3;
 	} contactOptions_t;
 
 	typedef struct
@@ -54,7 +56,6 @@ public:
 		double dryFictionVelEps = 1.0e-3;
 		contactOptions_t contact;
 		Vector6d gravity = (Vector6d() << 0.0,0.0,-9.81,0.0,0.0,0.0).finished();
-
 	} modelOptions_t;
 
 	typedef struct
@@ -75,10 +76,12 @@ public:
 	ExoSimulator(const string urdfPath,
 	             function<void(const double /*t*/,
 	                           const Eigen::VectorXd &/*x*/,
+	                           const Eigen::MatrixXd &/*optoforces*/,
 	                                 Eigen::VectorXd &/*u*/)> controller);
 	ExoSimulator(const string urdfPath,
 	             function<void(const double /*t*/,
 	                           const Eigen::VectorXd &/*x*/,
+	                           const Eigen::MatrixXd &/*optoforces*/,
 	                                 Eigen::VectorXd &/*u*/)> controller,
 	             const modelOptions_t &options);
 	~ExoSimulator(void);
@@ -102,21 +105,21 @@ public:
 protected:
 	void setUrdfPath(const string &urdfPath);
 	void setModelOptions(const modelOptions_t &options);
-
+	void checkCtrl(void);
+	
 	void dynamicsCL(const state_t &x,
 	                      state_t &xDot,
 	                const double t);
 	void internalDynamics(const Eigen::VectorXd &q,
 	                      const Eigen::VectorXd &dq,
 	                            Eigen::VectorXd &u);
-	void contactDynamics(const Eigen::VectorXd &q,
-	                     const Eigen::VectorXd &dq,
-	                           Eigen::VectorXd &Fext);
+	Vector6d contactDynamics(const int32_t &frameId);
+
 	double saturateSoft(const double in,
 	                    const double mi,
 	                    const double ma,
 	                    const double r);
-	void checkCtrl(void);
+
 
 ////////////////Public attributes/////////////////
 public:
@@ -127,6 +130,7 @@ protected:
 	string urdfPath_;
 	function<void(const double /*t*/,
 	              const Eigen::VectorXd &/*x*/,
+	              const Eigen::MatrixXd &/*optoforces*/,
 	                    Eigen::VectorXd &/*u*/)> controller_;
 	modelOptions_t options_;
 	pinocchio::Model model_;
@@ -143,6 +147,9 @@ protected:
    const int64_t nuFull_;
 
    bool tesc_;
+
+   const vector<string> contactFramesNames_;
+   vector<int32_t> contactFramesIdx_;
 };
 
 #endif //end of #ifndef EXO_SIMULATOR_sH
