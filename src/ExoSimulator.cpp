@@ -4,6 +4,7 @@ ExoSimulator::ExoSimulator(const string urdfPath,
                            function<void(const double /*t*/,
                                          const Eigen::VectorXd &/*x*/,
                                          const Eigen::MatrixXd &/*optoforces*/,
+                                         const Eigen::MatrixXd &/*IMUs*/,
                                                Eigen::VectorXd &/*u*/)> controller):
 ExoSimulator(urdfPath,controller,modelOptions_t())
 {}
@@ -12,6 +13,7 @@ ExoSimulator::ExoSimulator(const string urdfPath,
                            function<void(const double /*t*/,
                                          const Eigen::VectorXd &/*x*/,
                                          const Eigen::MatrixXd &/*optoforces*/,
+                                         const Eigen::MatrixXd &/*IMUs*/,
                                                Eigen::VectorXd &/*u*/)> controller,
                            const ExoSimulator::modelOptions_t &options):
 log(),
@@ -30,13 +32,32 @@ nxFull_(nq_+ndq_),
 nuFull_(ndqFull_),
 tesc_(true),
 contactFramesNames_{string("LeftExternalToe"),
-                    string("LeftInternalToe"),                    
+                    string("LeftInternalToe"),
                     string("LeftExternalHeel"),
                     string("LeftInternalHeel"),
                     string("RightInternalToe"),
                     string("RightExternalToe"),
                     string("RightInternalHeel"),
-                    string("RightExternalHeel")}
+                    string("RightExternalHeel")},
+imuFramesNames_{string("PelvisIMU"),
+                string("ThoraxIMU"),
+                string("RightTibiaIMU"),
+                string("LeftTibiaIMU")},
+jointsNames_{string("LeftFrontalHipJoint"),
+             string("LeftTransverseHipJoint"),
+             string("LeftSagittalHipJoint"),
+             string("LeftSagittalKneeJoint"),
+             string("LeftSagittalAnkleJoint"),
+             string("LeftHenkeAnkleJoint"),
+             string("RightFrontalHipJoint"),
+             string("RightTransverseHipJoint"),
+             string("RightSagittalHipJoint"),
+             string("RightSagittalKneeJoint"),
+             string("RightSagittalAnkleJoint"),
+             string("RightHenkeAnkleJoint")},
+contactFramesIdx_(),
+imuFramesIdx_(),
+jointsIdx_()
 {
 	setUrdfPath(urdfPath);
 	setModelOptions(options);
@@ -128,6 +149,7 @@ void ExoSimulator::setUrdfPath(const string &urdfPath)
 		tesc_ = false;
 	}
 
+	// Find contact frames idx
 	for(uint32_t i =0; i<contactFramesNames_.size(); i++)
 	{
 		if(!model_.existFrame(contactFramesNames_[i]))
@@ -139,7 +161,29 @@ void ExoSimulator::setUrdfPath(const string &urdfPath)
 		contactFramesIdx_.push_back(model_.getFrameId(contactFramesNames_[i]));
 	}
 
-	
+	// Find IMU frames idx
+	for(uint32_t i =0; i<imuFramesNames_.size(); i++)
+	{
+		if(!model_.existFrame(imuFramesNames_[i]))
+		{
+			cout << "Error - ExoSimulator::setUrdfPath - Frame '" << imuFramesNames_[i] << "' not found in urdf." << endl;
+			tesc_ = false;	
+			return;		
+		}
+		imuFramesIdx_.push_back(model_.getFrameId(imuFramesNames_[i]));
+	}
+
+	// Find joints idx
+	for(uint32_t i =0; i<jointsNames_.size(); i++)
+	{
+		if(!model_.existJointName(jointsNames_[i]))
+		{
+			cout << "Error - ExoSimulator::setUrdfPath - Joint '" << jointsNames_[i] << "' not found in urdf." << endl;
+			tesc_ = false;	
+			return;		
+		}
+		jointsIdx_.push_back(model_.getJointId(jointsNames_[i]));
+	}
 }
 
 ExoSimulator::modelOptions_t ExoSimulator::getModelOptions(void)
@@ -151,6 +195,13 @@ void ExoSimulator::setModelOptions(const ExoSimulator::modelOptions_t &options)
 {
 	options_ = options;
 	model_.gravity = options.gravity;
+	if(options_.joints.boundsFromUrdf)
+	{
+		options_.joints.boundsMin.head<6>() = model_.lowerPositionLimit.segment<6>(7);
+		options_.joints.boundsMin.tail<6>() = model_.lowerPositionLimit.segment<6>(14);
+		options_.joints.boundsMax.head<6>() = model_.upperPositionLimit.segment<6>(7);
+		options_.joints.boundsMax.tail<6>() = model_.upperPositionLimit.segment<6>(14);
+	}
 }
 
 void ExoSimulator::dynamicsCL(const state_t &x,
@@ -215,8 +266,25 @@ void ExoSimulator::dynamicsCL(const state_t &x,
 		fext[parentIdx] += fFrame;
 	}
 
+	// Get IMUs data
+	Eigen::Matrix<double,7,4> IMUs;
+	for(uint32_t i = 0; i<imuFramesIdx_.size(); i++)
+	{
+		const Eigen::Matrix4d tformIMU = data_.oMf[imuFramesIdx_[i]].toHomogeneousMatrix();
+		const Eigen::Matrix3d rotIMU = tformIMU.topLeftCorner<3,3>();
+		const Eigen::Quaterniond quatIMU(rotIMU);
+		pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_,data_,imuFramesIdx_[i]);
+		Eigen::Vector3d omegaIMU = motionIMU.angular();	
+		IMUs(0,i) = quatIMU.w();
+		IMUs(1,i) = quatIMU.x();
+		IMUs(2,i) = quatIMU.y();
+		IMUs(3,i) = quatIMU.z();
+		IMUs.block<3,1>(4,i) = omegaIMU;
+	}
+
+
 	// Compute control input
-	controller_(t,xEig,optoforces,u);
+	controller_(t,xEig,optoforces,IMUs,u);
 	uWithFF.tail(ndq_-6) = u;
 
 	// Compute internal dynamics
@@ -250,10 +318,52 @@ void ExoSimulator::internalDynamics(const Eigen::VectorXd &q,
 	// Joint friction
 	for(uint32_t i = 0; i<nu_; i++)
 	{
-		u(i+6) = -options_.frictionViscous(i)*dq(i+6) - options_.frictionDry(i)*saturateSoft(dq(i+6)/options_.dryFictionVelEps,-1.0,1.0,0.7) ;
+		u(i+6) = -options_.joints.frictionViscous(i)*dq(i+6) - options_.joints.frictionDry(i)*saturateSoft(dq(i+6)/options_.joints.dryFictionVelEps,-1.0,1.0,0.7);
 	}
 
 	// Joint bounds
+	for(uint32_t i = 0; i<nu_; i++)
+	{
+		const double qJt = q(i+7);
+		const double dqJt = dq(i+6);
+		const double qJtMin = options_.joints.boundsMin(i);
+		const double qJtMax = options_.joints.boundsMax(i);
+
+		double fJt;
+		if(qJt>qJtMax)
+		{
+			const double qErr = qJt - qJtMax;
+			double damping = 0;
+			if(dqJt>0)
+				damping = -options_.joints.boundDamping*dqJt;
+
+			fJt = -options_.joints.boundStiffness*qErr + damping;
+
+			double blendingFactor = qErr/options_.joints.boundTransitionEps;
+			if(blendingFactor>1.0)
+				blendingFactor = 1.0;
+
+			fJt*=blendingFactor;
+			u(i+6) += fJt;
+		}
+
+		if(qJt<qJtMin)
+		{
+			const double qErr = qJtMin - qJt;
+			double damping = 0;
+			if(dqJt<0)
+				damping = -options_.joints.boundDamping*dqJt;
+
+			fJt = options_.joints.boundStiffness*qErr + damping;
+
+			double blendingFactor = qErr/options_.joints.boundTransitionEps;
+			if(blendingFactor>1.0)
+				blendingFactor = 1.0;
+
+			fJt*=blendingFactor;
+			u(i+6) += fJt;
+		}
+	}
 }
 
 ExoSimulator::Vector6d ExoSimulator::contactDynamics(const int32_t &frameId)
@@ -266,50 +376,47 @@ ExoSimulator::Vector6d ExoSimulator::contactDynamics(const int32_t &frameId)
 	if(posFrame(2)<0.0)
 	{
 		// Get various transformations
-		Eigen::Matrix4d tformFrame2Jt = model_.frames[frameId].placement.toHomogeneousMatrix();
+		const Eigen::Matrix4d tformFrame2Jt = model_.frames[frameId].placement.toHomogeneousMatrix();
 		Eigen::Vector3d fextInWorld(0.0,0.0,0.0);
-		Eigen::Vector3d posFrameJoint = tformFrame2Jt.topRightCorner<3,1>();
-		pinocchio::Motion motionFrame = pinocchio::getFrameVelocity(model_,data_,frameId);
-		Eigen::Vector3d vFrameInWorld = tformFrame.topLeftCorner<3,3>()*motionFrame.linear();
+		const Eigen::Vector3d posFrameJoint = tformFrame2Jt.topRightCorner<3,1>();
+		const pinocchio::Motion motionFrame = pinocchio::getFrameVelocity(model_,data_,frameId);
+		const Eigen::Vector3d vFrameInWorld = tformFrame.topLeftCorner<3,3>()*motionFrame.linear();
 
 		// Compute normal force
 		double damping = 0;
 		if(vFrameInWorld(2)<0)
 		{
-			damping = -options_.contact.damping*vFrameInWorld(2);
+			damping = -options_.contacts.damping*vFrameInWorld(2);
 		}
-		fextInWorld(2) = -options_.contact.stiffness*posFrame(2) + damping;
+		fextInWorld(2) = -options_.contacts.stiffness*posFrame(2) + damping;
 
 		// Compute frcition force
-		Eigen::Vector2d vxy = vFrameInWorld.head<2>();
-		double vNorm = vxy.norm();
+		const Eigen::Vector2d vxy = vFrameInWorld.head<2>();
+		const double vNorm = vxy.norm();
 		double fricCoeff;
-		if(vNorm>options_.contact.dryFictionVelEps)
+		if(vNorm>options_.contacts.dryFictionVelEps)
 		{
-			if(vNorm<1.5*options_.contact.dryFictionVelEps)
+			if(vNorm<1.5*options_.contacts.dryFictionVelEps)
 			{
-				fricCoeff = -2.0*vNorm*(options_.contact.frictionDry - options_.contact.frictionViscous)/options_.contact.dryFictionVelEps + 3.0*options_.contact.frictionDry - 2.0*options_.contact.frictionViscous;
+				fricCoeff = -2.0*vNorm*(options_.contacts.frictionDry - options_.contacts.frictionViscous)/options_.contacts.dryFictionVelEps + 3.0*options_.contacts.frictionDry - 2.0*options_.contacts.frictionViscous;
 			}
 			else
 			{
-				fricCoeff = options_.contact.frictionViscous;
+				fricCoeff = options_.contacts.frictionViscous;
 			}
-			// fricCoeff = options_.contact.frictionViscous;
 		}
 		else
 		{
-			fricCoeff = vNorm*options_.contact.frictionDry/options_.contact.dryFictionVelEps;
-			// fricCoeff = vNorm*options_.contact.frictionViscous/options_.contact.dryFictionVelEps;
+			fricCoeff = vNorm*options_.contacts.frictionDry/options_.contacts.dryFictionVelEps;
 		}
 		fextInWorld.head<2>() = -vxy*fricCoeff*fextInWorld(2);
-		// fextInWorld.head<2>() = -vxy*fricCoeff;
 
 		// Express forces at parent joint frame origin
 		fextLocal.head<3>() = tformFrame2Jt.topLeftCorner<3,3>()*tformFrame.topLeftCorner<3,3>().transpose()*fextInWorld;
 		fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>()).eval();
 
 		// Add blending factor
-		double blendingFactor = (-posFrame(2)/options_.contact.transitionEps);
+		double blendingFactor = (-posFrame(2)/options_.contacts.transitionEps);
 		if(blendingFactor>1.0)
 			blendingFactor = 1.0;
 		fextLocal*=blendingFactor;
@@ -379,8 +486,9 @@ void ExoSimulator::checkCtrl(void)
 	Eigen::VectorXd u = Eigen::VectorXd::Zero(nu_);
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(nx_);
 	Eigen::Matrix<double,3,8> optoforces = Eigen::Matrix<double,3,8>::Zero();
+	Eigen::Matrix<double,7,4> IMUs = Eigen::Matrix<double,7,4>::Zero();
 
-	controller_(0.0,x,optoforces,u);
+	controller_(0.0,x,optoforces,IMUs,u);
 
 	if(u.rows()!=nu_)
 	{

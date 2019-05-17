@@ -25,6 +25,7 @@ string getexepath(void)
 void controller(const double t,
                 const Eigen::VectorXd &x,
                 const Eigen::MatrixXd &optoforces,
+                const Eigen::MatrixXd &IMUs,
                       Eigen::VectorXd &u)
 {
 	for(uint32_t i=0; i<u.rows(); i++)
@@ -51,17 +52,16 @@ int main(int argc, char *argv[])
 	Eigen::VectorXd x0 = Eigen::VectorXd::Zero(nx_);
 	x0(2) = 1.0;
 	x0(3) = 1.0;
-	// x0(25) = 1.0;
-	double t0 = 0;
-	double tend = 3;
+	double t0 = 0.0;
+	double tend = 3.0;
 	double dt = 0.001;
 	ExoSimulator::simulationOptions_t simOpts;
-	simOpts.tolRel = 1.0e-8;
-	simOpts.tolAbs = 1.0e-8;
+	simOpts.tolRel = 1.0e-7;
+	simOpts.tolAbs = 1.0e-6;
 	ExoSimulator::modelOptions_t modelOpts;
-	modelOpts.dryFictionVelEps = 1.0e-2;
-	// modelOpts.contact.frictionViscous = 0.8;
 	// modelOpts.gravity(2) = 0.0;
+	modelOpts.joints.frictionDry = ExoSimulator::Vector12d::Zero();
+	modelOpts.joints.frictionViscous = ExoSimulator::Vector12d::Zero();
 
 	// Urdf
 	string urdfPath = getexepath();
