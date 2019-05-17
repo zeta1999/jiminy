@@ -73,6 +73,7 @@ public:
 	{
 		double tolAbs = 1.0e-6;
 		double tolRel = 1.0e-6;
+		bool logController = false;
 	} simulationOptions_t;
 
 	typedef vector<state_t> log_t;
@@ -109,7 +110,7 @@ public:
 	                  const double &t0,
 	                  const double &tend,
 	                  const double &dt,
-	                  const simulationOptions_t &options);
+	                  const simulationOptions_t &simOptions);
 	//Accessors
 	string getUrdfPath(void);
 	modelOptions_t getModelOptions(void);

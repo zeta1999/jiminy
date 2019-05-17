@@ -79,7 +79,7 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
                                               const double &t0,
                                               const double &tend,
                                               const double &dt,
-                                              const simulationOptions_t &options)
+                                              const simulationOptions_t &simOptions)
 {
 	if(!tesc_)
 	{
@@ -113,8 +113,8 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
 	                    placeholders::_1,
 	                    placeholders::_2,
 	                    placeholders::_3);	
-	auto stepper = make_dense_output(options.tolAbs,
-	                                 options.tolRel,
+	auto stepper = make_dense_output(simOptions.tolAbs,
+	                                 simOptions.tolRel,
 	                                 stepper_t());
 	auto itBegin = make_n_step_iterator_begin(stepper, rhsBind, xx0, t0, dt, nPts-1);
 	auto itEnd = make_n_step_iterator_end(stepper, rhsBind, xx0);
@@ -130,6 +130,68 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
 		t+=dt;
 	}
 	log.shrink_to_fit();
+
+	if(simOptions.logController)
+	{
+		for(uint32_t i = 0; i<log.size(); i++)
+		{
+			// Prepare some variables
+			Eigen::Map<const Eigen::VectorXd> q(log[i].data()+1,nq_);
+			Eigen::Map<const Eigen::VectorXd> dq(log[i].data()+1+nq_,ndq_);
+			Eigen::Vector4d quatVec = q.segment<4>(3);
+			quatVec.normalize();
+			Eigen::VectorXd qPinocchio = q;
+			qPinocchio.segment<3>(3) = quatVec.tail<3>();
+			qPinocchio(6) = quatVec(0);
+			Eigen::VectorXd qFull(nqFull_);
+			Eigen::VectorXd dqFull(ndqFull_);
+			qFull.head<13>() = qPinocchio.head<13>();
+			qFull.segment<6>(14) = qPinocchio.tail<6>();
+			qFull(13) = 0.0;
+			qFull(20) = 0.0;
+			dqFull.head<12>() = dq.head<12>();
+			dqFull.segment<6>(13) = dq.tail<6>();
+			dqFull(12) = 0.0;
+			dqFull(19) = 0.0;
+			pinocchio::forwardKinematics(model_, data_, qFull, dqFull);
+			pinocchio::framesForwardKinematics(model_, data_);
+
+			// Compute foot contact forces
+			Eigen::Matrix<double,3,8> optoforces;
+			for(uint32_t i = 0; i<contactFramesIdx_.size(); i++)
+			{
+				const pinocchio::Force fFrame(contactDynamics(contactFramesIdx_[i]));
+				optoforces.block<3,1>(0,i) = fFrame.linear();
+			}
+
+			// Get IMUs data
+			Eigen::Matrix<double,7,4> IMUs;
+			for(uint32_t i = 0; i<imuFramesIdx_.size(); i++)
+			{
+				const Eigen::Matrix4d tformIMU = data_.oMf[imuFramesIdx_[i]].toHomogeneousMatrix();
+				const Eigen::Matrix3d rotIMU = tformIMU.topLeftCorner<3,3>();
+				const Eigen::Quaterniond quatIMU(rotIMU);
+				pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_,data_,imuFramesIdx_[i]);
+				Eigen::Vector3d omegaIMU = motionIMU.angular();	
+				IMUs(0,i) = quatIMU.w();
+				IMUs(1,i) = quatIMU.x();
+				IMUs(2,i) = quatIMU.y();
+				IMUs(3,i) = quatIMU.z();
+				IMUs.block<3,1>(4,i) = omegaIMU;
+			}
+
+			// Compute control action
+			Eigen::VectorXd u = Eigen::VectorXd::Zero(nu_);
+			Eigen::Map<const Eigen::VectorXd> xEig(log[i].data()+1,nx_);
+			t = log[i][0];
+			controller_(t,xEig,optoforces,IMUs,u);
+
+			// Fill up log
+			log[i].insert(log[i].end(),optoforces.data(),optoforces.data()+24);
+			log[i].insert(log[i].end(),IMUs.data(),IMUs.data()+28);
+			log[i].insert(log[i].end(),u.data(),u.data()+nu_);
+		}
+	}
 	return ExoSimulator::result_t::SUCCESS;
 }
 
@@ -256,7 +318,7 @@ void ExoSimulator::dynamicsCL(const state_t &x,
 	// Compute foot contact forces
 	pinocchio::forwardKinematics(model_, data_, qFull, dqFull);
 	pinocchio::framesForwardKinematics(model_, data_);
-	Eigen::Matrix<double,3,8> optoforces = Eigen::Matrix<double,3,8>::Zero();
+	Eigen::Matrix<double,3,8> optoforces;
 	pinocchio::container::aligned_vector<pinocchio::Force> fext(model_.joints.size(),pinocchio::Force::Zero());
 	for(uint32_t i = 0; i<contactFramesIdx_.size(); i++)
 	{
