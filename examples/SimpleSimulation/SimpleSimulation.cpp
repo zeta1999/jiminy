@@ -43,6 +43,16 @@ void controller(const double t,
 	}
 }
 
+
+bool monitor(const double t,
+             const Eigen::VectorXd &x)
+{
+	if(t<=2.5)
+		return true;
+	else
+		return false;
+}
+
 int main(int argc, char *argv[])
 {
 	// Prepare log file
@@ -79,7 +89,7 @@ int main(int argc, char *argv[])
 	// Run simulation
 	CustomTimer timer;
 	tic(&timer);
-	exoSim.simulate(x0,t0,tend,dt,simOpts);
+	exoSim.simulate(x0,t0,tend,dt,monitor,simOpts);
 	toc(&timer);
 
 	// Retreive log

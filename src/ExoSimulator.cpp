@@ -72,13 +72,36 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
                                               const double &tend,
                                               const double &dt)
 {
-	return simulate(x0,t0,tend,dt,simulationOptions_t());
+	auto monitorFun = [](const double t, const Eigen::VectorXd &x)->bool{return true;};
+	return simulate(x0,t0,tend,dt,monitorFun,simulationOptions_t());
 }
 
 ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
                                               const double &t0,
                                               const double &tend,
                                               const double &dt,
+                                              function<bool(const double /*t*/,
+	                                           const Eigen::VectorXd &/*x*/)> monitorFun)
+{
+	return simulate(x0,t0,tend,dt,monitorFun,simulationOptions_t());
+}
+
+ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
+                                              const double &t0,
+                                              const double &tend,
+                                              const double &dt,
+                                              const simulationOptions_t &simOptions)
+{
+	auto monitorFun = [](const double t, const Eigen::VectorXd &x)->bool{return true;};
+	return simulate(x0,t0,tend,dt,monitorFun,simOptions);
+}
+
+ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
+                                              const double &t0,
+                                              const double &tend,
+                                              const double &dt,
+                                              function<bool(const double /*t*/,
+                                                            const Eigen::VectorXd &/*x*/)> monitorFun,
                                               const simulationOptions_t &simOptions)
 {
 	if(!tesc_)
@@ -126,9 +149,17 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
 	{
 		log[i][0] = t;
 		copy(it->begin(), it->end(), log[i].begin()+1);
+		Eigen::Map<const Eigen::VectorXd> xEig(log[i].data()+1,nx_);
 		i++;
 		t+=dt;
+		if(!monitorFun(t,xEig))
+			break;
 	}
+
+	// Handle premature stop
+	if(i<nPts)
+		log.resize(i);
+
 	log.shrink_to_fit();
 
 	if(simOptions.logController)

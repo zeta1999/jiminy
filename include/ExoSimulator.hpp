@@ -91,6 +91,7 @@ public:
 	                           const Eigen::MatrixXd &/*optoforces*/,
 	                           const Eigen::MatrixXd &/*IMUs*/,
 	                                 Eigen::VectorXd &/*u*/)> controller);
+
 	ExoSimulator(const string urdfPath,
 	             function<void(const double /*t*/,
 	                           const Eigen::VectorXd &/*x*/,
@@ -98,9 +99,10 @@ public:
 	                           const Eigen::MatrixXd &/*IMUs*/,
 	                                 Eigen::VectorXd &/*u*/)> controller,
 	             const modelOptions_t &options);
+
 	~ExoSimulator(void);
 
-	//Functions
+	//Simulate functions
 	result_t simulate(const Eigen::VectorXd &x0,
 	                  const double &t0,
 	                  const double &tend,
@@ -110,7 +112,23 @@ public:
 	                  const double &t0,
 	                  const double &tend,
 	                  const double &dt,
+	                  function<bool(const double /*t*/,
+	                                const Eigen::VectorXd &/*x*/)> monitorFun);
+
+	result_t simulate(const Eigen::VectorXd &x0,
+	                  const double &t0,
+	                  const double &tend,
+	                  const double &dt,
 	                  const simulationOptions_t &simOptions);
+
+		result_t simulate(const Eigen::VectorXd &x0,
+	                  const double &t0,
+	                  const double &tend,
+	                  const double &dt,
+	                  function<bool(const double /*t*/,
+	                                const Eigen::VectorXd &/*x*/)> monitorFun,
+	                  const simulationOptions_t &simOptions);
+
 	//Accessors
 	string getUrdfPath(void);
 	modelOptions_t getModelOptions(void);
@@ -172,4 +190,4 @@ protected:
 	vector<int32_t> jointsIdx_;
 };
 
-#endif //end of #ifndef EXO_SIMULATOR_sH
+#endif //end of EXO_SIMULATOR_H
