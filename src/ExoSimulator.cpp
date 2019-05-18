@@ -362,6 +362,11 @@ void ExoSimulator::dynamicsCL(const state_t &x,
 	qPinocchio.segment<3>(3) = quatVec.tail<3>();
 	qPinocchio(6) = quatVec(0);
 
+	// Compute body velocity
+	Eigen::VectorXd dqPinocchio = dq;
+	const Eigen::Matrix3d Rb2w = quat.toRotationMatrix();
+	dqPinocchio.head<3>() = Rb2w.transpose()*dqPinocchio.head<3>();
+
 	// Stuf Specific to wandercraft urdf
 	Eigen::VectorXd qFull(nqFull_);
 	Eigen::VectorXd dqFull(ndqFull_);
@@ -373,8 +378,8 @@ void ExoSimulator::dynamicsCL(const state_t &x,
 	qFull(13) = 0.0;
 	qFull(20) = 0.0;
 
-	dqFull.head<12>() = dq.head<12>();
-	dqFull.segment<6>(13) = dq.tail<6>();
+	dqFull.head<12>() = dqPinocchio.head<12>();
+	dqFull.segment<6>(13) = dqPinocchio.tail<6>();
 	dqFull(12) = 0.0;
 	dqFull(19) = 0.0;
 
@@ -429,8 +434,21 @@ void ExoSimulator::dynamicsCL(const state_t &x,
 	ddq.head<12>() = ddqFull.head<12>();
 	ddq.tail<6>() = ddqFull.segment<6>(13);
 
+	// Compute world frame acceleration
+	Eigen::Matrix3d Rw2bDot;
+	Rw2bDot(0,0) = -4*quatVec(2)*quatDot(2) - 4*quatVec(3)*quatDot(3);
+	Rw2bDot(0,1) = 2*quatDot(1)*quatVec(2) + 2*quatVec(1)*quatDot(2) + 2*quatDot(0)*quatVec(3) + 2*quatVec(0)*quatDot(3);
+	Rw2bDot(0,2) = -2*quatDot(0)*quatVec(2) - 2*quatVec(0)*quatDot(2) + 2*quatDot(1)*quatVec(3) + 2*quatVec(1)*quatDot(3);
+	Rw2bDot(1,0) = 2*quatDot(1)*quatVec(2) + 2*quatVec(1)*quatDot(2) - 2*quatDot(0)*quatVec(3) - 2*quatVec(0)*quatDot(3);
+	Rw2bDot(1,1) = -4*quatVec(1)*quatDot(1) - 4*quatVec(3)*quatDot(3);
+	Rw2bDot(1,2) = 2*quatDot(0)*quatVec(1) + 2*quatVec(0)*quatDot(1) + 2*quatDot(2)*quatVec(3) + 2*quatVec(2)*quatDot(3);
+	Rw2bDot(2,0) = 2*quatDot(0)*quatVec(2) + 2*quatVec(0)*quatDot(2) + 2*quatDot(1)*quatVec(3) + 2*quatVec(1)*quatDot(3);
+	Rw2bDot(2,1) = -2*quatDot(0)*quatVec(1) - 2*quatVec(0)*quatDot(1) + 2*quatDot(2)*quatVec(3) + 2*quatVec(2)*quatDot(3);
+	Rw2bDot(2,2) = -4*quatVec(1)*quatDot(1) - 4*quatVec(2)*quatDot(2);
+	ddq.head<3>() = Rb2w*(ddq.head<3>()-Rw2bDot*dq.head<3>());
+
 	// Fill up xDot
-	xDotEig.head<3>() = quat.toRotationMatrix()*dq.head<3>();
+	xDotEig.head<3>() = dq.head<3>();
 	xDotEig.segment<4>(3) = quatDot;
 	xDotEig.segment(7,nq_-7) = dq.tail(ndq_-6);
 	xDotEig.segment(nq_,ndq_) = ddq;
