@@ -1,24 +1,14 @@
 #include "ExoSimulator.hpp"
 
-ExoSimulator::ExoSimulator(const string urdfPath,
-                           function<void(const double /*t*/,
-                                         const Eigen::VectorXd &/*x*/,
-                                         const Eigen::MatrixXd &/*optoforces*/,
-                                         const Eigen::MatrixXd &/*IMUs*/,
-                                               Eigen::VectorXd &/*u*/)> controller):
-ExoSimulator(urdfPath,controller,modelOptions_t())
+ExoSimulator::ExoSimulator(const string urdfPath):
+ExoSimulator(urdfPath,modelOptions_t())
 {}
 
 ExoSimulator::ExoSimulator(const string urdfPath,
-                           function<void(const double /*t*/,
-                                         const Eigen::VectorXd &/*x*/,
-                                         const Eigen::MatrixXd &/*optoforces*/,
-                                         const Eigen::MatrixXd &/*IMUs*/,
-                                               Eigen::VectorXd &/*u*/)> controller,
                            const ExoSimulator::modelOptions_t &options):
 log(),
-urdfPath_(urdfPath),
-controller_(controller),
+urdfPath_(),
+controller_(),
 options_(),
 model_(),
 data_(model_),
@@ -61,7 +51,6 @@ jointsIdx_()
 {
 	setUrdfPath(urdfPath);
 	setModelOptions(options);
-	checkCtrl();
 }
 
 ExoSimulator::~ExoSimulator(void)
@@ -70,36 +59,56 @@ ExoSimulator::~ExoSimulator(void)
 ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
                                               const double &t0,
                                               const double &tend,
-                                              const double &dt)
+                                              const double &dt,
+                                              function<void(const double /*t*/,
+                                                            const Eigen::VectorXd &/*x*/,
+                                                            const Eigen::MatrixXd &/*optoforces*/,
+                                                            const Eigen::MatrixXd &/*IMUs*/,
+                                                                  Eigen::VectorXd &/*u*/)> controller)
 {
 	auto monitorFun = [](const double t, const Eigen::VectorXd &x)->bool{return true;};
-	return simulate(x0,t0,tend,dt,monitorFun,simulationOptions_t());
+	return simulate(x0,t0,tend,dt,controller,monitorFun,simulationOptions_t());
 }
 
 ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
                                               const double &t0,
                                               const double &tend,
                                               const double &dt,
+                                              function<void(const double /*t*/,
+                                                            const Eigen::VectorXd &/*x*/,
+                                                            const Eigen::MatrixXd &/*optoforces*/,
+                                                            const Eigen::MatrixXd &/*IMUs*/,
+                                                                  Eigen::VectorXd &/*u*/)> controller,
                                               function<bool(const double /*t*/,
 	                                           const Eigen::VectorXd &/*x*/)> monitorFun)
 {
-	return simulate(x0,t0,tend,dt,monitorFun,simulationOptions_t());
+	return simulate(x0,t0,tend,dt,controller,monitorFun,simulationOptions_t());
 }
 
 ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
                                               const double &t0,
                                               const double &tend,
                                               const double &dt,
+                                              function<void(const double /*t*/,
+                                                            const Eigen::VectorXd &/*x*/,
+                                                            const Eigen::MatrixXd &/*optoforces*/,
+                                                            const Eigen::MatrixXd &/*IMUs*/,
+                                                                  Eigen::VectorXd &/*u*/)> controller,
                                               const simulationOptions_t &simOptions)
 {
 	auto monitorFun = [](const double t, const Eigen::VectorXd &x)->bool{return true;};
-	return simulate(x0,t0,tend,dt,monitorFun,simOptions);
+	return simulate(x0,t0,tend,dt,controller,monitorFun,simOptions);
 }
 
 ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
                                               const double &t0,
                                               const double &tend,
                                               const double &dt,
+                                              function<void(const double /*t*/,
+                                                            const Eigen::VectorXd &/*x*/,
+                                                            const Eigen::MatrixXd &/*optoforces*/,
+                                                            const Eigen::MatrixXd &/*IMUs*/,
+                                                                  Eigen::VectorXd &/*u*/)> controller,
                                               function<bool(const double /*t*/,
                                                             const Eigen::VectorXd &/*x*/)> monitorFun,
                                               const simulationOptions_t &simOptions)
@@ -124,6 +133,13 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
 	}
 	uint64_t nPts = round((tend - t0)/dt + 1.0);
 
+	
+	if(!checkCtrl(controller))
+	{
+		cout << "Error - ExoSimulator::checkCtrl - Controller returned input with wrong size."<< endl;
+		return ExoSimulator::result_t::ERROR_BAD_INPUT;		
+	}
+	controller_ = controller;
 
 	if(nPts<2)
 	{
@@ -162,7 +178,10 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
 
 	log.shrink_to_fit();
 
-	if(simOptions.logController)
+	// Log post processing
+	if(simOptions.logController ||
+		simOptions.logOptoforces ||
+		simOptions.logIMUs)
 	{
 		for(uint32_t i = 0; i<log.size(); i++)
 		{
@@ -189,38 +208,51 @@ ExoSimulator::result_t ExoSimulator::simulate(const Eigen::VectorXd &x0,
 
 			// Compute foot contact forces
 			Eigen::Matrix<double,3,8> optoforces;
-			for(uint32_t i = 0; i<contactFramesIdx_.size(); i++)
+			if(simOptions.logController || simOptions.logOptoforces)
 			{
-				const pinocchio::Force fFrame(contactDynamics(contactFramesIdx_[i]));
-				optoforces.block<3,1>(0,i) = fFrame.linear();
+				for(uint32_t i = 0; i<contactFramesIdx_.size(); i++)
+				{
+					const pinocchio::Force fFrame(contactDynamics(contactFramesIdx_[i]));
+					optoforces.block<3,1>(0,i) = fFrame.linear();
+				}				
 			}
 
 			// Get IMUs data
 			Eigen::Matrix<double,7,4> IMUs;
-			for(uint32_t i = 0; i<imuFramesIdx_.size(); i++)
+			if(simOptions.logController || simOptions.logIMUs)
 			{
-				const Eigen::Matrix4d tformIMU = data_.oMf[imuFramesIdx_[i]].toHomogeneousMatrix();
-				const Eigen::Matrix3d rotIMU = tformIMU.topLeftCorner<3,3>();
-				const Eigen::Quaterniond quatIMU(rotIMU);
-				pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_,data_,imuFramesIdx_[i]);
-				Eigen::Vector3d omegaIMU = motionIMU.angular();	
-				IMUs(0,i) = quatIMU.w();
-				IMUs(1,i) = quatIMU.x();
-				IMUs(2,i) = quatIMU.y();
-				IMUs(3,i) = quatIMU.z();
-				IMUs.block<3,1>(4,i) = omegaIMU;
+				for(uint32_t i = 0; i<imuFramesIdx_.size(); i++)
+				{
+					const Eigen::Matrix4d tformIMU = data_.oMf[imuFramesIdx_[i]].toHomogeneousMatrix();
+					const Eigen::Matrix3d rotIMU = tformIMU.topLeftCorner<3,3>();
+					const Eigen::Quaterniond quatIMU(rotIMU);
+					pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_,data_,imuFramesIdx_[i]);
+					Eigen::Vector3d omegaIMU = motionIMU.angular();	
+					IMUs(0,i) = quatIMU.w();
+					IMUs(1,i) = quatIMU.x();
+					IMUs(2,i) = quatIMU.y();
+					IMUs(3,i) = quatIMU.z();
+					IMUs.block<3,1>(4,i) = omegaIMU;
+				}				
 			}
 
 			// Compute control action
 			Eigen::VectorXd u = Eigen::VectorXd::Zero(nu_);
-			Eigen::Map<const Eigen::VectorXd> xEig(log[i].data()+1,nx_);
-			t = log[i][0];
-			controller_(t,xEig,optoforces,IMUs,u);
+			if(simOptions.logController)
+			{
+				Eigen::Map<const Eigen::VectorXd> xEig(log[i].data()+1,nx_);
+				t = log[i][0];
+				controller_(t,xEig,optoforces,IMUs,u);		
+			}
 
 			// Fill up log
-			log[i].insert(log[i].end(),optoforces.data(),optoforces.data()+24);
-			log[i].insert(log[i].end(),IMUs.data(),IMUs.data()+28);
-			log[i].insert(log[i].end(),u.data(),u.data()+nu_);
+			if(simOptions.logOptoforces)
+				log[i].insert(log[i].end(),optoforces.data(),optoforces.data()+24);
+			if(simOptions.logIMUs)
+				log[i].insert(log[i].end(),IMUs.data(),IMUs.data()+28);
+			if(simOptions.logController)
+				log[i].insert(log[i].end(),u.data(),u.data()+nu_);		
+
 		}
 	}
 	return ExoSimulator::result_t::SUCCESS;
@@ -574,18 +606,21 @@ double ExoSimulator::saturateSoft(const double in,
 	return out;
 }
 
-void ExoSimulator::checkCtrl(void)
+bool ExoSimulator::checkCtrl(function<void(const double /*t*/,
+                                           const Eigen::VectorXd &/*x*/,
+                                           const Eigen::MatrixXd &/*optoforces*/,
+                                           const Eigen::MatrixXd &/*IMUs*/,
+                                                 Eigen::VectorXd &/*u*/)> controller)
 {
 	Eigen::VectorXd u = Eigen::VectorXd::Zero(nu_);
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(nx_);
 	Eigen::Matrix<double,3,8> optoforces = Eigen::Matrix<double,3,8>::Zero();
 	Eigen::Matrix<double,7,4> IMUs = Eigen::Matrix<double,7,4>::Zero();
 
-	controller_(0.0,x,optoforces,IMUs,u);
+	controller(0.0,x,optoforces,IMUs,u);
 
 	if(u.rows()!=nu_)
-	{
-		cout << "Error - ExoSimulator::checkCtrl - Controller returned input with wrong size " << u.rows() <<" instead of " << nu_ << "." << endl;
-		tesc_ = false;
-	}
+		return false;
+	else
+		return true;
 }

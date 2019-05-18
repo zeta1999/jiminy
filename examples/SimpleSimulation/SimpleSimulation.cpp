@@ -43,7 +43,6 @@ void controller(const double t,
 	}
 }
 
-
 bool monitor(const double t,
              const Eigen::VectorXd &x)
 {
@@ -55,6 +54,9 @@ bool monitor(const double t,
 
 int main(int argc, char *argv[])
 {
+	// Prepare timer
+	CustomTimer timer;
+
 	// Prepare log file
 	ofstream myfile;
 	myfile.open("log.csv", ofstream::out | ofstream::trunc);
@@ -66,7 +68,7 @@ int main(int argc, char *argv[])
 	urdfPath+=string("/../atalante_tom.urdf");
 	cout << "URDF path: "<< urdfPath << endl;
 
-	// Simulation options
+	// Prepare options
 	Eigen::VectorXd x0 = Eigen::VectorXd::Zero(nx_);
 	x0(2) = 1.0;
 	x0(3) = 1.0;
@@ -78,26 +80,30 @@ int main(int argc, char *argv[])
 	ExoSimulator::simulationOptions_t simOpts;
 	simOpts.tolRel = 1.0e-7;
 	simOpts.tolAbs = 1.0e-6;
-	simOpts.logController = true;
+	simOpts.logController = false;
+	simOpts.logOptoforces = false;
+	simOpts.logIMUs = false;
 
 	ExoSimulator::modelOptions_t modelOpts;
-	// modelOpts.gravity(2) = 0.0;
+	// modelOpts.gravity(2) = -9.81;
 
 	// Instanciate simulator
-	ExoSimulator exoSim(urdfPath,controller,modelOpts);
+	tic(&timer);
+	ExoSimulator exoSim(urdfPath,modelOpts);
+	toc(&timer);
+	cout << "Instanciation time: " << timer.dt*1.0e3 << "ms" << endl;
 
 	// Run simulation
-	CustomTimer timer;
 	tic(&timer);
-	exoSim.simulate(x0,t0,tend,dt,monitor,simOpts);
+	exoSim.simulate(x0,t0,tend,dt,controller,monitor,simOpts);
 	toc(&timer);
+	cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << endl;
 
 	// Retreive log
-	cout << "Elapsed time: " << timer.dt*1.0e3 << "ms" << endl;
 	cout << exoSim.log.size() << " log points" << endl;
 	for(uint64_t i = 0; i<exoSim.log.size(); i++)
 	{
-		for(uint64_t j = 0; j<exoSim.log[0].size(); j++)
+		for(uint64_t j = 0; j<exoSim.log[0].size()-1; j++)
 		{
 			myfile << exoSim.log[i][j] <<',';
 		}

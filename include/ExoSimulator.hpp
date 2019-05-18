@@ -73,7 +73,9 @@ public:
 	{
 		double tolAbs = 1.0e-6;
 		double tolRel = 1.0e-6;
-		bool logController = false;
+		bool logController = true;
+		bool logOptoforces = true;
+		bool logIMUs = true;
 	} simulationOptions_t;
 
 	typedef vector<state_t> log_t;
@@ -85,19 +87,9 @@ protected:
 /////////////////Public methods///////////////////
 public:
 	//Constructor & destructor
-	ExoSimulator(const string urdfPath,
-	             function<void(const double /*t*/,
-	                           const Eigen::VectorXd &/*x*/,
-	                           const Eigen::MatrixXd &/*optoforces*/,
-	                           const Eigen::MatrixXd &/*IMUs*/,
-	                                 Eigen::VectorXd &/*u*/)> controller);
+	ExoSimulator(const string urdfPath);
 
 	ExoSimulator(const string urdfPath,
-	             function<void(const double /*t*/,
-	                           const Eigen::VectorXd &/*x*/,
-	                           const Eigen::MatrixXd &/*optoforces*/,
-	                           const Eigen::MatrixXd &/*IMUs*/,
-	                                 Eigen::VectorXd &/*u*/)> controller,
 	             const modelOptions_t &options);
 
 	~ExoSimulator(void);
@@ -106,12 +98,22 @@ public:
 	result_t simulate(const Eigen::VectorXd &x0,
 	                  const double &t0,
 	                  const double &tend,
-	                  const double &dt);
+	                  const double &dt,
+	                  function<void(const double /*t*/,
+                                   const Eigen::VectorXd &/*x*/,
+                                   const Eigen::MatrixXd &/*optoforces*/,
+                                   const Eigen::MatrixXd &/*IMUs*/,
+                                         Eigen::VectorXd &/*u*/)> controller);
 
 	result_t simulate(const Eigen::VectorXd &x0,
 	                  const double &t0,
 	                  const double &tend,
 	                  const double &dt,
+	                  function<void(const double /*t*/,
+                                   const Eigen::VectorXd &/*x*/,
+                                   const Eigen::MatrixXd &/*optoforces*/,
+                                   const Eigen::MatrixXd &/*IMUs*/,
+                                         Eigen::VectorXd &/*u*/)> controller,
 	                  function<bool(const double /*t*/,
 	                                const Eigen::VectorXd &/*x*/)> monitorFun);
 
@@ -119,12 +121,22 @@ public:
 	                  const double &t0,
 	                  const double &tend,
 	                  const double &dt,
+	                  function<void(const double /*t*/,
+                                   const Eigen::VectorXd &/*x*/,
+                                   const Eigen::MatrixXd &/*optoforces*/,
+                                   const Eigen::MatrixXd &/*IMUs*/,
+                                         Eigen::VectorXd &/*u*/)> controller,
 	                  const simulationOptions_t &simOptions);
 
-		result_t simulate(const Eigen::VectorXd &x0,
-	                  const double &t0,
-	                  const double &tend,
-	                  const double &dt,
+	result_t simulate(const Eigen::VectorXd &x0,
+                  const double &t0,
+                  const double &tend,
+                  const double &dt,
+                  function<void(const double /*t*/,
+                                   const Eigen::VectorXd &/*x*/,
+                                   const Eigen::MatrixXd &/*optoforces*/,
+                                   const Eigen::MatrixXd &/*IMUs*/,
+                                         Eigen::VectorXd &/*u*/)> controller,
 	                  function<bool(const double /*t*/,
 	                                const Eigen::VectorXd &/*x*/)> monitorFun,
 	                  const simulationOptions_t &simOptions);
@@ -137,8 +149,12 @@ public:
 protected:
 	void setUrdfPath(const string &urdfPath);
 	void setModelOptions(const modelOptions_t &options);
-	void checkCtrl(void);
-	
+	bool checkCtrl(function<void(const double /*t*/,
+                                const Eigen::VectorXd &/*x*/,
+                                const Eigen::MatrixXd &/*optoforces*/,
+                                const Eigen::MatrixXd &/*IMUs*/,
+                                      Eigen::VectorXd &/*u*/)> controller);
+
 	void dynamicsCL(const state_t &x,
 	                      state_t &xDot,
 	                const double t);
@@ -151,7 +167,6 @@ protected:
 	                    const double mi,
 	                    const double ma,
 	                    const double r);
-
 
 ////////////////Public attributes/////////////////
 public:
