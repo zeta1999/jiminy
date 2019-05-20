@@ -31,16 +31,8 @@ void controller(const double t,
                 const Eigen::MatrixXd &IMUs,
                       Eigen::VectorXd &u)
 {
-	for(uint32_t i=0; i<u.rows(); i++)
-	{
-		const double qJt = x(i+7);
-		const double dqJt = x(i+19);
-		const double kp = Kp(i);
-		const double kd = Kd(i);
-
-		// u(i) = -kp*qJt - kd*dqJt;
-		u(i) = 0.0;
-	}
+	// u = ExoSimulator::Vector12d::Zero();
+	u = -(Kp.array()*x.segment<12>(7).array() + Kd.array()*x.segment<12>(19).array());
 }
 
 bool monitor(const double t,
@@ -85,7 +77,7 @@ int main(int argc, char *argv[])
 	simOpts.logIMUs = false;
 
 	ExoSimulator::modelOptions_t modelOpts;
-	// modelOpts.gravity(2) = -9.81;
+	// modelOpts.gravity(2) = 9.81;
 
 	// Instanciate simulator
 	tic(&timer);

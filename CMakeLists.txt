@@ -65,9 +65,9 @@ install(TARGETS exo_simu++
 export(EXPORT ${PROJECT_NAME}
        FILE "${CMAKE_CURRENT_BINARY_DIR}/exo_simu++-targets.cmake")
 
-# if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/exo_simu++-config.cmake)
-  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exo_simu++-config.cmake "include(CMakeFindDependencyMacro)\nfind_dependency(Eigen3)\ninclude(\"\${CMAKE_CURRENT_LIST_DIR}/exo_simu++-targets.cmake\")\nSET(COMPILE_FLAGS \"-DPINOCCHIO_WITH_URDFDOM -DPINOCCHIO_URDFDOM_TYPEDEF_SHARED_PTR -DPINOCCHIO_URDFDOM_USE_STD_SHARED_PTR\")\nadd_definitions(${COMPILE_FLAGS})\n")
-# endif()
+# Create Config file
+# ----------------------------------------------
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exo_simu++-config.cmake "include(CMakeFindDependencyMacro)\nfind_dependency(Eigen3)\ninclude(\"\${CMAKE_CURRENT_LIST_DIR}/exo_simu++-targets.cmake\")\nSET(COMPILE_FLAGS \"-DPINOCCHIO_WITH_URDFDOM -DPINOCCHIO_URDFDOM_TYPEDEF_SHARED_PTR -DPINOCCHIO_URDFDOM_USE_STD_SHARED_PTR\")\nadd_definitions(${COMPILE_FLAGS})\n")
 
 # Create CMake packages for the install directory
 # ----------------------------------------------
