@@ -1,26 +1,22 @@
 #ifndef EXO_SIMULATOR_H
 #define EXO_SIMULATOR_H
 
-#include "ExoSimulatorUtils.hpp"
-
-#include <vector>
-#include <map>
-#include <functional>
-#include <iostream>
-#include <iomanip>
 #include <string>
+#include <vector>
+#include <functional>
 
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include <boost/numeric/odeint.hpp>
 #include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
 
 #include "pinocchio/multibody/model.hpp"
-#include "pinocchio/parsers/urdf.hpp"
-#include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/aba.hpp"
-#include "pinocchio/algorithm/frames.hpp"
 
-using namespace boost::numeric::odeint;
+
 using namespace std;
+using namespace boost::numeric::odeint;
+
 
 class ExoSimulator
 {
@@ -100,20 +96,20 @@ public:
 	                  const double &tend,
 	                  const double &dt,
 	                  function<void(const double /*t*/,
-                                   const Eigen::VectorXd &/*x*/,
-                                   const Eigen::MatrixXd &/*optoforces*/,
-                                   const Eigen::MatrixXd &/*IMUs*/,
-                                         Eigen::VectorXd &/*u*/)> controller);
+                                    const Eigen::VectorXd &/*x*/,
+                                    const Eigen::MatrixXd &/*optoforces*/,
+                                    const Eigen::MatrixXd &/*IMUs*/,
+                                          Eigen::VectorXd &/*u*/)> controller);
 
 	result_t simulate(const Eigen::VectorXd &x0,
 	                  const double &t0,
 	                  const double &tend,
 	                  const double &dt,
 	                  function<void(const double /*t*/,
-                                   const Eigen::VectorXd &/*x*/,
-                                   const Eigen::MatrixXd &/*optoforces*/,
-                                   const Eigen::MatrixXd &/*IMUs*/,
-                                         Eigen::VectorXd &/*u*/)> controller,
+                                    const Eigen::VectorXd &/*x*/,
+                                    const Eigen::MatrixXd &/*optoforces*/,
+                                    const Eigen::MatrixXd &/*IMUs*/,
+                                          Eigen::VectorXd &/*u*/)> controller,
 	                  function<bool(const double /*t*/,
 	                                const Eigen::VectorXd &/*x*/)> monitorFun);
 
@@ -122,10 +118,10 @@ public:
 	                  const double &tend,
 	                  const double &dt,
 	                  function<void(const double /*t*/,
-                                   const Eigen::VectorXd &/*x*/,
-                                   const Eigen::MatrixXd &/*optoforces*/,
-                                   const Eigen::MatrixXd &/*IMUs*/,
-                                         Eigen::VectorXd &/*u*/)> controller,
+                                    const Eigen::VectorXd &/*x*/,
+                                    const Eigen::MatrixXd &/*optoforces*/,
+                                    const Eigen::MatrixXd &/*IMUs*/,
+                                          Eigen::VectorXd &/*u*/)> controller,
 	                  const simulationOptions_t &simOptions);
 
 	result_t simulate(const Eigen::VectorXd &x0,
@@ -133,10 +129,10 @@ public:
                   const double &tend,
                   const double &dt,
                   function<void(const double /*t*/,
-                                   const Eigen::VectorXd &/*x*/,
-                                   const Eigen::MatrixXd &/*optoforces*/,
-                                   const Eigen::MatrixXd &/*IMUs*/,
-                                         Eigen::VectorXd &/*u*/)> controller,
+                                const Eigen::VectorXd &/*x*/,
+                                const Eigen::MatrixXd &/*optoforces*/,
+                                const Eigen::MatrixXd &/*IMUs*/,
+                                      Eigen::VectorXd &/*u*/)> controller,
 	                  function<bool(const double /*t*/,
 	                                const Eigen::VectorXd &/*x*/)> monitorFun,
 	                  const simulationOptions_t &simOptions);
@@ -150,10 +146,10 @@ protected:
 	void setUrdfPath(const string &urdfPath);
 	void setModelOptions(const modelOptions_t &options);
 	bool checkCtrl(function<void(const double /*t*/,
-                                const Eigen::VectorXd &/*x*/,
-                                const Eigen::MatrixXd &/*optoforces*/,
-                                const Eigen::MatrixXd &/*IMUs*/,
-                                      Eigen::VectorXd &/*u*/)> controller);
+                                 const Eigen::VectorXd &/*x*/,
+                                 const Eigen::MatrixXd &/*optoforces*/,
+                                 const Eigen::MatrixXd &/*IMUs*/,
+                                       Eigen::VectorXd &/*u*/)> controller);
 
 	void dynamicsCL(const state_t &x,
 	                      state_t &xDot,

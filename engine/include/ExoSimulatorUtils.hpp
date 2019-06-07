@@ -1,11 +1,12 @@
 #ifndef EXO_SIMULATOR_UTILS_H
 #define EXO_SIMULATOR_UTILS_H
 
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
 #include <math.h>
 #include <ctime>
 #include <stdio.h>
+
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 typedef struct
 {

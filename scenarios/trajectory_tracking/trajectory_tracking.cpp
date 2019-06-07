@@ -1,5 +1,6 @@
-#include <ExoSimulator.hpp>
-
+#include <unistd.h>
+#include <sys/types.h>
+#include <pwd.h>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -8,22 +9,18 @@
 #include <unistd.h>
 #include <string>
 
+#include "ExoSimulator.hpp"
+#include "ExoSimulatorUtils.hpp"
+
 using namespace std;
 
 const uint32_t nx_ = 37;
 const uint32_t nu_ = 12;
 
-string getexepath(void)
-{
-  char result[ PATH_MAX ];
-  ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
-  string strtmp = string( result, (count > 0) ? count : 0 );
-  size_t found = strtmp.find_last_of("/\\");
-  return strtmp.substr(0,found);
-}
-
-ExoSimulator::Vector12d Kp = (ExoSimulator::Vector12d() << 41000.0,16000.0,16000.0,32000.0,4500.0,3500.0,41000.0,16000.0,16000.0,32000.0,4500.0,3500.0).finished();
-ExoSimulator::Vector12d Kd = (ExoSimulator::Vector12d() << 500.0,160.0,120.0,270.0,15.0,20.0,500.0,160.0,120.0,270.0,15.0,20.0).finished();
+ExoSimulator::Vector12d Kp = (ExoSimulator::Vector12d() << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
+                                                           41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
+ExoSimulator::Vector12d Kd = (ExoSimulator::Vector12d() << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
+														   500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
 
 void controller(const double t,
                 const Eigen::VectorXd &x,
@@ -56,8 +53,9 @@ int main(int argc, char *argv[])
 	myfile << setprecision(10);
 
 	// Urdf
-	string urdfPath = getexepath();
-	urdfPath+=string("/../atalante_tom.urdf");
+	struct passwd *pw = getpwuid(getuid());
+	const char *homedir = pw->pw_dir;
+	string urdfPath = string(homedir) + string("/.simulation/atalante_with_patient/atalante_with_patient.urdf");
 	cout << "URDF path: "<< urdfPath << endl;
 
 	// Prepare options
@@ -97,7 +95,7 @@ int main(int argc, char *argv[])
 	{
 		for(uint64_t j = 0; j<exoSim.log[0].size()-1; j++)
 		{
-			myfile << exoSim.log[i][j] <<',';
+			myfile << exoSim.log[i][j] << ',';
 		}
 		myfile << exoSim.log[i].back() << endl;
 	}
