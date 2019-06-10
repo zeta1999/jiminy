@@ -184,6 +184,11 @@ namespace python
                     configPy[name] = l;
                     break;
                 }
+                case configholder::optiontype::CONFIG_HOLDER:
+                {
+                    configPy[name] = convertConfigHolderPy(config.get<ConfigHolder>(name));
+                    break;
+                }
                 case configholder::optiontype::NOT_A_TYPE:
                 default:
                 {
@@ -235,6 +240,11 @@ namespace python
                 case configholder::optiontype::EIGEN_MATRIX:
                 {
                     config.get<MatrixN>(name) = listPyToMatrix(bp::extract<bp::list>(configPy[name]));
+                    break;
+                }
+                case configholder::optiontype::CONFIG_HOLDER:
+                {
+                    loadConfigHolder(bp::extract<bp::dict>(configPy[name]), config.get<ConfigHolder>(name));
                     break;
                 }
                 case configholder::optiontype::NOT_A_TYPE:

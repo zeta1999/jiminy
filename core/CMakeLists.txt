@@ -24,7 +24,7 @@ set(SRC
 add_library(${PROJECT_NAME} STATIC ${SRC})
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC rt)
+target_link_libraries(${PROJECT_NAME} PUBLIC rt pthread)
 
 # Add sources to library.
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)

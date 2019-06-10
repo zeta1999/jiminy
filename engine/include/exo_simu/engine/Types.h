@@ -31,12 +31,6 @@ namespace exo_simu
     typedef Eigen::Matrix<real_t, 3, 3> rotation_t;
     typedef Eigen::Matrix<real_t, 4, 1> vector4_t;
 
-    template <typename object_T>
-    struct vector
-    {
-        typedef std::vector<object_T> type;
-    };
-
     template<typename key_T, typename value_T>
     struct map
     {

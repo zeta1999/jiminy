@@ -45,7 +45,7 @@ namespace python
         /// \brief      Run the simulation
         ///////////////////////////////////////////////////////////////////////////////
         static void init(ExoSimulator& self,
-                         string const& urdf_path)
+                         std::string const& urdf_path)
         {
             //self.simulate(x0, t0, tf, dt, FctHandleProxy(controller));
         }

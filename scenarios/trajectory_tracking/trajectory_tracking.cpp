@@ -12,7 +12,6 @@
 #include "exo_simu/engine/ExoSimulator.hpp"
 #include "exo_simu/engine/ExoSimulatorUtils.hpp"
 
-using namespace std;
 using namespace exo_simu;
 
 const uint32_t nx_ = 37;
@@ -47,8 +46,8 @@ int main(int argc, char *argv[])
     // Default argument(s)
     struct passwd *pw = getpwuid(getuid());
     const char *homedir = pw->pw_dir;
-    string urdfPath = string(homedir) + string("/.simulation/atalante_with_patient/atalante_with_patient.urdf");
-    string outputDirPath = string("/tmp/blackbox/");
+    std::string urdfPath = std::string(homedir) + std::string("/.simulation/atalante_with_patient/atalante_with_patient.urdf");
+    std::string outputDirPath = std::string("/tmp/blackbox/");
 
     // Parsing of the user argument(s)
     const char* const short_opts = "u:o:h";
@@ -65,10 +64,10 @@ int main(int argc, char *argv[])
         switch (opt)
         {
         case 'u':
-            urdfPath = string(optarg);
+            urdfPath = std::string(optarg);
             break;
         case 'o':
-            outputDirPath = string(optarg);
+            outputDirPath = std::string(optarg);
             break;
         case 'h': // -h or --help
         case '?': // Unrecognized option
@@ -81,17 +80,17 @@ int main(int argc, char *argv[])
     }
 
     // Display some information for the user
-    cout << "URDF path: "<< urdfPath << endl;
-    cout << "Log directory: "<< outputDirPath << endl;
+    std::cout << "URDF path: "<< urdfPath << std::endl;
+    std::cout << "Log directory: "<< outputDirPath << std::endl;
 
     // Prepare timer
     CustomTimer timer;
 
     // Prepare log file
-    ofstream myfile;
-    myfile.open(outputDirPath + string("/log.csv"), ofstream::out | ofstream::trunc);
-    myfile << fixed;
-    myfile << setprecision(10);
+    std::ofstream myfile;
+    myfile.open(outputDirPath + std::string("/log.csv"), std::ofstream::out | std::ofstream::trunc);
+    myfile << std::fixed;
+    myfile << std::setprecision(10);
 
     // Prepare options
     Eigen::VectorXd x0 = Eigen::VectorXd::Zero(nx_);
@@ -102,37 +101,37 @@ int main(int argc, char *argv[])
     double tend = 3.0;
     double dt = 0.001;
 
-    ExoSimulator::simulationOptions_t simOpts;
-    simOpts.tolRel = 1.0e-7;
-    simOpts.tolAbs = 1.0e-6;
-    simOpts.logController = false;
-    simOpts.logOptoforces = false;
-    simOpts.logIMUs = false;
+    ConfigHolder simOpts = ExoSimulator::getDefaultSimulationOptions();
+    simOpts.get<float64_t>("tolRel") = 1.0e-7;
+    simOpts.get<float64_t>("tolAbs") = 1.0e-6;
+    simOpts.get<bool>("logController") = false;
+    simOpts.get<bool>("logOptoforces") = false;
+    simOpts.get<bool>("logIMUs") = false;
 
-    ExoSimulator::modelOptions_t modelOpts;
-    // modelOpts.gravity(2) = 9.81;
+    ConfigHolder modelOpts = ExoSimulator::getDefaultModelOptions();
+    // modelOpts.get<vectorN_t>("gravity")(2) = 9.81;
 
     // Instanciate simulator
     tic(&timer);
     ExoSimulator exoSim(urdfPath,modelOpts);
     toc(&timer);
-    cout << "Instanciation time: " << timer.dt*1.0e3 << "ms" << endl;
+    std::cout << "Instanciation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // Run simulation
     tic(&timer);
     exoSim.simulate(x0,t0,tend,dt,controller,monitor,simOpts);
     toc(&timer);
-    cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << endl;
+    std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // Retreive log
-    cout << exoSim.log.size() << " log points" << endl;
+    std::cout << exoSim.log.size() << " log points" << std::endl;
     for(uint64_t i = 0; i<exoSim.log.size(); i++)
     {
         for(uint64_t j = 0; j<exoSim.log[0].size()-1; j++)
         {
             myfile << exoSim.log[i][j] << ',';
         }
-        myfile << exoSim.log[i].back() << endl;
+        myfile << exoSim.log[i].back() << std::endl;
     }
 
     // Close log file

@@ -24,7 +24,8 @@ namespace exo_simu
             REAL,
             STRING,
             EIGEN_VECTOR,
-            EIGEN_MATRIX
+            EIGEN_MATRIX,
+            CONFIG_HOLDER
         };
 
         ///////////////////////////////////////////////////////////////////////
