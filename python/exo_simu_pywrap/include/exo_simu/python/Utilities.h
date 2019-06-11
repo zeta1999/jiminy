@@ -125,10 +125,8 @@ namespace python
     ///////////////////////////////////////////////////////////////////////
     /// \brief      Convert config holder into a python dictionary.
     ///////////////////////////////////////////////////////////////////////
-    bp::dict convertConfigHolderPy(ConfigHolder const& config)
+    void convertConfigHolderPy(ConfigHolder const& config, bp::dict& configPy)
     {
-        bp::dict configPy;
-
         std::vector<std::string> const options = config.getOptionNames();
         for (int32_t i = 0; i < options.size(); i++)
         {
@@ -186,7 +184,9 @@ namespace python
                 }
                 case configholder::optiontype::CONFIG_HOLDER:
                 {
-                    configPy[name] = convertConfigHolderPy(config.get<ConfigHolder>(name));
+                    bp::dict configPyTmp;
+                    convertConfigHolderPy(config.get<ConfigHolder>(name), configPyTmp);
+                    configPy[name] = configPyTmp;
                     break;
                 }
                 case configholder::optiontype::NOT_A_TYPE:
@@ -197,8 +197,6 @@ namespace python
                 }
             }
         }
-
-        return configPy;
     }
 
     ///////////////////////////////////////////////////////////////////////

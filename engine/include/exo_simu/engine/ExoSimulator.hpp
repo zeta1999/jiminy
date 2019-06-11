@@ -105,6 +105,10 @@ namespace exo_simu
         ExoSimulator(const std::string urdfPath,
                      const ConfigHolder & mdlOptions);
 
+        ExoSimulator(const std::string urdfPath,
+                     const ConfigHolder & mdlOptions,
+                     const ConfigHolder & simOptions);
+
         ~ExoSimulator(void);
 
         void init(const std::string urdfPath);
@@ -112,10 +116,14 @@ namespace exo_simu
         void init(const std::string urdfPath,
                   const ConfigHolder & mdlOptions);
 
+        void init(const std::string urdfPath,
+                  const ConfigHolder & mdlOptions,
+                  const ConfigHolder & simOptions);
+
         //Simulate functions
         result_t simulate(const vectorN_t & x0,
                           const float64_t & t0,
-                          const float64_t & tend,
+                          const float64_t & tf,
                           const float64_t & dt,
                           std::function<void(const float64_t /*t*/,
                                              const vectorN_t &/*x*/,
@@ -125,7 +133,7 @@ namespace exo_simu
 
         result_t simulate(const vectorN_t & x0,
                           const float64_t & t0,
-                          const float64_t & tend,
+                          const float64_t & tf,
                           const float64_t & dt,
                           std::function<void(const float64_t /*t*/,
                                              const vectorN_t &/*x*/,
@@ -135,38 +143,16 @@ namespace exo_simu
                           std::function<bool(const float64_t /*t*/,
                                              const vectorN_t &/*x*/)> monitorFun);
 
-        result_t simulate(const vectorN_t & x0,
-                          const float64_t & t0,
-                          const float64_t & tend,
-                          const float64_t & dt,
-                          std::function<void(const float64_t /*t*/,
-                                             const vectorN_t &/*x*/,
-                                             const matrixN_t &/*optoforces*/,
-                                             const matrixN_t &/*IMUs*/,
-                                                   vectorN_t &/*u*/)> controller,
-                          const ConfigHolder & simOptions);
-
-        result_t simulate(const vectorN_t & x0,
-                          const float64_t & t0,
-                          const float64_t & tend,
-                          const float64_t & dt,
-                          std::function<void(const float64_t /*t*/,
-                                             const vectorN_t &/*x*/,
-                                             const matrixN_t &/*optoforces*/,
-                                             const matrixN_t &/*IMUs*/,
-                                                   vectorN_t &/*u*/)> controller,
-                          std::function<bool(const float64_t /*t*/,
-                                             const vectorN_t &/*x*/)> monitorFun,
-                          const ConfigHolder & simOptions);
-
         //Accessors
         std::string getUrdfPath(void);
+        void setUrdfPath(const std::string & urdfPath);
         ConfigHolder getModelOptions(void);
+        void setModelOptions(const ConfigHolder & mdlOptions);
+        ConfigHolder getSimulationOptions(void);
+        void setSimulationOptions(const ConfigHolder & simOptions);
 
     ////////////////Protected methods/////////////////
     protected:
-        void setUrdfPath(const std::string & urdfPath);
-        void setModelOptions(const ConfigHolder & mdlOptions);
         bool checkCtrl(std::function<void(const float64_t /*t*/,
                                           const vectorN_t &/*x*/,
                                           const matrixN_t &/*optoforces*/,
@@ -194,12 +180,13 @@ namespace exo_simu
     protected:
         bool isInitialized_;
         std::string urdfPath_;
-        std::function<void(const float64_t /*t*/,
+        std::function<void(const float64_t &/*t*/,
                            const vectorN_t &/*x*/,
                            const matrixN_t &/*optoforces*/,
                            const matrixN_t &/*IMUs*/,
                                  vectorN_t &/*u*/)> controller_;
         ConfigHolder mdlOptions_;
+        ConfigHolder simOptions_;
         pinocchio::Model model_;
         pinocchio::Data data_;
 

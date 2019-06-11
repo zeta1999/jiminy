@@ -5,9 +5,9 @@ import argparse
 import numpy as np
 import os
 
-from exo_simu_py import visualize
+from exo_simu_py import load_csv_log, visualize
 
 
-csv_log_path = '/home/builder/wdc_workspace/log.csv'
+csv_log_path = os.path.dirname(os.path.realpath(__file__)) + '/log.csv'
 fast_mode = False
-visualize(csv_log_path, fast_mode)
+visualize(load_csv_log(csv_log_path), fast_mode)

@@ -7,7 +7,7 @@ project(exo_simu)
 # Set various flags
 set(default_build_type "Release")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_RELEASE "-Wall -O3 -D NDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-Wall -O3 -DNDEBUG")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Release type

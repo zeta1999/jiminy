@@ -17,6 +17,7 @@ namespace exo_simu
     urdfPath_(),
     controller_(),
     mdlOptions_(),
+    simOptions_(),
     model_(),
     data_(model_),
     nq_(19),
@@ -57,6 +58,7 @@ namespace exo_simu
     jointsIdx_()
     {
         setModelOptions(getDefaultModelOptions());
+        setSimulationOptions(getDefaultSimulationOptions());
     }
 
     ExoSimulator::ExoSimulator(const std::string urdfPath):
@@ -72,11 +74,23 @@ namespace exo_simu
         init(urdfPath, mdlOptions);
     }
 
+    ExoSimulator::ExoSimulator(const std::string urdfPath,
+                               const ConfigHolder & mdlOptions,
+                               const ConfigHolder & simOptions):
+    ExoSimulator()
+    {
+        init(urdfPath, mdlOptions, simOptions);
+    }
 
     ExoSimulator::~ExoSimulator(void)
     {
     }
 
+
+    void ExoSimulator::init(const std::string urdfPath)
+    {
+        setUrdfPath(urdfPath);
+    }
 
     void ExoSimulator::init(const std::string urdfPath,
                             const ConfigHolder & mdlOptions)
@@ -85,15 +99,19 @@ namespace exo_simu
         setModelOptions(mdlOptions);
     }
 
-    void ExoSimulator::init(const std::string urdfPath)
+    void ExoSimulator::init(const std::string urdfPath,
+                            const ConfigHolder & mdlOptions,
+                            const ConfigHolder & simuOption)
     {
         setUrdfPath(urdfPath);
+        setModelOptions(mdlOptions);
+        setSimulationOptions(simuOption);
     }
 
 
     ExoSimulator::result_t ExoSimulator::simulate(const vectorN_t & x0,
                                                   const float64_t & t0,
-                                                  const float64_t & tend,
+                                                  const float64_t & tf,
                                                   const float64_t & dt,
                                                   std::function<void(const float64_t /*t*/,
                                                                      const vectorN_t &/*x*/,
@@ -102,12 +120,12 @@ namespace exo_simu
                                                                            vectorN_t &/*u*/)> controller)
     {
         auto monitorFun = [](const float64_t t, const vectorN_t & x)->bool{ return true; };
-        return simulate(x0,t0,tend,dt,controller,monitorFun,getDefaultSimulationOptions());
+        return simulate(x0,t0,tf,dt,controller,monitorFun);
     }
 
     ExoSimulator::result_t ExoSimulator::simulate(const vectorN_t & x0,
                                                   const float64_t & t0,
-                                                  const float64_t & tend,
+                                                  const float64_t & tf,
                                                   const float64_t & dt,
                                                   std::function<void(const float64_t /*t*/,
                                                                      const vectorN_t &/*x*/,
@@ -117,56 +135,25 @@ namespace exo_simu
                                                   std::function<bool(const float64_t /*t*/,
                                                   const vectorN_t &/*x*/)> monitorFun)
     {
-        return simulate(x0,t0,tend,dt,controller,monitorFun,getDefaultSimulationOptions());
-    }
-
-    ExoSimulator::result_t ExoSimulator::simulate(const vectorN_t & x0,
-                                                  const float64_t & t0,
-                                                  const float64_t & tend,
-                                                  const float64_t & dt,
-                                                  std::function<void(const float64_t /*t*/,
-                                                                     const vectorN_t &/*x*/,
-                                                                     const matrixN_t &/*optoforces*/,
-                                                                     const matrixN_t &/*IMUs*/,
-                                                                           vectorN_t &/*u*/)> controller,
-                                                  const ConfigHolder & simOptions)
-    {
-        auto monitorFun = [](const float64_t t, const vectorN_t & x)->bool{ return true; };
-        return simulate(x0,t0,tend,dt,controller,monitorFun,simOptions);
-    }
-
-    ExoSimulator::result_t ExoSimulator::simulate(const vectorN_t & x0,
-                                                  const float64_t & t0,
-                                                  const float64_t & tend,
-                                                  const float64_t & dt,
-                                                  std::function<void(const float64_t /*t*/,
-                                                                     const vectorN_t &/*x*/,
-                                                                     const matrixN_t &/*optoforces*/,
-                                                                     const matrixN_t &/*IMUs*/,
-                                                                           vectorN_t &/*u*/)> controller,
-                                                  std::function<bool(const float64_t /*t*/,
-                                                                     const vectorN_t &/*x*/)> monitorFun,
-                                                  const ConfigHolder & simOptions)
-    {
         if(!tesc_)
         {
             std::cout << "Error - ExoSimulator::simulate - Initialization failed, will not run simulation" << std::endl;
             return ExoSimulator::result_t::ERROR_INIT_FAILED;        
         }
 
-        if(x0.rows()!=nx_)
+        if(x0.rows() != nx_)
         {
             std::cout << "Error - ExoSimulator::simulate - Size of x0 (" << x0.size() << ") inconsistent with model size (" << nx_ << ")." << std::endl;
             return ExoSimulator::result_t::ERROR_BAD_INPUT;
         }
         state_t xx0(x0.data(),x0.data() + x0.size());
 
-        if(tend<=t0)
+        if(tf <= t0)
         {
-            std::cout << "Error - ExoSimulator::simulate - Final time (" << tend << ") is less that initial time (" << t0 << ")." << std::endl;
+            std::cout << "Error - ExoSimulator::simulate - Final time (" << tf << ") is less that initial time (" << t0 << ")." << std::endl;
             return ExoSimulator::result_t::ERROR_BAD_INPUT;
         }
-        uint64_t nPts = round((tend - t0) / dt + 1.0);
+        uint64_t nPts = round((tf - t0) / dt + 1.0);
 
         
         if(!checkCtrl(controller))
@@ -176,7 +163,7 @@ namespace exo_simu
         }
         controller_ = controller;
 
-        if(nPts<2)
+        if(nPts < 2)
         {
             std::cout << "Error - ExoSimulator::simulate - Number of integration points is less than 2." << std::endl;
             return ExoSimulator::result_t::ERROR_GENERIC;
@@ -187,8 +174,8 @@ namespace exo_simu
                             std::placeholders::_1,
                             std::placeholders::_2,
                             std::placeholders::_3);    
-        auto stepper = make_dense_output(simOptions.get<float64_t>("tolAbs"),
-                                         simOptions.get<float64_t>("tolRel"),
+        auto stepper = make_dense_output(simOptions_.get<float64_t>("tolAbs"),
+                                         simOptions_.get<float64_t>("tolRel"),
                                          stepper_t());
         auto itBegin = make_n_step_iterator_begin(stepper, rhsBind, xx0, t0, dt, nPts-1);
         auto itEnd = make_n_step_iterator_end(stepper, rhsBind, xx0);
@@ -218,9 +205,9 @@ namespace exo_simu
         log.shrink_to_fit();
 
         // Log post processing
-        if(simOptions.get<bool>("logController") || 
-           simOptions.get<bool>("logOptoforces") || 
-           simOptions.get<bool>("logIMUs"))
+        if(simOptions_.get<bool>("logController") || 
+           simOptions_.get<bool>("logOptoforces") || 
+           simOptions_.get<bool>("logIMUs"))
         {
             for(uint32_t i = 0; i < log.size(); i++)
             {
@@ -247,7 +234,7 @@ namespace exo_simu
 
                 // Compute foot contact forces
                 Eigen::Matrix<float64_t,3,8> optoforces;
-                if(simOptions.get<bool>("logController") || simOptions.get<bool>("logOptoforces"))
+                if(simOptions_.get<bool>("logController") || simOptions_.get<bool>("logOptoforces"))
                 {
                     for(uint32_t i = 0; i<contactFramesIdx_.size(); i++)
                     {
@@ -258,7 +245,7 @@ namespace exo_simu
 
                 // Get IMUs data
                 Eigen::Matrix<float64_t,7,4> IMUs;
-                if(simOptions.get<bool>("logController") || simOptions.get<bool>("logIMUs"))
+                if(simOptions_.get<bool>("logController") || simOptions_.get<bool>("logIMUs"))
                 {
                     for(uint32_t i = 0; i<imuFramesIdx_.size(); i++)
                     {
@@ -277,7 +264,7 @@ namespace exo_simu
 
                 // Compute control action
                 vectorN_t u = vectorN_t::Zero(nu_);
-                if(simOptions.get<bool>("logController"))
+                if(simOptions_.get<bool>("logController"))
                 {
                     Eigen::Map<const vectorN_t> xEig(log[i].data() + 1,nx_);
                     t = log[i][0];
@@ -285,15 +272,15 @@ namespace exo_simu
                 }
 
                 // Fill up log
-                if(simOptions.get<bool>("logOptoforces"))
+                if(simOptions_.get<bool>("logOptoforces"))
                 {
                     log[i].insert(log[i].end(),optoforces.data(),optoforces.data() + 24);
                 }
-                if(simOptions.get<bool>("logIMUs"))
+                if(simOptions_.get<bool>("logIMUs"))
                 {
                     log[i].insert(log[i].end(),IMUs.data(),IMUs.data() + 28);
                 }
-                if(simOptions.get<bool>("logController"))
+                if(simOptions_.get<bool>("logController"))
                 {
                     log[i].insert(log[i].end(),u.data(),u.data() + nu_);        
                 }
@@ -384,6 +371,16 @@ namespace exo_simu
             jointOptions_.get<vectorN_t>("boundsMax").head<6>() = model_.upperPositionLimit.segment<6>(7);
             jointOptions_.get<vectorN_t>("boundsMax").tail<6>() = model_.upperPositionLimit.segment<6>(14);
         }
+    }
+
+    ConfigHolder ExoSimulator::getSimulationOptions(void)
+    {
+        return simOptions_;
+    }
+
+    void ExoSimulator::setSimulationOptions(const ConfigHolder & simOptions)
+    {
+        simOptions_ = simOptions;
     }
 
     void ExoSimulator::dynamicsCL(const state_t &x,

@@ -43,6 +43,9 @@ def _reorderJoint(position, velocity, joint_order, dynamics_teller):
         v[dynamics_teller.getJointIdInVelocity(joint_order[i])] = velocity[i]
     return q, v
 
+def load_csv_log(csv_log_path):
+    return genfromtxt(csv_log_path, delimiter=',')
+
 ## @brief visualize Replays a exo_simu-readable csv log file into gepetto viewer.
 ##
 ## @details This enables quick visual review of the trajectory (though it does not guarantee that the trajectory will work
@@ -51,9 +54,9 @@ def _reorderJoint(position, velocity, joint_order, dynamics_teller):
 ## This script 'tries' to replay a trajectory in real time. In practice however there will be small time dilatation
 ## (typically trajectory running 5 to 10% slower than usual).
 ##
-## @param csv_log_path Path of the csv log file
+## @param log_data Data of a csv log file stored in a numpy.array
 ## @param fast_mode Do not try to keep the real time factor and display as fast as possible instead
-def visualize(csv_log_path, fast_mode=False):
+def visualize(log_data, fast_mode=False):
     # Load urdf file, create DynamicsTeller and RobotWrapper
     robot = RobotWrapper()
     robot.initFromURDF(WDC_URDF_PATH, WDC_MESH_PATH, se3.JointModelFreeFlyer())
@@ -78,7 +81,6 @@ def visualize(csv_log_path, fast_mode=False):
     robot.loadDisplayModel("world/wdc_robot")
 
     # Load trajectory file
-    log_data = genfromtxt(csv_log_path, delimiter=',')
     t = log_data[:,0]
     q = log_data[:,8:20]
     positions_freeflyer = log_data[:,1:4]

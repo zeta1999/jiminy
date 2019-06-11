@@ -35,7 +35,7 @@ void controller(const double t,
 bool monitor(const double t,
              const Eigen::VectorXd &x)
 {
-    if(t<=2.5)
+    if(t <= 2.5)
         return true;
     else
         return false;
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     x0(3) = 1.0;
 
     double t0 = 0.0;
-    double tend = 3.0;
+    double tf = 3.0;
     double dt = 0.001;
 
     ConfigHolder simOpts = ExoSimulator::getDefaultSimulationOptions();
@@ -113,13 +113,15 @@ int main(int argc, char *argv[])
 
     // Instanciate simulator
     tic(&timer);
-    ExoSimulator exoSim(urdfPath,modelOpts);
+    ExoSimulator exoSim(urdfPath);
+    exoSim.setModelOptions(modelOpts);
     toc(&timer);
     std::cout << "Instanciation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // Run simulation
+    exoSim.setSimulationOptions(simOpts);
     tic(&timer);
-    exoSim.simulate(x0,t0,tend,dt,controller,monitor,simOpts);
+    exoSim.simulate(x0,t0,tf,dt,controller,monitor);
     toc(&timer);
     std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 

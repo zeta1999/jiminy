@@ -20,14 +20,27 @@ namespace python
 {
     namespace bp = boost::python;
 
+    struct controllerPyWrapper {
+    public:
+        controllerPyWrapper(bp::object const& objPy) : funcPyPtr_(objPy) {}
+        double operator() (const float64_t & t,
+                           const vectorN_t & x,
+                           const matrixN_t & optoforces,
+                           const matrixN_t & IMUs,
+                                 vectorN_t & u)
+        {
+            u = bp::extract<vectorN_t>(funcPyPtr_(t, x, optoforces, IMUs));
+        }
+    private:
+        bp::object funcPyPtr_;
+    };
+
     struct ExoSimulatorVisitor
         : public bp::def_visitor<ExoSimulatorVisitor>
     {
     public:
         ///////////////////////////////////////////////////////////////////////////////
-        ///
         /// \brief Expose C++ API through the visitor.
-        ///
         ///////////////////////////////////////////////////////////////////////////////
         template<class PyClass>
         void visit(PyClass& cl) const
@@ -35,9 +48,13 @@ namespace python
             cl
                 .def("init", &ExoSimulatorVisitor::init, (bp::arg("self"), "urdf_path"))
                 .def("simulate", &ExoSimulatorVisitor::simulate, (bp::arg("self"), "x0", "t0", "tf", "dt", "controller"))
-                .add_property("urdf_path", &ExoSimulator::getUrdfPath,  &ExoSimulator::setUrdfPath)
-                .add_property("simulation_options", &ExoSimulatorVisitor::getSimulationOptions,  &ExoSimulatorVisitor::setSimulationOptions)
-                .add_property("model_options", &ExoSimulatorVisitor::getModelOptions,  &ExoSimulatorVisitor::setModelOptions)
+                .def("get_log", &ExoSimulatorVisitor::getLog)
+                .def("get_urdf_path", &ExoSimulator::getUrdfPath, bp::return_value_policy<bp::return_by_value>())
+                .def("set_urdf_path", &ExoSimulator::setUrdfPath)
+                .def("get_model_options", &ExoSimulatorVisitor::getModelOptions, bp::return_value_policy<bp::return_by_value>())
+                .def("set_model_options", &ExoSimulatorVisitor::setModelOptions)
+                .def("get_simulation_options", &ExoSimulatorVisitor::getSimulationOptions, bp::return_value_policy<bp::return_by_value>())
+                .def("set_simulation_options", &ExoSimulatorVisitor::setSimulationOptions)
                 ;
         }
 
@@ -47,7 +64,7 @@ namespace python
         static void init(ExoSimulator& self,
                          std::string const& urdf_path)
         {
-            //self.simulate(x0, t0, tf, dt, FctHandleProxy(controller));
+            self.init(urdf_path);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -58,32 +75,47 @@ namespace python
                              float64_t const& t0,
                              float64_t const& tf,
                              float64_t const& dt,
-                             bp::object const& controller)
+                             bp::object const& controllerPy)
         {
-            //self.simulate(x0, t0, tf, dt, FctHandleProxy(controller));
+            controllerPyWrapper controller = controllerPyWrapper(controllerPy);
+            self.simulate(x0, t0, tf, dt, controller);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief      Getters and Setters
         ///////////////////////////////////////////////////////////////////////////////
-        static void getSimulationOptions(void)
-        {
 
+        static std::vector<std::vector<float64_t> > getLog(ExoSimulator& self)
+        {
+            return self.log;
         }
 
-        static void setSimulationOptions(void)
+        static bp::dict getModelOptions(ExoSimulator& self)
         {
-                
+            bp::dict configPy;
+            convertConfigHolderPy(self.getModelOptions(), configPy);
+            return configPy;
         }
 
-        static void getModelOptions(void)
+        static void setModelOptions(ExoSimulator& self, bp::dict const& configPy)
         {
-
+            ConfigHolder config = self.getDefaultModelOptions();
+            loadConfigHolder(configPy, config);
+            self.setModelOptions(config);
         }
 
-        static void setModelOptions(void)
+        static bp::dict getSimulationOptions(ExoSimulator& self)
         {
-                
+            bp::dict configPy;
+            convertConfigHolderPy(self.getSimulationOptions(), configPy);
+            return configPy;
+        }
+
+        static void setSimulationOptions(ExoSimulator& self, bp::dict const& configPy)
+        {
+            ConfigHolder config = self.getDefaultSimulationOptions();
+            loadConfigHolder(configPy, config);
+            self.setSimulationOptions(config);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -91,12 +123,11 @@ namespace python
         ///////////////////////////////////////////////////////////////////////////////
         static void expose()
         {
-            bp::to_python_converter<std::vector<int32_t>, VecToList<int32_t> >();
+            bp::to_python_converter<std::vector<float64_t>, VecToList<float64_t> >();
             bp::to_python_converter<std::vector<vectorN_t>, VecToList<vectorN_t> >();
             bp::to_python_converter<std::vector<matrixN_t>, VecToList<matrixN_t> >();
-            bp::to_python_converter<std::vector<std::vector<matrixN_t> >, VecToList<std::vector<matrixN_t> > >();
-            bp::class_<ExoSimulator>("ExoSimulator", "ExoSimulator class")
-                .def(ExoSimulatorVisitor());
+            bp::to_python_converter<std::vector<std::vector<float64_t> >, VecToList<std::vector<float64_t> > >();
+            bp::class_<ExoSimulator>("ExoSimulator", "ExoSimulator class").def(ExoSimulatorVisitor());
         }
     };
 }  // End of namespace python.
