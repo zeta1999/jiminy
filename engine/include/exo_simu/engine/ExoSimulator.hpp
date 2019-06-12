@@ -25,11 +25,15 @@ namespace exo_simu
     {
     ////////////////Public typedefs//////////////////
     public:
-
-        typedef Eigen::Matrix<float64_t,6,1> Vector6d;
-        typedef Eigen::Matrix<float64_t,12,1> Vector12d;
         typedef std::vector<float64_t> state_t;
         typedef std::vector<state_t> log_t;
+        typedef std::function<void(const float64_t &/*t*/,
+                                   const vectorN_t &/*x*/,
+                                   const matrixN_t &/*optoforces*/,
+                                   const matrixN_t &/*IMUs*/,
+                                         vectorN_t &/*u*/)> controller_t;
+        typedef std::function<bool(const float64_t &/*t*/,
+                                   const vectorN_t &/*x*/)> callbackFct_t;
 
         enum class result_t : int32_t
         {
@@ -52,13 +56,33 @@ namespace exo_simu
             return config;
         };
 
+        struct contactOptions_t
+        {
+            const float64_t frictionViscous;
+            const float64_t frictionDry;
+            const float64_t dryFictionVelEps;
+            const float64_t stiffness;
+            const float64_t damping;
+            const float64_t transitionEps;
+
+            contactOptions_t(ConfigHolder const& options):
+            frictionViscous(options.get<float64_t>("frictionViscous")),
+            frictionDry(options.get<float64_t>("frictionDry")),
+            dryFictionVelEps(options.get<float64_t>("dryFictionVelEps")),
+            stiffness(options.get<float64_t>("stiffness")),
+            damping(options.get<float64_t>("damping")),
+            transitionEps(options.get<float64_t>("transitionEps"))
+            {
+            }
+        };
+
         static ConfigHolder getDefaultJointOptions()
         {
             ConfigHolder config;
-            config.addOption<vectorN_t>("frictionViscous", (Vector12d() << 100.0,100.0,100.0,100.0,20.0,20.0,100.0,100.0,100.0,100.0,20.0,20.0).finished());
-            config.addOption<vectorN_t>("frictionDry", (Vector12d() << 10.0,10.0,10.0,10.0,2.0,2.0,10.0,10.0,10.0,10.0,2.0,2.0).finished());
-            config.addOption<vectorN_t>("boundsMin", -(Vector12d() << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
-            config.addOption<vectorN_t>("boundsMax", (Vector12d() << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
+            config.addOption<vectorN_t>("frictionViscous", (vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,100.0,100.0,100.0,100.0,20.0,20.0).finished());
+            config.addOption<vectorN_t>("frictionDry", (vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,10.0,10.0,10.0,10.0,2.0,2.0).finished());
+            config.addOption<vectorN_t>("boundsMin", -(vectorN_t(12) << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
+            config.addOption<vectorN_t>("boundsMax", (vectorN_t(12) << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
             config.addOption<bool>("boundsFromUrdf", true);
             config.addOption<float64_t>("dryFictionVelEps", 1.0e-2);
             config.addOption<float64_t>("boundStiffness", 5.0e5);
@@ -68,15 +92,54 @@ namespace exo_simu
             return config;
         };
 
+        struct jointOptions_t
+        {
+            const vectorN_t frictionViscous;
+            const vectorN_t frictionDry;
+            const vectorN_t boundsMin;
+            const vectorN_t boundsMax;
+            const bool      boundsFromUrdf;
+            const float64_t dryFictionVelEps;
+            const float64_t boundStiffness;
+            const float64_t boundDamping;
+            const float64_t boundTransitionEps;
+
+            jointOptions_t(ConfigHolder const& options):
+            frictionViscous(options.get<vectorN_t>("frictionViscous")),
+            frictionDry(options.get<vectorN_t>("frictionDry")),
+            boundsMin(options.get<vectorN_t>("boundsMin")),
+            boundsMax(options.get<vectorN_t>("boundsMax")),
+            boundsFromUrdf(options.get<bool>("boundsFromUrdf")),
+            dryFictionVelEps(options.get<float64_t>("dryFictionVelEps")),
+            boundStiffness(options.get<float64_t>("boundStiffness")),
+            boundDamping(options.get<float64_t>("boundDamping")),
+            boundTransitionEps(options.get<float64_t>("boundTransitionEps"))
+            {
+            }
+        };
 
         static ConfigHolder getDefaultModelOptions()
         {
             ConfigHolder config;
             config.addOption<ConfigHolder>("joints", getDefaultJointOptions());
             config.addOption<ConfigHolder>("contacts", getDefaultContactOptions());
-            config.addOption<vectorN_t>("gravity", (Vector6d() << 0.0,0.0,-9.81,0.0,0.0,0.0).finished());
+            config.addOption<vectorN_t>("gravity", (vectorN_t(6) << 0.0,0.0,-9.81,0.0,0.0,0.0).finished());
 
             return config;
+        };
+
+        struct modelOptions_t
+        {
+            const jointOptions_t   joints;
+            const contactOptions_t contacts;
+            const vectorN_t        gravity;
+
+            modelOptions_t(ConfigHolder const& options):
+            joints(options.get<ConfigHolder>("joints")),
+            contacts(options.get<ConfigHolder>("contacts")),
+            gravity(options.get<vectorN_t>("gravity"))
+            {
+            }
         };
 
         static ConfigHolder getDefaultSimulationOptions()
@@ -89,6 +152,24 @@ namespace exo_simu
             config.addOption<bool>("logIMUs", true);
 
             return config;
+        };
+
+        struct simulationOptions_t
+        {
+            const float64_t tolAbs;
+            const float64_t tolRel;
+            const bool      logController;
+            const bool      logOptoforces;
+            const bool      logIMUs;
+
+            simulationOptions_t(ConfigHolder const& options):
+            tolAbs(options.get<float64_t>("tolAbs")),
+            tolRel(options.get<float64_t>("tolRel")),
+            logController(options.get<bool>("logController")),
+            logOptoforces(options.get<bool>("logOptoforces")),
+            logIMUs(options.get<bool>("logIMUs"))
+            {
+            }
         };
 
     ////////////////Protected typedefs//////////////////
@@ -125,23 +206,14 @@ namespace exo_simu
                           const float64_t & t0,
                           const float64_t & tf,
                           const float64_t & dt,
-                          std::function<void(const float64_t /*t*/,
-                                             const vectorN_t &/*x*/,
-                                             const matrixN_t &/*optoforces*/,
-                                             const matrixN_t &/*IMUs*/,
-                                                   vectorN_t &/*u*/)> controller);
+                          controller_t controller);
 
         result_t simulate(const vectorN_t & x0,
                           const float64_t & t0,
                           const float64_t & tf,
                           const float64_t & dt,
-                          std::function<void(const float64_t /*t*/,
-                                             const vectorN_t &/*x*/,
-                                             const matrixN_t &/*optoforces*/,
-                                             const matrixN_t &/*IMUs*/,
-                                                   vectorN_t &/*u*/)> controller,
-                          std::function<bool(const float64_t /*t*/,
-                                             const vectorN_t &/*x*/)> monitorFun);
+                          controller_t controller,
+                          callbackFct_t callbackFct);
 
         //Accessors
         std::string getUrdfPath(void);
@@ -153,11 +225,7 @@ namespace exo_simu
 
     ////////////////Protected methods/////////////////
     protected:
-        bool checkCtrl(std::function<void(const float64_t /*t*/,
-                                          const vectorN_t &/*x*/,
-                                          const matrixN_t &/*optoforces*/,
-                                          const matrixN_t &/*IMUs*/,
-                                                vectorN_t &/*u*/)> controller);
+        bool checkCtrl(controller_t controller);
 
         void dynamicsCL(const state_t & x,
                         state_t & xDot,
@@ -165,7 +233,7 @@ namespace exo_simu
         void internalDynamics(const vectorN_t & q,
                               const vectorN_t & dq,
                                     vectorN_t & u);
-        Vector6d contactDynamics(const int32_t & frameId);
+        vectorN_t contactDynamics(const int32_t & frameId);
 
         float64_t saturateSoft(const float64_t in,
                                const float64_t mi,
@@ -180,13 +248,11 @@ namespace exo_simu
     protected:
         bool isInitialized_;
         std::string urdfPath_;
-        std::function<void(const float64_t &/*t*/,
-                           const vectorN_t &/*x*/,
-                           const matrixN_t &/*optoforces*/,
-                           const matrixN_t &/*IMUs*/,
-                                 vectorN_t &/*u*/)> controller_;
-        ConfigHolder mdlOptions_;
-        ConfigHolder simOptions_;
+        controller_t controller_;
+        ConfigHolder mdlOptionsHolder_;
+        ConfigHolder simOptionsHolder_;
+        std::shared_ptr<modelOptions_t> mdlOptions_;
+        std::shared_ptr<simulationOptions_t> simOptions_;
         pinocchio::Model model_;
         pinocchio::Data data_;
 

@@ -23,13 +23,24 @@ namespace python
     struct controllerPyWrapper {
     public:
         controllerPyWrapper(bp::object const& objPy) : funcPyPtr_(objPy) {}
-        double operator() (const float64_t & t,
+        void operator() (const float64_t & t,
                            const vectorN_t & x,
                            const matrixN_t & optoforces,
                            const matrixN_t & IMUs,
                                  vectorN_t & u)
         {
             u = bp::extract<vectorN_t>(funcPyPtr_(t, x, optoforces, IMUs));
+        }
+    private:
+        bp::object funcPyPtr_;
+    };
+
+    struct callbackPyWrapper {
+    public:
+        callbackPyWrapper(bp::object const& objPy) : funcPyPtr_(objPy) {}
+        bool operator() (const float64_t & t, const vectorN_t & x)
+        {
+            return bp::extract<bool>(funcPyPtr_(t, x));
         }
     private:
         bp::object funcPyPtr_;
@@ -46,14 +57,21 @@ namespace python
         void visit(PyClass& cl) const
         {
             cl
-                .def("init", &ExoSimulatorVisitor::init, (bp::arg("self"), "urdf_path"))
-                .def("simulate", &ExoSimulatorVisitor::simulate, (bp::arg("self"), "x0", "t0", "tf", "dt", "controller"))
+                .def("init", &ExoSimulatorVisitor::init, 
+                             (bp::arg("self"), "urdf_path"))
+                .def("simulate", &ExoSimulatorVisitor::simulate, 
+                                 (bp::arg("self"), "x0", "t0", "tf", "dt", "controller"))
+                .def("simulate", &ExoSimulatorVisitor::simulate_with_callback, 
+                                 (bp::arg("self"), "x0", "t0", "tf", "dt", "controller", "callback"))
                 .def("get_log", &ExoSimulatorVisitor::getLog)
-                .def("get_urdf_path", &ExoSimulator::getUrdfPath, bp::return_value_policy<bp::return_by_value>())
+                .def("get_urdf_path", &ExoSimulator::getUrdfPath, 
+                                      bp::return_value_policy<bp::return_by_value>())
                 .def("set_urdf_path", &ExoSimulator::setUrdfPath)
-                .def("get_model_options", &ExoSimulatorVisitor::getModelOptions, bp::return_value_policy<bp::return_by_value>())
+                .def("get_model_options", &ExoSimulatorVisitor::getModelOptions, 
+                                          bp::return_value_policy<bp::return_by_value>())
                 .def("set_model_options", &ExoSimulatorVisitor::setModelOptions)
-                .def("get_simulation_options", &ExoSimulatorVisitor::getSimulationOptions, bp::return_value_policy<bp::return_by_value>())
+                .def("get_simulation_options", &ExoSimulatorVisitor::getSimulationOptions, 
+                                               bp::return_value_policy<bp::return_by_value>())
                 .def("set_simulation_options", &ExoSimulatorVisitor::setSimulationOptions)
                 ;
         }
@@ -79,6 +97,19 @@ namespace python
         {
             controllerPyWrapper controller = controllerPyWrapper(controllerPy);
             self.simulate(x0, t0, tf, dt, controller);
+        }
+
+        static void simulate_with_callback(ExoSimulator& self,
+                                           vectorN_t const& x0,
+                                           float64_t const& t0,
+                                           float64_t const& tf,
+                                           float64_t const& dt,
+                                           bp::object const& controllerPy,
+                                           bp::object const& callbackPy)
+        {
+            controllerPyWrapper controller = controllerPyWrapper(controllerPy);
+            callbackPyWrapper callback = callbackPyWrapper(callbackPy);
+            self.simulate(x0, t0, tf, dt, controller, callback);
         }
 
         ///////////////////////////////////////////////////////////////////////////////

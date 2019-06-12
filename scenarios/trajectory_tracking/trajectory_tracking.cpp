@@ -17,10 +17,10 @@ using namespace exo_simu;
 const uint32_t nx_ = 37;
 const uint32_t nu_ = 12;
 
-ExoSimulator::Vector12d Kp = (ExoSimulator::Vector12d() << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
-                                                           41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
-ExoSimulator::Vector12d Kd = (ExoSimulator::Vector12d() << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
-                                                           500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
+vectorN_t Kp = (vectorN_t(12) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
+                               41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
+vectorN_t Kd = (vectorN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
+                               500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
 
 void controller(const double t,
                 const Eigen::VectorXd &x,
@@ -28,17 +28,13 @@ void controller(const double t,
                 const Eigen::MatrixXd &IMUs,
                       Eigen::VectorXd &u)
 {
-    // u = ExoSimulator::Vector12d::Zero();
-    u = -(Kp.array()*x.segment<12>(7).array() + Kd.array()*x.segment<12>(19).array());
+    // u = vectorN_t::Zero(12);
+    u = -(Kp.array() * x.segment<12>(7).array() + Kd.array() * x.segment<12>(19+6).array());
 }
 
-bool monitor(const double t,
-             const Eigen::VectorXd &x)
+bool monitor(const double t, const Eigen::VectorXd &x)
 {
-    if(t <= 2.5)
-        return true;
-    else
-        return false;
+    return (t <= 2.5);
 }
 
 int main(int argc, char *argv[])
@@ -102,8 +98,8 @@ int main(int argc, char *argv[])
     double dt = 0.001;
 
     ConfigHolder simOpts = ExoSimulator::getDefaultSimulationOptions();
-    simOpts.get<float64_t>("tolRel") = 1.0e-7;
-    simOpts.get<float64_t>("tolAbs") = 1.0e-6;
+    simOpts.get<float64_t>("tolRel") = 1.0e-5;
+    simOpts.get<float64_t>("tolAbs") = 1.0e-4;
     simOpts.get<bool>("logController") = false;
     simOpts.get<bool>("logOptoforces") = false;
     simOpts.get<bool>("logIMUs") = false;
