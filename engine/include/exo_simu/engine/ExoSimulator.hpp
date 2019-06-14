@@ -79,12 +79,12 @@ namespace exo_simu
         static ConfigHolder getDefaultJointOptions()
         {
             ConfigHolder config;
-            config.addOption<vectorN_t>("frictionViscous", (vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,100.0,100.0,100.0,100.0,20.0,20.0).finished());
-            config.addOption<vectorN_t>("frictionDry", (vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,10.0,10.0,10.0,10.0,2.0,2.0).finished());
+            config.addOption<bool>("boundsFromUrdf", true);
             config.addOption<vectorN_t>("boundsMin", -(vectorN_t(12) << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
             config.addOption<vectorN_t>("boundsMax", (vectorN_t(12) << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
-            config.addOption<bool>("boundsFromUrdf", true);
-            config.addOption<float64_t>("dryFictionVelEps", 1.0e-2);
+            config.addOption<vectorN_t>("frictionViscous", 0*(vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,100.0,100.0,100.0,100.0,20.0,20.0).finished());
+            config.addOption<vectorN_t>("frictionDry", 0*(vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,10.0,10.0,10.0,10.0,2.0,2.0).finished());
+            config.addOption<float64_t>("dryFictionVelEps", 0*1.0e-2);
             config.addOption<float64_t>("boundStiffness", 5.0e5);
             config.addOption<float64_t>("boundDamping", 5.0e2);
             config.addOption<float64_t>("boundTransitionEps", 2.0e-3);
@@ -94,22 +94,22 @@ namespace exo_simu
 
         struct jointOptions_t
         {
-            const vectorN_t frictionViscous;
-            const vectorN_t frictionDry;
+            const bool      boundsFromUrdf;
             const vectorN_t boundsMin;
             const vectorN_t boundsMax;
-            const bool      boundsFromUrdf;
+            const vectorN_t frictionViscous;
+            const vectorN_t frictionDry;
             const float64_t dryFictionVelEps;
             const float64_t boundStiffness;
             const float64_t boundDamping;
             const float64_t boundTransitionEps;
 
             jointOptions_t(ConfigHolder const& options):
-            frictionViscous(options.get<vectorN_t>("frictionViscous")),
-            frictionDry(options.get<vectorN_t>("frictionDry")),
+            boundsFromUrdf(options.get<bool>("boundsFromUrdf")),
             boundsMin(options.get<vectorN_t>("boundsMin")),
             boundsMax(options.get<vectorN_t>("boundsMax")),
-            boundsFromUrdf(options.get<bool>("boundsFromUrdf")),
+            frictionViscous(options.get<vectorN_t>("frictionViscous")),
+            frictionDry(options.get<vectorN_t>("frictionDry")),
             dryFictionVelEps(options.get<float64_t>("dryFictionVelEps")),
             boundStiffness(options.get<float64_t>("boundStiffness")),
             boundDamping(options.get<float64_t>("boundDamping")),

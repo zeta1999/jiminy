@@ -402,7 +402,7 @@ namespace exo_simu
         const Eigen::Matrix3d Rb2w = quat.toRotationMatrix();
         dqPinocchio.head<3>() = Rb2w.transpose()*dqPinocchio.head<3>();
 
-        // Stuf Specific to wandercraft urdf
+        // Stuff Specific to wandercraft urdf
         vectorN_t qFull(nqFull_);
         vectorN_t dqFull(ndqFull_);
         vectorN_t ddqFull(ndqFull_);

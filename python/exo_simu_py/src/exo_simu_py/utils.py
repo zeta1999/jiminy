@@ -2,10 +2,11 @@
 
 import json
 import argparse
-import numpy as np
 import os
 import time
-from numpy import genfromtxt
+import numpy as np
+from numba import jit # Use to precompile Python code
+from scipy.interpolate import UnivariateSpline
 
 from gepetto.corbaserver import Client
 import pinocchio as se3
@@ -44,7 +45,7 @@ def _reorderJoint(position, velocity, joint_order, dynamics_teller):
     return q, v
 
 def load_csv_log(csv_log_path):
-    return genfromtxt(csv_log_path, delimiter=',')
+    return np.genfromtxt(csv_log_path, delimiter=',')
 
 ## @brief visualize Replays a exo_simu-readable csv log file into gepetto viewer.
 ##
@@ -55,8 +56,8 @@ def load_csv_log(csv_log_path):
 ## (typically trajectory running 5 to 10% slower than usual).
 ##
 ## @param log_data Data of a csv log file stored in a numpy.array
-## @param fast_mode Do not try to keep the real time factor and display as fast as possible instead
-def visualize(log_data, fast_mode=False):
+## @param speed_ratio Ratio between real time and display time
+def visualize(log_data, speed_ratio=1.0):
     # Load urdf file, create DynamicsTeller and RobotWrapper
     robot = RobotWrapper()
     robot.initFromURDF(WDC_URDF_PATH, WDC_MESH_PATH, se3.JointModelFreeFlyer())
@@ -96,7 +97,85 @@ def visualize(log_data, fast_mode=False):
 
         robot.display(qe)
         client.gui.refresh()
-        if not fast_mode:
-            t_simu = time.time() - init_time
-            if t_simu < t[i]:
-                time.sleep(t[i] - t_simu)
+        t_simu = (time.time() - init_time) * speed_ratio
+        if t_simu < t[i]:
+            time.sleep(t[i] - t_simu)
+
+def smoothing_filter(time_in,val_in,time_out=None,relabel=None,params=None):
+    if time_out is None:
+        time_out = time_in
+    if params is None:
+        params = dict()
+        params['mixing_ratio_1'] = 0.12
+        params['mixing_ratio_2'] = 0.04
+        params['smoothness'] = [0.0,0.0,0.0]
+        params['smoothness'][0]  = 5e-4
+        params['smoothness'][1]  = 5e-4
+        params['smoothness'][2]  = 5e-4
+
+    if relabel is None:
+        mix_fit    = [None,None,None]
+        mix_fit[0] = lambda t: 0.5*(1+np.sin(1/params['mixing_ratio_1']*((t-time_in[0])/(time_in[-1]-time_in[0]))*np.pi-np.pi/2))
+        mix_fit[1] = lambda t: 0.5*(1+np.sin(1/params['mixing_ratio_2']*((t-(1-params['mixing_ratio_2'])*time_in[-1])/(time_in[-1]-time_in[0]))*np.pi+np.pi/2))
+        mix_fit[2] = lambda t: 1
+        
+        val_fit = []
+        for jj in range(val_in.shape[0]):
+            val_fit_jj = []
+            for kk in range(len(params['smoothness'])):
+                val_fit_jj.append(UnivariateSpline(time_in, val_in[jj], s=params['smoothness'][kk]))
+            val_fit.append(val_fit_jj)
+        
+        time_out_mixing = [None, None, None]
+        time_out_mixing_ind = [None, None, None]
+        time_out_mixing_ind[0] = time_out < time_out[-1]*params['mixing_ratio_1']
+        time_out_mixing[0] = time_out[time_out_mixing_ind[0]]
+        time_out_mixing_ind[1] = time_out > time_out[-1]*(1-params['mixing_ratio_2'])
+        time_out_mixing[1] = time_out[time_out_mixing_ind[1]]
+        time_out_mixing_ind[2] = np.logical_and(np.logical_not(time_out_mixing_ind[0]), np.logical_not(time_out_mixing_ind[1]))
+        time_out_mixing[2] = time_out[time_out_mixing_ind[2]]
+        
+        val_out = np.zeros((val_in.shape[0],len(time_out)))
+        for jj in range(val_in.shape[0]):
+            for kk in range(len(time_out_mixing)):
+                val_out[jj,time_out_mixing_ind[kk]] = \
+                   (1 - mix_fit[kk](time_out_mixing[kk])) * val_fit[jj][kk](time_out_mixing[kk]) + \
+                        mix_fit[kk](time_out_mixing[kk])  * val_fit[jj][-1](time_out_mixing[kk])
+    else:
+        time_tmp   = np.concatenate([time_in[:-1]-time_in[-1],time_in,time_in[1:]+time_in[-1]])
+        val_in_tmp = np.concatenate([relabel.dot(val_in[:,:-1]),val_in,relabel.dot(val_in[:,1:])], axis=1)
+        val_out = np.zeros((val_in.shape[0],len(time_out)))
+        for jj in range(val_in_tmp.shape[0]):
+            f = UnivariateSpline(time_tmp, val_in_tmp[jj], s=params['smoothness'][-1])
+            val_out[jj] = f(time_out)
+
+    return val_out
+
+@jit(nopython=True)
+def get_closest_left_ind(arr, target):
+    n = len(arr)
+    left = 0
+    right = n - 1
+    mid = 0
+
+    # edge case - last or above all
+    if target >= arr[n - 1]:
+        return n - 1
+    # edge case - first or below all
+    if target <= arr[0]:
+        return 0
+    # BSearch solution: Time & Space: Log(N)
+
+    while left < right:
+        mid = (left + right) // 2  # find the mid
+        if target < arr[mid]:
+            right = mid
+        elif target > arr[mid]:
+            left = mid + 1
+        else:
+            return mid
+
+    if target < arr[mid]:
+        return mid - 1
+    else:
+        return mid
