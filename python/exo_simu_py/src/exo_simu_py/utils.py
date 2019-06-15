@@ -1,34 +1,58 @@
 #!/usr/bin/env python
 
-import json
-import argparse
 import os
 import time
+from collections import OrderedDict
+import json
+import xmltodict
 import numpy as np
 from numba import jit # Use to precompile Python code
 from scipy.interpolate import UnivariateSpline
 
-from gepetto.corbaserver import Client
-import pinocchio as se3
+import pinocchio as pnc
 from pinocchio.utils import *
 from pinocchio.robot_wrapper import RobotWrapper
-from wdc_dynamicsteller import *
+from gepetto.corbaserver import Client
+
+from wdc_dynamicsteller import DynamicsTeller, rootjoint
+from wdc.effort_assessment.state_extracting import State, retrieve_freeflyer
+from wdc.effort_assessment.compute_efforts import compute_efforts_with_rnea
 from wdc.log_analysis_py import WDC_MESH_PATH, WDC_URDF_PATH
 
 
-joint_order = ["LeftFrontalHipJoint",
-               "LeftTransverseHipJoint",
-               "LeftSagittalHipJoint",
-               "LeftSagittalKneeJoint",
-               "LeftSagittalAnkleJoint",
-               "LeftHenkeAnkleJoint",
-               "RightFrontalHipJoint",
-               "RightTransverseHipJoint",
-               "RightSagittalHipJoint",
-               "RightSagittalKneeJoint",
-               "RightSagittalAnkleJoint",
-               "RightHenkeAnkleJoint"]
-
+EXO_THIGH_RPY = [-7/180*np.pi, 0, 0]
+EXO_DEFAULT_THIGH_SETTINGS_MM = 420
+JOINT_ORDER_EXO_SIMU = ['LeftFrontalHipJoint',
+                        'LeftTransverseHipJoint',
+                        'LeftSagittalHipJoint',
+                        'LeftSagittalKneeJoint',
+                        'LeftSagittalAnkleJoint',
+                        'LeftHenkeAnkleJoint',
+                        'RightFrontalHipJoint',
+                        'RightTransverseHipJoint',
+                        'RightSagittalHipJoint',
+                        'RightSagittalKneeJoint',
+                        'RightSagittalAnkleJoint',
+                        'RightHenkeAnkleJoint']
+JOINT_ORDER_NN = ["RightFrontalHipJoint",
+                  "RightTransverseHipJoint",
+                  "RightSagittalHipJoint",
+                  "RightSagittalKneeJoint",
+                  "RightSagittalAnkleJoint",
+                  "RightHenkeAnkleJoint",
+                  "LeftFrontalHipJoint",
+                  "LeftTransverseHipJoint",
+                  "LeftSagittalHipJoint",
+                  "LeftSagittalKneeJoint",
+                  "LeftSagittalAnkleJoint",
+                  "LeftHenkeAnkleJoint"]
+SUPPORT_FOOT_NN = 'RightSole'
+SUPPORT_FOOT_ENUM = ['RightSole', 'LeftSole']
+INPUT_ORDER_NN = {"steplength": 1, "duration": 2, "stairheight": 3}
+THOT_TO_SIMU_JOINT_MASK_POSITION = np.concatenate((np.arange(7,13),np.arange(14,20)))
+THOT_TO_SIMU_JOINT_MASK_VELOCITY = np.concatenate((np.arange(6,12),np.arange(13,19)))
+RELABELING_JOINT_MATRIX = np.zeros((12,12))
+RELABELING_JOINT_MATRIX[6:,:6] = RELABELING_JOINT_MATRIX[:6,6:] = np.diag([-1,-1,1,1,1,-1])
 
 ## @brief Reorder the elements position and velocity from json to dynamics_teller order
 ##
@@ -36,70 +60,52 @@ joint_order = ["LeftFrontalHipJoint",
 ## @param velocity list of joint velocity
 ## @param json_order list giving the joint order in json file
 ## @param dynamics_teller DynamicsTeller target
-def _reorderJoint(position, velocity, joint_order, dynamics_teller):
-    q = np.zeros((dynamics_teller.getModelPositionSize(), 1))
-    v = np.zeros((dynamics_teller.getModelVelocitySize(), 1))
+def _reorderJoint(dynamics_teller, joint_order, position, velocity=None, acceleration=None):
+    q = np.zeros((dynamics_teller.getModelPositionSize(), position.shape[1]))
+    if velocity is not None:
+        v = np.zeros((dynamics_teller.getModelVelocitySize(), position.shape[1]))
+        if acceleration is not None:
+            a = np.zeros((dynamics_teller.getModelVelocitySize(), position.shape[1]))
     for i in range(len(joint_order)):
         q[dynamics_teller.getJointIdInPosition(joint_order[i])] = position[i]
-        v[dynamics_teller.getJointIdInVelocity(joint_order[i])] = velocity[i]
-    return q, v
+        if velocity is not None:
+            v[dynamics_teller.getJointIdInVelocity(joint_order[i])] = velocity[i]
+            if acceleration is not None:
+                a[dynamics_teller.getJointIdInVelocity(joint_order[i])] = acceleration[i]
+    if velocity is None:
+        return q
+    if acceleration is None:       
+        return q, v
+    return q, v, a
 
-def load_csv_log(csv_log_path):
-    return np.genfromtxt(csv_log_path, delimiter=',')
+@jit(nopython=True)
+def get_closest_left_ind(arr, target):
+    n = len(arr)
+    left = 0
+    right = n - 1
+    mid = 0
 
-## @brief visualize Replays a exo_simu-readable csv log file into gepetto viewer.
-##
-## @details This enables quick visual review of the trajectory (though it does not guarantee that the trajectory will work
-## on the exoskeleton). Indeed, hardware stops (present in the URDF) are not checked, and soft
-## bounds cannot be checked (as they depend on wanderbrain and this script does not parse it).
-## This script 'tries' to replay a trajectory in real time. In practice however there will be small time dilatation
-## (typically trajectory running 5 to 10% slower than usual).
-##
-## @param log_data Data of a csv log file stored in a numpy.array
-## @param speed_ratio Ratio between real time and display time
-def visualize(log_data, speed_ratio=1.0):
-    # Load urdf file, create DynamicsTeller and RobotWrapper
-    robot = RobotWrapper()
-    robot.initFromURDF(WDC_URDF_PATH, WDC_MESH_PATH, se3.JointModelFreeFlyer())
-    dynamics_teller = DynamicsTeller.make(WDC_URDF_PATH, rootjoint.FREEFLYER)
+    # edge case - last or above all
+    if target >= arr[n - 1]:
+        return n - 1
+    # edge case - first or below all
+    if target <= arr[0]:
+        return 0
+    # BSearch solution: Time & Space: Log(N)
 
-    lower_limit, upper_limit = dynamics_teller.getPositionLimits()
-
-    # Load robot in gepetto viewer
-    client = Client()
-    try:
-        scene = client.gui.createSceneWithFloor('world')
-        if not 'replay_simulation' in client.gui.getWindowList():
-            window = client.gui.createWindow('replay_simulation')
-            client.gui.addSceneToWindow('world', window)
-            client.gui.createGroup('world/world')
-            client.gui.addLandmark('world/world', 0.1)
+    while left < right:
+        mid = (left + right) // 2  # find the mid
+        if target < arr[mid]:
+            right = mid
+        elif target > arr[mid]:
+            left = mid + 1
         else:
-            window = client.gui.getWindowID('replay_simulation')
-    except:
-        pass
-    robot.initDisplay()
-    robot.loadDisplayModel("world/wdc_robot")
+            return mid
 
-    # Load trajectory file
-    t = log_data[:,0]
-    q = log_data[:,8:20]
-    positions_freeflyer = log_data[:,1:4]
-    quatVec_freeflyer = log_data[:,np.concatenate([np.arange(5,8), [4]])]
-    quatVec_freeflyer /= np.linalg.norm(quatVec_freeflyer, axis=1, keepdims=True)
-
-    # Init timer in order to run in "real time"
-    init_time = time.time()
-    for i in range(len(t)):
-        qe, v = _reorderJoint(q[i], np.zeros(12,), joint_order, dynamics_teller)
-        qe[0:3] = np.asmatrix(positions_freeflyer[i]).T
-        qe[3:7] = np.asmatrix(quatVec_freeflyer[i]).T
-
-        robot.display(qe)
-        client.gui.refresh()
-        t_simu = (time.time() - init_time) * speed_ratio
-        if t_simu < t[i]:
-            time.sleep(t[i] - t_simu)
+    if target < arr[mid]:
+        return mid - 1
+    else:
+        return mid
 
 def smoothing_filter(time_in,val_in,time_out=None,relabel=None,params=None):
     if time_out is None:
@@ -151,31 +157,98 @@ def smoothing_filter(time_in,val_in,time_out=None,relabel=None,params=None):
 
     return val_out
 
-@jit(nopython=True)
-def get_closest_left_ind(arr, target):
-    n = len(arr)
-    left = 0
-    right = n - 1
-    mid = 0
+def get_patient_info(urdf_path):
+    # Get patient information and robot settings from the URDF file
+    patient_info = {}
+    with open(urdf_path,'r') as urdf_file:
+        urdf_data = xmltodict.parse(urdf_file.read())
+    patient_info['patient_height'] = float(urdf_data['robot']['patient_info']['patient_height'])
+    patient_info["patient_weight"] = float(urdf_data['robot']['patient_info']['patient_mass'])
 
-    # edge case - last or above all
-    if target >= arr[n - 1]:
-        return n - 1
-    # edge case - first or below all
-    if target <= arr[0]:
-        return 0
-    # BSearch solution: Time & Space: Log(N)
+    thigh_coord = np.fromstring([joint for joint in urdf_data['robot']['joint'] 
+                                if joint['@name'] == 'RightSagittalKneeJoint'][0]['origin']['@xyz'], dtype=float, sep=' ')
+    shank_coord = np.fromstring([joint for joint in urdf_data['robot']['joint'] 
+                                if joint['@name'] == 'RightSagittalAnkleJoint'][0]['origin']['@xyz'], dtype=float, sep=' ')
+    thigh_adjust = np.sign(thigh_coord[2])*thigh_coord - np.array([0,0,np.cos(0*EXO_THIGH_RPY[0])*EXO_DEFAULT_THIGH_SETTINGS_MM*1e-3])
+    patient_info["thigh_setting"] = 1e3 * (EXO_DEFAULT_THIGH_SETTINGS_MM*1e-3 + np.sign(thigh_adjust[2])*np.linalg.norm(thigh_adjust[2]))
+    patient_info["shank_setting"] = - 1e3 * shank_coord[2]
 
-    while left < right:
-        mid = (left + right) // 2  # find the mid
-        if target < arr[mid]:
-            right = mid
-        elif target > arr[mid]:
-            left = mid + 1
-        else:
-            return mid
+    return patient_info
 
-    if target < arr[mid]:
-        return mid - 1
-    else:
-        return mid
+def extract_state_from_neural_network_prediction(urdf_path, pred):
+    # Extract time and joint angle evolution from prediction
+    t = np.linspace(0,pred[1],200)
+    q = np.reshape(pred[42:], (12,-1))
+
+    # Post-processing: Filtering and numerical derivation
+    params = dict()
+    params['mixing_ratio_1'] = 0.04
+    params['mixing_ratio_2'] = 0.04
+    params['smoothness'] = [0.0,0.0,0.0]
+    params['smoothness'][0]  = 2e-9
+    params['smoothness'][1]  = 2e-9
+    params['smoothness'][2]  = 2e-9
+
+    q = smoothing_filter(t, q, t, relabel=RELABELING_JOINT_MATRIX, params=params)
+    t_tmp  = (t[:-1] + t[1:])/2
+    dq  = np.diff(q,n=1,axis=1) / np.diff(t)
+    dq = smoothing_filter(t_tmp, dq, t)
+    t_tmp = (t[:-1] + t[1:])/2
+    ddq = np.diff(dq,n=1,axis=1) / np.diff(t)
+    ddq = smoothing_filter(t_tmp, ddq, t)
+
+    ## Reorder the joints
+    rbdt = DynamicsTeller.make(urdf_path, rootjoint.FREEFLYER)
+    qe, dqe, ddqe = _reorderJoint(rbdt, JOINT_ORDER_NN, q, dq, ddq)
+    
+    # Create state sequence
+    evolution_robot = []
+    for i in range(len(t)):
+        evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], support_foot=SUPPORT_FOOT_NN))
+
+    return {"evolution_robot": evolution_robot, "urdf": urdf_path}
+
+def extract_state_from_simulation_log(urdf_path, log_data):
+    # Extract time, joint positions and velocities evolution from log
+    t = log_data[:,0]
+    q = log_data[:,8:20].T
+    dq = log_data[:,25:37].T
+    quatVec_freeflyer = log_data[:,np.concatenate([np.arange(5,8), [4]])].T
+    quatVec_freeflyer_norm = np.linalg.norm(quatVec_freeflyer, axis=0, keepdims=True)
+    quatVec_freeflyer /= quatVec_freeflyer_norm
+    position_freeflyer = np.concatenate((log_data[:,1:4].T, quatVec_freeflyer))
+    diff_quatVec_freeflyer = log_data[:,22:25].T
+    diff_quatVec_freeflyer /= quatVec_freeflyer_norm
+    velocity_freeflyer = np.concatenate((log_data[:,19:22].T, diff_quatVec_freeflyer))
+
+    ## Reorder the joints
+    #TODO: Check the formula for the derivative of the free flyer
+    rbdt = DynamicsTeller.make(urdf_path, rootjoint.FREEFLYER)
+    qe, dqe = _reorderJoint(rbdt, JOINT_ORDER_EXO_SIMU, q, dq)
+    qe[:7] = position_freeflyer
+    dqe[:6] = velocity_freeflyer
+
+    # Post-processing: numerical derivation
+    #TODO: Check the formula for the second derivative of the free flyer
+    ddqe = np.gradient(dqe, t, axis=1)
+
+    # Create state sequence
+    evolution_robot = []
+    for i in range(len(t)):
+        evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], support_foot=SUPPORT_FOOT_NN))
+
+    return {"evolution_robot": evolution_robot, "urdf": urdf_path}
+
+def load_csv_log(csv_log_path):
+    return np.genfromtxt(csv_log_path, delimiter=',')
+
+def get_initial_state_simulation(trajectory_data):
+    evolution_robot = trajectory_data["evolution_robot"]
+    qe = evolution_robot[0].q
+    dqe = evolution_robot[0].v
+
+    x0 = np.concatenate((qe[0:3],np.array([[1]]),qe[3:6]/qe[6],qe[THOT_TO_SIMU_JOINT_MASK_POSITION],
+                         dqe[0:6],dqe[THOT_TO_SIMU_JOINT_MASK_VELOCITY]))
+    x0[2] -= 0.02 # Compensate optoforce wrong frame
+
+    return x0
