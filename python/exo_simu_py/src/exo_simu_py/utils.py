@@ -2,8 +2,9 @@
 
 import os
 import time
-from collections import OrderedDict
+from copy import copy
 import json
+from collections import OrderedDict
 import xmltodict
 import numpy as np
 from numba import jit # Use to precompile Python code
@@ -79,7 +80,7 @@ def _reorderJoint(dynamics_teller, joint_order, position, velocity=None, acceler
     return q, v, a
 
 @jit(nopython=True)
-def get_closest_left_ind(arr, target):
+def get_closest_inf_ind(arr, target):
     n = len(arr)
     left = 0
     right = n - 1
@@ -206,13 +207,21 @@ def extract_state_from_neural_network_prediction(urdf_path, pred):
     for i in range(len(t)):
         evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], support_foot=SUPPORT_FOOT_NN))
 
-    return {"evolution_robot": evolution_robot, "urdf": urdf_path}
+    trajectory_data = {"evolution_robot": evolution_robot, "urdf": urdf_path}
+
+    # Estimate the free-flyer
+    retrieve_freeflyer(trajectory_data)
+
+    # Compute the ground reaction forces and motor torques
+    compute_efforts_with_rnea(trajectory_data)
+
+    return trajectory_data
 
 def extract_state_from_simulation_log(urdf_path, log_data):
     # Extract time, joint positions and velocities evolution from log
     t = log_data[:,0]
     q = log_data[:,8:20].T
-    dq = log_data[:,25:37].T
+    dq = log_data[:,26:38].T
     quatVec_freeflyer = log_data[:,np.concatenate([np.arange(5,8), [4]])].T
     quatVec_freeflyer_norm = np.linalg.norm(quatVec_freeflyer, axis=0, keepdims=True)
     quatVec_freeflyer /= quatVec_freeflyer_norm
@@ -252,3 +261,53 @@ def get_initial_state_simulation(trajectory_data):
     x0[2] -= 0.02 # Compensate optoforce wrong frame
 
     return x0
+
+def get_n_steps(trajectory_data, n):
+    evolution_robot = trajectory_data["evolution_robot"]
+    
+    state_dict = State.todict(evolution_robot)
+
+    state_dict_sym = dict()
+    support_foot = [elem for elem in SUPPORT_FOOT_ENUM if state_dict['support_foot'][0] not in elem][0]
+    state_dict_sym['q'] = copy(state_dict['q'])
+    state_dict_sym['q'][THOT_TO_SIMU_JOINT_MASK_POSITION] = \
+        RELABELING_JOINT_MATRIX.dot(state_dict_sym['q'][THOT_TO_SIMU_JOINT_MASK_POSITION])
+    state_dict_sym['v'] = copy(state_dict['v'])
+    state_dict_sym['v'][THOT_TO_SIMU_JOINT_MASK_VELOCITY] = \
+        RELABELING_JOINT_MATRIX.dot(state_dict_sym['v'][THOT_TO_SIMU_JOINT_MASK_VELOCITY])
+    state_dict_sym['a'] = copy(state_dict['a'])
+    state_dict_sym['a'][THOT_TO_SIMU_JOINT_MASK_VELOCITY] = \
+        RELABELING_JOINT_MATRIX.dot(state_dict_sym['a'][THOT_TO_SIMU_JOINT_MASK_VELOCITY])
+    state_dict_sym['t'] = copy(state_dict['t'])
+    state_dict_sym['hzd_state'] = [None for i in range(len(state_dict['hzd_state']))]
+    state_dict_sym['support_foot'] = [support_foot for i in range(len(state_dict['support_foot']))]
+    state_dict_sym['f'] = [None for i in range(len(state_dict['f']))]
+    state_dict_sym['tau'] = copy(state_dict['tau'])
+    for key in state_dict['tau'][0].keys():
+        for i in range(state_dict['q'].shape[1]):
+            state_dict_sym['tau'][i][key][THOT_TO_SIMU_JOINT_MASK_VELOCITY] = \
+                RELABELING_JOINT_MATRIX.dot(state_dict_sym['tau'][i][key][THOT_TO_SIMU_JOINT_MASK_VELOCITY])
+    state_dict_sym['f_ext'] = [None for i in range(len(state_dict['f_ext']))]
+
+    state_dict_gbl = dict(state_dict) # Copy
+    for i in range(1,n):
+        if i % 2:
+            state_dict_tmp = dict(state_dict_sym) # Copy
+        else:
+            state_dict_tmp = dict(state_dict) # Copy
+        state_dict_tmp['t'] += state_dict_gbl['t'][-1] - state_dict_tmp['t'][0]
+        state_dict_tmp['q'][0] += state_dict_gbl['q'][0,-1] - state_dict_tmp['q'][0,0]
+
+        for key in state_dict_gbl.keys():
+            if isinstance(state_dict_tmp[key], list):
+                state_dict_gbl[key] = state_dict_gbl[key] + state_dict_tmp[key] # list concatenation
+            else:
+                state_dict_gbl[key] = np.concatenate((state_dict_gbl[key], state_dict_tmp[key]), axis=-1) # list concatenation
+
+    return {"evolution_robot": State.fromdict(state_dict_gbl), "urdf": trajectory_data["urdf"]}
+
+def delete_scenes_viewer(*scene_names):
+    client = Client()
+    for scene_name in scene_names:
+        if scene_name in client.gui.getNodeList():
+            client.gui.deleteNode(scene_name, True)
