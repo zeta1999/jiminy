@@ -48,7 +48,7 @@ namespace exo_simu
             ConfigHolder config;
             config.addOption<float64_t>("frictionViscous", 0.8);
             config.addOption<float64_t>("frictionDry", 1.0);
-            config.addOption<float64_t>("dryFictionVelEps", 1.0e-3);
+            config.addOption<float64_t>("dryFrictionVelEps", 1.0e-2);
             config.addOption<float64_t>("stiffness", 5.0e5);
             config.addOption<float64_t>("damping", 5.0e3);
             config.addOption<float64_t>("transitionEps", 1.0e-3);
@@ -60,7 +60,7 @@ namespace exo_simu
         {
             const float64_t frictionViscous;
             const float64_t frictionDry;
-            const float64_t dryFictionVelEps;
+            const float64_t dryFrictionVelEps;
             const float64_t stiffness;
             const float64_t damping;
             const float64_t transitionEps;
@@ -68,7 +68,7 @@ namespace exo_simu
             contactOptions_t(ConfigHolder const& options):
             frictionViscous(options.get<float64_t>("frictionViscous")),
             frictionDry(options.get<float64_t>("frictionDry")),
-            dryFictionVelEps(options.get<float64_t>("dryFictionVelEps")),
+            dryFrictionVelEps(options.get<float64_t>("dryFrictionVelEps")),
             stiffness(options.get<float64_t>("stiffness")),
             damping(options.get<float64_t>("damping")),
             transitionEps(options.get<float64_t>("transitionEps"))
@@ -84,7 +84,7 @@ namespace exo_simu
             config.addOption<vectorN_t>("boundsMax", (vectorN_t(12) << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
             config.addOption<vectorN_t>("frictionViscous", 0*(vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,100.0,100.0,100.0,100.0,20.0,20.0).finished());
             config.addOption<vectorN_t>("frictionDry", 0*(vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,10.0,10.0,10.0,10.0,2.0,2.0).finished());
-            config.addOption<float64_t>("dryFictionVelEps", 0*1.0e-2);
+            config.addOption<float64_t>("dryFrictionVelEps", 1.0e-2);
             config.addOption<float64_t>("boundStiffness", 5.0e5);
             config.addOption<float64_t>("boundDamping", 5.0e2);
             config.addOption<float64_t>("boundTransitionEps", 2.0e-3);
@@ -99,7 +99,7 @@ namespace exo_simu
             const vectorN_t boundsMax;
             const vectorN_t frictionViscous;
             const vectorN_t frictionDry;
-            const float64_t dryFictionVelEps;
+            const float64_t dryFrictionVelEps;
             const float64_t boundStiffness;
             const float64_t boundDamping;
             const float64_t boundTransitionEps;
@@ -110,7 +110,7 @@ namespace exo_simu
             boundsMax(options.get<vectorN_t>("boundsMax")),
             frictionViscous(options.get<vectorN_t>("frictionViscous")),
             frictionDry(options.get<vectorN_t>("frictionDry")),
-            dryFictionVelEps(options.get<float64_t>("dryFictionVelEps")),
+            dryFrictionVelEps(options.get<float64_t>("dryFrictionVelEps")),
             boundStiffness(options.get<float64_t>("boundStiffness")),
             boundDamping(options.get<float64_t>("boundDamping")),
             boundTransitionEps(options.get<float64_t>("boundTransitionEps"))

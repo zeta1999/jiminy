@@ -18,7 +18,7 @@ add_definitions(${COMPILE_FLAGS})
 
 # Add sources
 set(SRC 
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoSimulator.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoSimulator.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigHolder.cc"
 )
 

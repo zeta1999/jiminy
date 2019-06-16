@@ -6,8 +6,8 @@
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
-#include "exo_simu/engine/ExoSimulator.hpp"
-#include "exo_simu/engine/ExoSimulatorUtils.hpp"
+#include "exo_simu/engine/ExoSimulator.h"
+#include "exo_simu/engine/ExoSimulatorUtils.h"
 
 namespace exo_simu
 {
@@ -167,9 +167,9 @@ namespace exo_simu
                             std::placeholders::_1,
                             std::placeholders::_2,
                             std::placeholders::_3);
-        auto stepper = make_dense_output(simOptions_->tolAbs, simOptions_->tolRel, stepper_t()); // make_dense_output, make_controlled
-        auto itBegin = make_const_step_time_iterator_begin(stepper, rhsBind, xx0, t0, tf, dt); // const_step_time, adaptive_time
-        auto itEnd = make_const_step_time_iterator_end(stepper, rhsBind, xx0);
+        auto stepper = make_controlled(simOptions_->tolAbs, simOptions_->tolRel, stepper_t()); // make_dense_output, make_controlled
+        auto itBegin = make_adaptive_time_iterator_begin(stepper, rhsBind, xx0, t0, tf, dt); // const_step_time, adaptive_time
+        auto itEnd = make_adaptive_time_iterator_end(stepper, rhsBind, xx0);
 
         data_ = pinocchio::Data(model_); // Initialize the internal state
         for(auto it = itBegin; it != itEnd; it++)
@@ -447,7 +447,6 @@ namespace exo_simu
             IMUs.block<3,1>(4,i) = omegaIMU;
         }
 
-
         // Compute control input
         controller_(t,xEig,optoforces,IMUs,u);
         uWithFF.tail(ndq_ - 6) = u;
@@ -499,7 +498,7 @@ namespace exo_simu
         for(uint32_t i = 0; i<nu_; i++)
         {
             u(i+6) = -jointOptions_->frictionViscous(i)*dq(i+6) - jointOptions_->frictionDry(i) * \
-                     saturateSoft(dq(i+6) / jointOptions_->dryFictionVelEps,-1.0,1.0,0.7);
+                     saturateSoft(dq(i+6) / jointOptions_->dryFrictionVelEps,-1.0,1.0,0.7);
         }
 
         // Joint bounds
@@ -520,7 +519,7 @@ namespace exo_simu
                     damping = -jointOptions_->boundDamping*dqJt;
                 }
 
-                fJt = - jointOptions_->boundStiffness * qErr + damping;
+                fJt = -jointOptions_->boundStiffness * qErr + damping;
 
                 float64_t blendingFactor = qErr / jointOptions_->boundTransitionEps;
                 if(blendingFactor>1.0)
@@ -528,7 +527,7 @@ namespace exo_simu
                     blendingFactor = 1.0;
                 }
 
-                fJt*=blendingFactor;
+                fJt *= blendingFactor;
                 u(i + 6) += fJt;
             }
 
@@ -585,12 +584,12 @@ namespace exo_simu
             const Eigen::Vector2d vxy = vFrameInWorld.head<2>();
             const float64_t vNorm = vxy.norm();
             float64_t frictionCoeff;
-            if(vNorm > contactOptions_->dryFictionVelEps)
+            if(vNorm > contactOptions_->dryFrictionVelEps)
             {
-                if(vNorm < 1.5 * contactOptions_->dryFictionVelEps)
+                if(vNorm < 1.5 * contactOptions_->dryFrictionVelEps)
                 {
                     frictionCoeff = -2.0 * vNorm * (contactOptions_->frictionDry - contactOptions_->frictionViscous) \
-                        / contactOptions_->dryFictionVelEps + 3.0*contactOptions_->frictionDry - \
+                        / contactOptions_->dryFrictionVelEps + 3.0*contactOptions_->frictionDry - \
                         2.0*contactOptions_->frictionViscous;
                 }
                 else
@@ -600,7 +599,7 @@ namespace exo_simu
             }
             else
             {
-                frictionCoeff = vNorm * contactOptions_->frictionDry / contactOptions_->dryFictionVelEps;
+                frictionCoeff = vNorm * contactOptions_->frictionDry / contactOptions_->dryFrictionVelEps;
             }
             fextInWorld.head<2>() = -vxy * frictionCoeff * fextInWorld(2);
 
@@ -614,16 +613,8 @@ namespace exo_simu
             {
                 blendingFactor = 1.0;
             }
-            fextLocal*=blendingFactor;
+            fextLocal *= blendingFactor;
         }
-
-        // std::cout << "Frame Name: " << model_.frames[frameId].name << std::endl;
-        // std::cout << "Frame Id: " << frameId << std::endl;
-        // std::cout << "tformFrame2Jt: " << std::endl << tformFrame2Jt << std::endl << std::endl;
-        // std::cout << "vFrame: " << std::endl << vFrame << std::endl << std::endl;
-        // std::cout << "posFrame: " << std::endl << posFrame << std::endl << std::endl ;
-        // std::cout << "fext: " << std::endl << fext << std::endl << std::endl ;
-        // std::cout << "fextLocal: " << std::endl << fextLocal << std::endl << std::endl ;
 
         return fextLocal;
     }

@@ -8,7 +8,7 @@ project(trajectory_tracking)
 find_package(urdfdom REQUIRED)
 
 # Add sources
-set(SRC "${CMAKE_CURRENT_SOURCE_DIR}/trajectory_tracking.cpp")
+set(SRC "${CMAKE_CURRENT_SOURCE_DIR}/trajectory_tracking.cc")
 
 # Make executables
 add_executable(${PROJECT_NAME} ${SRC})

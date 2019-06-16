@@ -7,7 +7,6 @@ import json
 from collections import OrderedDict
 import xmltodict
 import numpy as np
-from numba import jit # Use to precompile Python code
 from scipy.interpolate import UnivariateSpline
 
 import pinocchio as pnc
@@ -78,35 +77,6 @@ def _reorderJoint(dynamics_teller, joint_order, position, velocity=None, acceler
     if acceleration is None:       
         return q, v
     return q, v, a
-
-@jit(nopython=True)
-def get_closest_inf_ind(arr, target):
-    n = len(arr)
-    left = 0
-    right = n - 1
-    mid = 0
-
-    # edge case - last or above all
-    if target >= arr[n - 1]:
-        return n - 1
-    # edge case - first or below all
-    if target <= arr[0]:
-        return 0
-    # BSearch solution: Time & Space: Log(N)
-
-    while left < right:
-        mid = (left + right) // 2  # find the mid
-        if target < arr[mid]:
-            right = mid
-        elif target > arr[mid]:
-            left = mid + 1
-        else:
-            return mid
-
-    if target < arr[mid]:
-        return mid - 1
-    else:
-        return mid
 
 def smoothing_filter(time_in,val_in,time_out=None,relabel=None,params=None):
     if time_out is None:
@@ -213,7 +183,7 @@ def extract_state_from_neural_network_prediction(urdf_path, pred):
     retrieve_freeflyer(trajectory_data)
 
     # Compute the ground reaction forces and motor torques
-    compute_efforts_with_rnea(trajectory_data)
+    compute_efforts_with_rnea(trajectory_data, verbose=False)
 
     return trajectory_data
 

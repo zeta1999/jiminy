@@ -9,8 +9,8 @@
 #include <getopt.h>
 #include <string>
 
-#include "exo_simu/engine/ExoSimulator.hpp"
-#include "exo_simu/engine/ExoSimulatorUtils.hpp"
+#include "exo_simu/engine/ExoSimulator.h"
+#include "exo_simu/engine/ExoSimulatorUtils.h"
 
 using namespace exo_simu;
 
@@ -18,9 +18,9 @@ const uint32_t nx_ = 37;
 const uint32_t nu_ = 12;
 
 vectorN_t Kp = (vectorN_t(12) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
-                               41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
+                                 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
 vectorN_t Kd = (vectorN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
-                               500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
+                                 500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
 
 void controller(const double t,
                 const Eigen::VectorXd &x,
@@ -28,13 +28,12 @@ void controller(const double t,
                 const Eigen::MatrixXd &IMUs,
                       Eigen::VectorXd &u)
 {
-    // u = vectorN_t::Zero(12);
-    u = -(Kp.array() * x.segment<12>(7).array() + Kd.array() * x.segment<12>(19+6).array());
+    u = -(Kp.array() * x.segment<12>(7).array() + Kd.array() * x.segment<12>(25).array());
 }
 
 bool monitor(const double t, const Eigen::VectorXd &x)
 {
-    return (t <= 2.5);
+    return true;
 }
 
 int main(int argc, char *argv[])
@@ -106,6 +105,12 @@ int main(int argc, char *argv[])
 
     ConfigHolder modelOpts = ExoSimulator::getDefaultModelOptions();
     // modelOpts.get<vectorN_t>("gravity")(2) = 9.81;
+    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("stiffness") = 1e3;
+    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("damping") = 2000.0;
+    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("dryFrictionVelEps") = 0.01;
+    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("frictionDry") = 5.0;
+    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("frictionViscous") = 5.0;
+    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("transitionEps") = 0.001;
 
     // Instanciate simulator
     tic(&timer);

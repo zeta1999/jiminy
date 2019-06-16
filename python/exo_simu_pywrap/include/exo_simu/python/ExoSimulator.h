@@ -11,7 +11,7 @@
 #include <boost/python/def.hpp>
 #include <boost/python/dict.hpp>
 
-#include "exo_simu/engine/ExoSimulator.hpp"
+#include "exo_simu/engine/ExoSimulator.h"
 #include "exo_simu/python/Utilities.h"
 
 namespace exo_simu

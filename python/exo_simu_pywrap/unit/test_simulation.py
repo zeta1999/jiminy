@@ -45,11 +45,19 @@ model_options = simulator.get_model_options()
 simu_options = simulator.get_simulation_options()
 
 # model_options["gravity"][2] = 0
+
 simu_options["tolRel"] = 1.0e-5
 simu_options["tolAbs"] = 1.0e-4
 simu_options["logController"] = False
 simu_options["logOptoforces"] = False
 simu_options["logIMUs"] = False
+
+model_options['contacts']['stiffness'] = 1e6
+model_options['contacts']['damping'] = 2000.0
+model_options['contacts']['dryFrictionVelEps'] = 0.01
+model_options['contacts']['frictionDry'] = 5.0
+model_options['contacts']['frictionViscous'] = 5.0
+model_options['contacts']['transitionEps'] = 0.001
 
 simulator.set_urdf_path(urdf_path)
 simulator.set_model_options(model_options)
@@ -60,11 +68,16 @@ def callback(t, x):
 
 x0 = get_initial_state_simulation(trajectory_data)
 t0 = 0.0
-tf = 5.0
+tf = 3.0
 dt = 1e-3
 
-controller = pid_feedforward(trajectory_data)
+Kp = np.array([[20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
+                20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0]]).T
+Kd = np.array([[250.0, 150.0, 100.0, 100.0, 150.0, 100.0, 
+                250.0, 150.0, 100.0, 100.0, 150.0, 100.0]]).T
+controller = pid_feedforward(trajectory_data,Kp,Kd)
 simulator.simulate(x0,t0,0.1,dt,controller.compute_command,callback) # Force compile Python controller for a fair benchmark
+controller.reset()
 start = time.time()
 simulator.simulate(x0,t0,tf,dt,controller.compute_command,callback)
 end = time.time()
@@ -73,14 +86,15 @@ print("Simulation time: %03.0fms" %((end - start)*1.0e3))
 ################################## Display the results ##################################
 
 log = np.array(simulator.get_log())
-print(log.shape)
+print('%i log points' % log.shape[0])
 trajectory_data_log = extract_state_from_simulation_log(urdf_path, log)
 
 # Display the simulation trajectory
-display_robot(trajectory_data_log, speed_ratio=0.5)
+# display_robot(trajectory_data_log, speed_ratio=0.5)
 
 # Display the reference trajectory
 # display_robot(trajectory_data, speed_ratio=0.5, scene_name="ref")
-# delete_scenes_viewer('ref')
+# delete_scenes_viewer("ref")
 
-# plot_kinematics(trajectory_data_log, get_n_steps(trajectory_data, int(tf//trajectory_data['evolution_robot'][-1].t)))
+# plot_kinematics(trajectory_data_log, get_n_steps(trajectory_data, 
+#     int(np.ceil(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evolution_robot'][-1].t))))
