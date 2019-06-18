@@ -52,7 +52,7 @@ simu_options["logController"] = False
 simu_options["logOptoforces"] = False
 simu_options["logIMUs"] = False
 
-model_options['contacts']['stiffness'] = 1e6
+model_options['contacts']['stiffness'] = 1.0e6
 model_options['contacts']['damping'] = 2000.0
 model_options['contacts']['dryFrictionVelEps'] = 0.01
 model_options['contacts']['frictionDry'] = 5.0

@@ -1,4 +1,3 @@
-#include <map>
 #include <iostream>
 #include <iomanip>
 
@@ -70,15 +69,15 @@ namespace exo_simu
     }
 
     ExoSimulator::ExoSimulator(const std::string urdfPath,
-                               const ConfigHolder & mdlOptions):
+                               const configHolder_t & mdlOptions):
     ExoSimulator()
     {
         init(urdfPath, mdlOptions);
     }
 
     ExoSimulator::ExoSimulator(const std::string urdfPath,
-                               const ConfigHolder & mdlOptions,
-                               const ConfigHolder & simOptions):
+                               const configHolder_t & mdlOptions,
+                               const configHolder_t & simOptions):
     ExoSimulator()
     {
         init(urdfPath, mdlOptions, simOptions);
@@ -95,15 +94,15 @@ namespace exo_simu
     }
 
     void ExoSimulator::init(const std::string urdfPath,
-                            const ConfigHolder & mdlOptions)
+                            const configHolder_t & mdlOptions)
     {
         setUrdfPath(urdfPath);
         setModelOptions(mdlOptions);
     }
 
     void ExoSimulator::init(const std::string urdfPath,
-                            const ConfigHolder & mdlOptions,
-                            const ConfigHolder & simuOptions)
+                            const configHolder_t & mdlOptions,
+                            const configHolder_t & simuOptions)
     {
         setUrdfPath(urdfPath);
         setModelOptions(mdlOptions);
@@ -236,7 +235,7 @@ namespace exo_simu
                     {
                         const Eigen::Matrix4d tformIMU = data_.oMf[imuFramesIdx_[i]].toHomogeneousMatrix();
                         const Eigen::Matrix3d rotIMU = tformIMU.topLeftCorner<3,3>();
-                        const Eigen::Quaterniond quatIMU(rotIMU);
+                        const quaternion_t quatIMU(rotIMU);
                         pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_,data_,imuFramesIdx_[i]);
                         Eigen::Vector3d omegaIMU = motionIMU.angular();    
                         IMUs(0,i) = quatIMU.w();
@@ -331,34 +330,34 @@ namespace exo_simu
         setModelOptions(getModelOptions()); // Make sure bounds are updated if necessary
     }
 
-    ConfigHolder ExoSimulator::getModelOptions(void)
+    configHolder_t ExoSimulator::getModelOptions(void)
     {
         return mdlOptionsHolder_;
     }
 
-    void ExoSimulator::setModelOptions(const ConfigHolder & mdlOptions)
+    void ExoSimulator::setModelOptions(const configHolder_t & mdlOptions)
     {
         mdlOptionsHolder_ = mdlOptions;
-        model_.gravity = mdlOptions.get<vectorN_t>("gravity");
+        model_.gravity = boost::get<vectorN_t>(mdlOptions.at("gravity"));
 
-        ConfigHolder& jointOptionsHolder_ = mdlOptionsHolder_.get<ConfigHolder>("joints");
-        if(isInitialized_ && jointOptionsHolder_.get<bool>("boundsFromUrdf"))
+        configHolder_t& jointOptionsHolder_ = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
+        if(isInitialized_ && boost::get<bool>(jointOptionsHolder_.at("boundsFromUrdf")))
         {
-            jointOptionsHolder_.get<vectorN_t>("boundsMin").head<6>() = model_.lowerPositionLimit.segment<6>(7);
-            jointOptionsHolder_.get<vectorN_t>("boundsMin").tail<6>() = model_.lowerPositionLimit.segment<6>(14);
-            jointOptionsHolder_.get<vectorN_t>("boundsMax").head<6>() = model_.upperPositionLimit.segment<6>(7);
-            jointOptionsHolder_.get<vectorN_t>("boundsMax").tail<6>() = model_.upperPositionLimit.segment<6>(14);
+            boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMin")).head<6>() = model_.lowerPositionLimit.segment<6>(7);
+            boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMin")).tail<6>() = model_.lowerPositionLimit.segment<6>(14);
+            boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMax")).head<6>() = model_.upperPositionLimit.segment<6>(7);
+            boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMax")).tail<6>() = model_.upperPositionLimit.segment<6>(14);
         }
 
         mdlOptions_ = std::shared_ptr<modelOptions_t>(new modelOptions_t(mdlOptionsHolder_));
     }
 
-    ConfigHolder ExoSimulator::getSimulationOptions(void)
+    configHolder_t ExoSimulator::getSimulationOptions(void)
     {
         return simOptionsHolder_;
     }
 
-    void ExoSimulator::setSimulationOptions(const ConfigHolder & simOptions)
+    void ExoSimulator::setSimulationOptions(const configHolder_t & simOptions)
     {
         simOptionsHolder_ = simOptions;
         simOptions_ = std::shared_ptr<simulationOptions_t>(new simulationOptions_t(simOptionsHolder_));
@@ -383,7 +382,7 @@ namespace exo_simu
         const Eigen::Vector3d omega = dq.segment<3>(3);
         Eigen::Vector4d quatVec = q.segment<4>(3);
         quatVec.normalize();
-        const Eigen::Quaterniond quat(quatVec(0),quatVec(1),quatVec(2),quatVec(3));
+        const quaternion_t quat(quatVec(0),quatVec(1),quatVec(2),quatVec(3));
         Eigen::Matrix<float64_t,4,4> quat2quatDot;
         quat2quatDot << 0        , omega(0), omega(1), omega(2),
                         -omega(0),        0,-omega(2), omega(1),
@@ -437,7 +436,7 @@ namespace exo_simu
         {
             const Eigen::Matrix4d tformIMU = data_.oMf[imuFramesIdx_[i]].toHomogeneousMatrix();
             const Eigen::Matrix3d rotIMU = tformIMU.topLeftCorner<3,3>();
-            const Eigen::Quaterniond quatIMU(rotIMU);
+            const quaternion_t quatIMU(rotIMU);
             pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_,data_,imuFramesIdx_[i]);
             Eigen::Vector3d omegaIMU = motionIMU.angular();    
             IMUs(0,i) = quatIMU.w();

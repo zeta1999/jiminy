@@ -1,12 +1,14 @@
 #ifndef WDC_EXO_SIMULATOR_H
 #define WDC_EXO_SIMULATOR_H
 
+#include <map>
 #include <string>
 #include <vector>
 #include <functional>
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include <boost/variant.hpp>
 #include <boost/numeric/odeint.hpp>
 #include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
 
@@ -14,19 +16,21 @@
 #include "pinocchio/algorithm/aba.hpp"
 
 #include "exo_simu/engine/Types.h"
-#include "exo_simu/engine/ConfigHolder.h"
 
 
 using namespace boost::numeric::odeint;
 
 namespace exo_simu
 {
+    typedef boost::make_recursive_variant<bool_t, int32_t, real_t, std::string, vectorN_t, matrixN_t, std::map<std::string, boost::recursive_variant_> >::type configField_t;
+    typedef std::map<std::string, configField_t> configHolder_t;
+    typedef std::vector<float64_t> state_t;
+    typedef std::vector<state_t> log_t;
+        
     class ExoSimulator
     {
     ////////////////Public typedefs//////////////////
     public:
-        typedef std::vector<float64_t> state_t;
-        typedef std::vector<state_t> log_t;
         typedef std::function<void(const float64_t &/*t*/,
                                    const vectorN_t &/*x*/,
                                    const matrixN_t &/*optoforces*/,
@@ -43,15 +47,15 @@ namespace exo_simu
             ERROR_INIT_FAILED = -3
         };
 
-        static ConfigHolder getDefaultContactOptions()
+        static configHolder_t getDefaultContactOptions()
         {
-            ConfigHolder config;
-            config.addOption<float64_t>("frictionViscous", 0.8);
-            config.addOption<float64_t>("frictionDry", 1.0);
-            config.addOption<float64_t>("dryFrictionVelEps", 1.0e-2);
-            config.addOption<float64_t>("stiffness", 5.0e5);
-            config.addOption<float64_t>("damping", 5.0e3);
-            config.addOption<float64_t>("transitionEps", 1.0e-3);
+            configHolder_t config;
+            config["frictionViscous"] = 0.8;
+            config["frictionDry"] = 1.0;
+            config["dryFrictionVelEps"] = 1.0e-2;
+            config["stiffness"] = 5.0e5;
+            config["damping"] = 5.0e3;
+            config["transitionEps"] = 1.0e-3;
 
             return config;
         };
@@ -65,29 +69,29 @@ namespace exo_simu
             const float64_t damping;
             const float64_t transitionEps;
 
-            contactOptions_t(ConfigHolder const& options):
-            frictionViscous(options.get<float64_t>("frictionViscous")),
-            frictionDry(options.get<float64_t>("frictionDry")),
-            dryFrictionVelEps(options.get<float64_t>("dryFrictionVelEps")),
-            stiffness(options.get<float64_t>("stiffness")),
-            damping(options.get<float64_t>("damping")),
-            transitionEps(options.get<float64_t>("transitionEps"))
+            contactOptions_t(configHolder_t const & options):
+            frictionViscous(boost::get<float64_t>(options.at("frictionViscous"))),
+            frictionDry(boost::get<float64_t>(options.at("frictionDry"))),
+            dryFrictionVelEps(boost::get<float64_t>(options.at("dryFrictionVelEps"))),
+            stiffness(boost::get<float64_t>(options.at("stiffness"))),
+            damping(boost::get<float64_t>(options.at("damping"))),
+            transitionEps(boost::get<float64_t>(options.at("transitionEps")))
             {
             }
         };
 
-        static ConfigHolder getDefaultJointOptions()
+        static configHolder_t getDefaultJointOptions()
         {
-            ConfigHolder config;
-            config.addOption<bool>("boundsFromUrdf", true);
-            config.addOption<vectorN_t>("boundsMin", -(vectorN_t(12) << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
-            config.addOption<vectorN_t>("boundsMax", (vectorN_t(12) << M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI,M_PI).finished());
-            config.addOption<vectorN_t>("frictionViscous", 0*(vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,100.0,100.0,100.0,100.0,20.0,20.0).finished());
-            config.addOption<vectorN_t>("frictionDry", 0*(vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,10.0,10.0,10.0,10.0,2.0,2.0).finished());
-            config.addOption<float64_t>("dryFrictionVelEps", 1.0e-2);
-            config.addOption<float64_t>("boundStiffness", 5.0e5);
-            config.addOption<float64_t>("boundDamping", 5.0e2);
-            config.addOption<float64_t>("boundTransitionEps", 2.0e-3);
+            configHolder_t config;
+            config["boundsFromUrdf"] = true;
+            config["boundsMin"] = (vectorN_t) (-M_PI * vectorN_t::Ones(12));
+            config["boundsMax"] = (vectorN_t) ( M_PI * vectorN_t::Ones(12));
+            config["frictionViscous"] = (vectorN_t) (0*(vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,100.0,100.0,100.0,100.0,20.0,20.0).finished());
+            config["frictionDry"] = (vectorN_t) (0*(vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,10.0,10.0,10.0,10.0,2.0,2.0).finished());
+            config["dryFrictionVelEps"] = 1.0e-2;
+            config["boundStiffness"] = 5.0e5;
+            config["boundDamping"] = 5.0e2;
+            config["boundTransitionEps"] = 2.0e-3;
 
             return config;
         };
@@ -104,26 +108,26 @@ namespace exo_simu
             const float64_t boundDamping;
             const float64_t boundTransitionEps;
 
-            jointOptions_t(ConfigHolder const& options):
-            boundsFromUrdf(options.get<bool>("boundsFromUrdf")),
-            boundsMin(options.get<vectorN_t>("boundsMin")),
-            boundsMax(options.get<vectorN_t>("boundsMax")),
-            frictionViscous(options.get<vectorN_t>("frictionViscous")),
-            frictionDry(options.get<vectorN_t>("frictionDry")),
-            dryFrictionVelEps(options.get<float64_t>("dryFrictionVelEps")),
-            boundStiffness(options.get<float64_t>("boundStiffness")),
-            boundDamping(options.get<float64_t>("boundDamping")),
-            boundTransitionEps(options.get<float64_t>("boundTransitionEps"))
+            jointOptions_t(configHolder_t const & options):
+            boundsFromUrdf(boost::get<bool>(options.at("boundsFromUrdf"))),
+            boundsMin(boost::get<vectorN_t>(options.at("boundsMin"))),
+            boundsMax(boost::get<vectorN_t>(options.at("boundsMax"))),
+            frictionViscous(boost::get<vectorN_t>(options.at("frictionViscous"))),
+            frictionDry(boost::get<vectorN_t>(options.at("frictionDry"))),
+            dryFrictionVelEps(boost::get<float64_t>(options.at("dryFrictionVelEps"))),
+            boundStiffness(boost::get<float64_t>(options.at("boundStiffness"))),
+            boundDamping(boost::get<float64_t>(options.at("boundDamping"))),
+            boundTransitionEps(boost::get<float64_t>(options.at("boundTransitionEps")))
             {
             }
         };
 
-        static ConfigHolder getDefaultModelOptions()
+        static configHolder_t getDefaultModelOptions()
         {
-            ConfigHolder config;
-            config.addOption<ConfigHolder>("joints", getDefaultJointOptions());
-            config.addOption<ConfigHolder>("contacts", getDefaultContactOptions());
-            config.addOption<vectorN_t>("gravity", (vectorN_t(6) << 0.0,0.0,-9.81,0.0,0.0,0.0).finished());
+            configHolder_t config;
+            config["joints"] = getDefaultJointOptions();
+            config["contacts"] = getDefaultContactOptions();
+            config["gravity"] = (vectorN_t(6) << 0.0,0.0,-9.81,0.0,0.0,0.0).finished();
 
             return config;
         };
@@ -134,22 +138,22 @@ namespace exo_simu
             const contactOptions_t contacts;
             const vectorN_t        gravity;
 
-            modelOptions_t(ConfigHolder const& options):
-            joints(options.get<ConfigHolder>("joints")),
-            contacts(options.get<ConfigHolder>("contacts")),
-            gravity(options.get<vectorN_t>("gravity"))
+            modelOptions_t(configHolder_t const & options):
+            joints(boost::get<configHolder_t>(options.at("joints"))),
+            contacts(boost::get<configHolder_t>(options.at("contacts"))),
+            gravity(boost::get<vectorN_t>(options.at("gravity")))
             {
             }
         };
 
-        static ConfigHolder getDefaultSimulationOptions()
+        static configHolder_t getDefaultSimulationOptions()
         {
-            ConfigHolder config;
-            config.addOption<float64_t>("tolAbs", 1.0e-6);
-            config.addOption<float64_t>("tolRel", 1.0e-6);
-            config.addOption<bool>("logController", true);
-            config.addOption<bool>("logOptoforces", true);
-            config.addOption<bool>("logIMUs", true);
+            configHolder_t config;
+            config["tolAbs"] = 1.0e-6;
+            config["tolRel"] = 1.0e-6;
+            config["logController"] = true;
+            config["logOptoforces"] = true;
+            config["logIMUs"] = true;
 
             return config;
         };
@@ -162,12 +166,12 @@ namespace exo_simu
             const bool      logOptoforces;
             const bool      logIMUs;
 
-            simulationOptions_t(ConfigHolder const& options):
-            tolAbs(options.get<float64_t>("tolAbs")),
-            tolRel(options.get<float64_t>("tolRel")),
-            logController(options.get<bool>("logController")),
-            logOptoforces(options.get<bool>("logOptoforces")),
-            logIMUs(options.get<bool>("logIMUs"))
+            simulationOptions_t(configHolder_t const & options):
+            tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
+            tolRel(boost::get<float64_t>(options.at("tolRel"))),
+            logController(boost::get<bool>(options.at("logController"))),
+            logOptoforces(boost::get<bool>(options.at("logOptoforces"))),
+            logIMUs(boost::get<bool>(options.at("logIMUs")))
             {
             }
         };
@@ -184,22 +188,22 @@ namespace exo_simu
         ExoSimulator(const std::string urdfPath);
 
         ExoSimulator(const std::string urdfPath,
-                     const ConfigHolder & mdlOptions);
+                     const configHolder_t & mdlOptions);
 
         ExoSimulator(const std::string urdfPath,
-                     const ConfigHolder & mdlOptions,
-                     const ConfigHolder & simOptions);
+                     const configHolder_t & mdlOptions,
+                     const configHolder_t & simOptions);
 
         ~ExoSimulator(void);
 
         void init(const std::string urdfPath);
 
         void init(const std::string urdfPath,
-                  const ConfigHolder & mdlOptions);
+                  const configHolder_t & mdlOptions);
 
         void init(const std::string urdfPath,
-                  const ConfigHolder & mdlOptions,
-                  const ConfigHolder & simOptions);
+                  const configHolder_t & mdlOptions,
+                  const configHolder_t & simOptions);
 
         //Simulate functions
         result_t simulate(const vectorN_t & x0,
@@ -218,10 +222,10 @@ namespace exo_simu
         //Accessors
         std::string getUrdfPath(void);
         void setUrdfPath(const std::string & urdfPath);
-        ConfigHolder getModelOptions(void);
-        void setModelOptions(const ConfigHolder & mdlOptions);
-        ConfigHolder getSimulationOptions(void);
-        void setSimulationOptions(const ConfigHolder & simOptions);
+        configHolder_t getModelOptions(void);
+        void setModelOptions(const configHolder_t & mdlOptions);
+        configHolder_t getSimulationOptions(void);
+        void setSimulationOptions(const configHolder_t & simOptions);
 
     ////////////////Protected methods/////////////////
     protected:
@@ -249,8 +253,8 @@ namespace exo_simu
         bool isInitialized_;
         std::string urdfPath_;
         controller_t controller_;
-        ConfigHolder mdlOptionsHolder_;
-        ConfigHolder simOptionsHolder_;
+        configHolder_t mdlOptionsHolder_;
+        configHolder_t simOptionsHolder_;
         std::shared_ptr<modelOptions_t> mdlOptions_;
         std::shared_ptr<simulationOptions_t> simOptions_;
         pinocchio::Model model_;

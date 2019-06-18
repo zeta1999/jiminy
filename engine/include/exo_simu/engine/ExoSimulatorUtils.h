@@ -39,7 +39,7 @@ namespace exo_simu
 	}
 
 	inline void quat2eulZYX(const Eigen::Quaterniond &q,
-								Eigen::Vector3d &eul)
+                                     Eigen::Vector3d &eul)
 	{
 		double eul_tmp = 2.0 * (q.y() * q.y());
 		eul(0) = atan2(2.0 * q.w() * q.x() + 2.0 * q.y() * q.z(), (1.0 - 2.0 * (q.x() * q.x())) - eul_tmp);

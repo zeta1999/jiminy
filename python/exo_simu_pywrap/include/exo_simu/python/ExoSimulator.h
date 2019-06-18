@@ -130,7 +130,7 @@ namespace python
 
         static void setModelOptions(ExoSimulator& self, bp::dict const& configPy)
         {
-            ConfigHolder config = self.getDefaultModelOptions();
+            configHolder_t config = self.getDefaultModelOptions();
             loadConfigHolder(configPy, config);
             self.setModelOptions(config);
         }
@@ -144,7 +144,7 @@ namespace python
 
         static void setSimulationOptions(ExoSimulator& self, bp::dict const& configPy)
         {
-            ConfigHolder config = self.getDefaultSimulationOptions();
+            configHolder_t config = self.getDefaultSimulationOptions();
             loadConfigHolder(configPy, config);
             self.setSimulationOptions(config);
         }

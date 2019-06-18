@@ -96,21 +96,21 @@ int main(int argc, char *argv[])
     double tf = 3.0;
     double dt = 0.001;
 
-    ConfigHolder simOpts = ExoSimulator::getDefaultSimulationOptions();
-    simOpts.get<float64_t>("tolRel") = 1.0e-5;
-    simOpts.get<float64_t>("tolAbs") = 1.0e-4;
-    simOpts.get<bool>("logController") = false;
-    simOpts.get<bool>("logOptoforces") = false;
-    simOpts.get<bool>("logIMUs") = false;
+    configHolder_t simOpts = ExoSimulator::getDefaultSimulationOptions();
+    boost::get<float64_t>(simOpts.at("tolRel")) = 1.0e-5;
+    boost::get<float64_t>(simOpts.at("tolAbs")) = 1.0e-4;
+    boost::get<bool>(simOpts.at("logController")) = false;
+    boost::get<bool>(simOpts.at("logOptoforces")) = false;
+    boost::get<bool>(simOpts.at("logIMUs")) = false;
 
-    ConfigHolder modelOpts = ExoSimulator::getDefaultModelOptions();
-    // modelOpts.get<vectorN_t>("gravity")(2) = 9.81;
-    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("stiffness") = 1e3;
-    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("damping") = 2000.0;
-    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("dryFrictionVelEps") = 0.01;
-    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("frictionDry") = 5.0;
-    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("frictionViscous") = 5.0;
-    modelOpts.get<ConfigHolder>("contacts").get<float64_t>("transitionEps") = 0.001;
+    configHolder_t modelOpts = ExoSimulator::getDefaultModelOptions();
+    // boost::get<vectorN_t>(modelOpts.at("gravity"))(2) = 9.81;
+    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("stiffness")) = 1e6;
+    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("damping")) = 2000.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("dryFrictionVelEps")) = 0.01;
+    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("frictionDry")) = 5.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("frictionViscous")) = 5.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("transitionEps")) = 0.001;
 
     // Instanciate simulator
     tic(&timer);

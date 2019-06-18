@@ -16,9 +16,14 @@ add_executable(${PROJECT_NAME} ${SRC})
 # Link with other libraries
 target_link_libraries(${PROJECT_NAME} engine)
 
-# Add c++11 flags
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_11)
+# Activate c++14
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    CXX_STANDARD 14
+    CXX_STANDARD_REQUIRED YES
+    CXX_EXTENSIONS NO
+)
 
 # Install
 install(TARGETS ${PROJECT_NAME} 
-        RUNTIME       DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
