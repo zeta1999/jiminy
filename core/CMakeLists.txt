@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(engine)
+project(core)
 
 # Find library and headers
 find_package(Boost REQUIRED)
@@ -17,7 +17,13 @@ add_definitions(${COMPILE_FLAGS})
 
 # Add sources
 set(SRC 
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoSimulator.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractSensor.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Sensor.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Model.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractController.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Logger.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Utilities.cc"
 )
 
 # Make library

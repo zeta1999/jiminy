@@ -9,9 +9,7 @@ import xmltodict
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
-import pinocchio as pnc
 from pinocchio.utils import *
-from pinocchio.robot_wrapper import RobotWrapper
 from gepetto.corbaserver import Client
 
 from wdc_dynamicsteller import DynamicsTeller, rootjoint

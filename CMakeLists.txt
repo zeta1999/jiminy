@@ -5,9 +5,19 @@ cmake_minimum_required (VERSION 3.10)
 project(exo_simu)
 
 # Set various flags
+set(WARN_FULL "-Wall -Wextra -Weffc++ -pedantic -pedantic-errors \
+               -Wcast-align -Wcast-qual -Wfloat-equal -Wformat=2 \
+               -Wformat-nonliteral -Wformat-security -Wformat-y2k \
+               -Wimport -Winit-self -Winvalid-pch -Wlong-long \
+               -Wmissing-field-initializers -Wmissing-format-attribute \
+               -Wmissing-include-dirs -Wmissing-noreturn -Wpacked \
+               -Wpointer-arith -Wredundant-decls -Wshadow -Wstack-protector \
+               -Wstrict-aliasing=2 -Wswitch-default -Wswitch-enum \
+               -Wunreachable-code -Wunused -Wunused-parameter"
+)
 set(default_build_type "Release")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_RELEASE "-Wall -O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -Werror ${WARN_FULL}")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${WARN_FULL} -Wno-unused-parameter")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Release type
@@ -27,6 +37,6 @@ include_directories(SYSTEM /usr/include/python2.7/)
 include_directories(SYSTEM /usr/local/lib/python2.7/dist-packages/numpy/core/include/)
 
 # Sub-project name(s)
-add_subdirectory(engine)
+add_subdirectory(core)
 add_subdirectory(python)
 add_subdirectory(scenarios/trajectory_tracking)

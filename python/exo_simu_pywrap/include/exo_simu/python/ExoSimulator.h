@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-/// \brief             Python exposition functions for ExoSimulator.
+/// \brief             Python exposition functions for ExoSimulator project.
 ///
 /// \copyright         Wandercraft
 ////////////////////////////////////////////////////////////////////////////////
@@ -11,7 +11,7 @@
 #include <boost/python/def.hpp>
 #include <boost/python/dict.hpp>
 
-#include "exo_simu/engine/ExoSimulator.h"
+#include "exo_simu/core/Engine.h"
 #include "exo_simu/python/Utilities.h"
 
 namespace exo_simu
@@ -64,9 +64,9 @@ namespace python
                 .def("simulate", &ExoSimulatorVisitor::simulate_with_callback, 
                                  (bp::arg("self"), "x0", "t0", "tf", "dt", "controller", "callback"))
                 .def("get_log", &ExoSimulatorVisitor::getLog)
-                .def("get_urdf_path", &ExoSimulator::getUrdfPath, 
+                .def("get_urdf_path", &Engine::getUrdfPath, 
                                       bp::return_value_policy<bp::return_by_value>())
-                .def("set_urdf_path", &ExoSimulator::setUrdfPath)
+                .def("set_urdf_path", &Engine::setUrdfPath)
                 .def("get_model_options", &ExoSimulatorVisitor::getModelOptions, 
                                           bp::return_value_policy<bp::return_by_value>())
                 .def("set_model_options", &ExoSimulatorVisitor::setModelOptions)
@@ -79,7 +79,7 @@ namespace python
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief      Run the simulation
         ///////////////////////////////////////////////////////////////////////////////
-        static void init(ExoSimulator& self,
+        static void init(Engine& self,
                          std::string const& urdf_path)
         {
             self.init(urdf_path);
@@ -88,7 +88,7 @@ namespace python
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief      Run the simulation
         ///////////////////////////////////////////////////////////////////////////////
-        static void simulate(ExoSimulator& self,
+        static void simulate(Engine& self,
                              vectorN_t const& x0,
                              float64_t const& t0,
                              float64_t const& tf,
@@ -99,7 +99,7 @@ namespace python
             self.simulate(x0, t0, tf, dt, controller);
         }
 
-        static void simulate_with_callback(ExoSimulator& self,
+        static void simulate_with_callback(Engine& self,
                                            vectorN_t const& x0,
                                            float64_t const& t0,
                                            float64_t const& tf,
@@ -116,33 +116,33 @@ namespace python
         /// \brief      Getters and Setters
         ///////////////////////////////////////////////////////////////////////////////
 
-        static std::vector<std::vector<float64_t> > getLog(ExoSimulator& self)
+        static std::vector<std::vector<float64_t> > getLog(Engine& self)
         {
             return self.log;
         }
 
-        static bp::dict getModelOptions(ExoSimulator& self)
+        static bp::dict getModelOptions(Engine& self)
         {
             bp::dict configPy;
             convertConfigHolderPy(self.getModelOptions(), configPy);
             return configPy;
         }
 
-        static void setModelOptions(ExoSimulator& self, bp::dict const& configPy)
+        static void setModelOptions(Engine& self, bp::dict const& configPy)
         {
             configHolder_t config = self.getDefaultModelOptions();
             loadConfigHolder(configPy, config);
             self.setModelOptions(config);
         }
 
-        static bp::dict getSimulationOptions(ExoSimulator& self)
+        static bp::dict getSimulationOptions(Engine& self)
         {
             bp::dict configPy;
             convertConfigHolderPy(self.getSimulationOptions(), configPy);
             return configPy;
         }
 
-        static void setSimulationOptions(ExoSimulator& self, bp::dict const& configPy)
+        static void setSimulationOptions(Engine& self, bp::dict const& configPy)
         {
             configHolder_t config = self.getDefaultSimulationOptions();
             loadConfigHolder(configPy, config);
@@ -158,7 +158,7 @@ namespace python
             bp::to_python_converter<std::vector<vectorN_t>, VecToList<vectorN_t> >();
             bp::to_python_converter<std::vector<matrixN_t>, VecToList<matrixN_t> >();
             bp::to_python_converter<std::vector<std::vector<float64_t> >, VecToList<std::vector<float64_t> > >();
-            bp::class_<ExoSimulator>("ExoSimulator", "ExoSimulator class").def(ExoSimulatorVisitor());
+            bp::class_<Engine>("Engine", "Engine class").def(ExoSimulatorVisitor());
         }
     };
 }  // End of namespace python.

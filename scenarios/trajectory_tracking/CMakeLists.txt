@@ -8,13 +8,23 @@ project(trajectory_tracking)
 find_package(urdfdom REQUIRED)
 
 # Add sources
-set(SRC "${CMAKE_CURRENT_SOURCE_DIR}/trajectory_tracking.cc")
+set(SRC 
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/trajectory_tracking.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoModel.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Controller.cc"
+)
 
 # Make executables
 add_executable(${PROJECT_NAME} ${SRC})
 
+# Set include directory
+target_include_directories(${PROJECT_NAME} PUBLIC
+    "$<INSTALL_INTERFACE:include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+)
+
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} engine)
+target_link_libraries(${PROJECT_NAME} PUBLIC core)
 
 # Activate c++14
 set_target_properties(${PROJECT_NAME} PROPERTIES

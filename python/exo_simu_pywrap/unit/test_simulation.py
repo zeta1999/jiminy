@@ -40,7 +40,7 @@ trajectory_data = extract_state_from_neural_network_prediction(urdf_path, pred)
   
 ################################ Simulate the system ####################################
 
-simulator = exo_simu.ExoSimulator()
+simulator = exo_simu.Engine()
 model_options = simulator.get_model_options()
 simu_options = simulator.get_simulation_options()
 

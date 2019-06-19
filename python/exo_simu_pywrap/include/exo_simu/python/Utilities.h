@@ -126,7 +126,8 @@ namespace python
     void convertConfigHolderPy(configHolder_t const& config, bp::dict& configPy)
     {
         std::vector<std::string> options;
-        for(auto const& it : config) {
+        for(auto const& it : config) 
+        {
             options.push_back(it.first);
         }
 
@@ -197,7 +198,8 @@ namespace python
     void loadConfigHolder(bp::dict const& configPy, configHolder_t& config)
     {
         std::vector<std::string> options;
-        for(auto const& it : config) {
+        for(auto const& it : config) 
+        {
             options.push_back(it.first);
         }
         

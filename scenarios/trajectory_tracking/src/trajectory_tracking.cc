@@ -9,8 +9,8 @@
 #include <getopt.h>
 #include <string>
 
-#include "exo_simu/engine/ExoSimulator.h"
-#include "exo_simu/engine/ExoSimulatorUtils.h"
+#include "exo_simu/core/Engine.h"
+#include "exo_simu/core/Utilities.h"
 
 using namespace exo_simu;
 
@@ -78,9 +78,6 @@ int main(int argc, char *argv[])
     std::cout << "URDF path: "<< urdfPath << std::endl;
     std::cout << "Log directory: "<< outputDirPath << std::endl;
 
-    // Prepare timer
-    CustomTimer timer;
-
     // Prepare log file
     std::ofstream myfile;
     myfile.open(outputDirPath + std::string("/log.csv"), std::ofstream::out | std::ofstream::trunc);
@@ -96,14 +93,14 @@ int main(int argc, char *argv[])
     double tf = 3.0;
     double dt = 0.001;
 
-    configHolder_t simOpts = ExoSimulator::getDefaultSimulationOptions();
+    configHolder_t simOpts = Engine::getDefaultSimulationOptions();
     boost::get<float64_t>(simOpts.at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(simOpts.at("tolAbs")) = 1.0e-4;
     boost::get<bool>(simOpts.at("logController")) = false;
     boost::get<bool>(simOpts.at("logOptoforces")) = false;
     boost::get<bool>(simOpts.at("logIMUs")) = false;
 
-    configHolder_t modelOpts = ExoSimulator::getDefaultModelOptions();
+    configHolder_t modelOpts = Engine::getDefaultModelOptions();
     // boost::get<vectorN_t>(modelOpts.at("gravity"))(2) = 9.81;
     boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("stiffness")) = 1e6;
     boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("damping")) = 2000.0;
@@ -112,18 +109,24 @@ int main(int argc, char *argv[])
     boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("frictionViscous")) = 5.0;
     boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("transitionEps")) = 0.001;
 
+
+    // ############################################################
+
+    // Instantiate timer
+    Timer timer;
+
     // Instanciate simulator
-    tic(&timer);
-    ExoSimulator exoSim(urdfPath);
+    timer.tic();
+    Engine exoSim(urdfPath);
     exoSim.setModelOptions(modelOpts);
-    toc(&timer);
+    timer.toc();
     std::cout << "Instanciation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // Run simulation
     exoSim.setSimulationOptions(simOpts);
-    tic(&timer);
+    timer.tic();
     exoSim.simulate(x0,t0,tf,dt,controller,monitor);
-    toc(&timer);
+    timer.toc();
     std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // Retreive log
