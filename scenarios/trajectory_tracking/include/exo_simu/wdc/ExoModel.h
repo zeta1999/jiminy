@@ -18,17 +18,14 @@ namespace exo_simu
         {
             // Add extra options or update default values
             configHolder_t config = Model::getDefaultJointOptions();
-            config["boundsFromUrdf"] = false; 
-            config["boundsMin"] = (vectorN_t(21) << -std::numeric_limits<float64_t>::infinity() * vectorN_t::Ones(7), 
-                                                    -M_PI * vectorN_t::Ones(14)).finished();
-            config["boundsMax"] = (vectorN_t(21) <<  std::numeric_limits<float64_t>::infinity() * vectorN_t::Ones(7),  
-                                                     M_PI * vectorN_t::Ones(14)).finished();
-            config["frictionViscous"] = (vectorN_t) (0*(vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,
-                                                                         100.0,100.0,100.0,100.0,20.0,20.0).finished());
-            config["frictionDry"] = (vectorN_t) (0*(vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,
-                                                                     10.0,10.0,10.0,10.0,2.0,2.0).finished());
+            config["boundsFromUrdf"] = true;
+            config["boundsMin"] = (vectorN_t) (-M_PI * vectorN_t::Ones(14));
+            config["boundsMax"] = (vectorN_t) ( M_PI * vectorN_t::Ones(14));
+            config["frictionViscous"] = (vectorN_t) (0*(vectorN_t(14) << 100.0,100.0,100.0,100.0,20.0,20.0,0.0,
+                                                                         100.0,100.0,100.0,100.0,20.0,20.0,0.0).finished());
+            config["frictionDry"] = (vectorN_t) (0*(vectorN_t(14) << 10.0,10.0,10.0,10.0,2.0,2.0,0.0,
+                                                                     10.0,10.0,10.0,10.0,2.0,2.0,0.0).finished());
             config["dryFrictionVelEps"] = 1.0e-2;
-
             return config;
         };
 
@@ -62,11 +59,25 @@ namespace exo_simu
 
         ExoModel(void);
         ~ExoModel(void);
+        Model* clone(void);
 
         result_t initialize(std::string const & urdfPath);
 
         result_t setOptions(configHolder_t const & mdlOptions);
 
+    protected:
+        result_t setUrdfPath(std::string const & urdfPath);
+        result_t getFrameIdx(std::string const & frameName, 
+                             int32_t           & frameIdx) const;
+        result_t getFramesIdx(std::vector<std::string> const & framesNames, 
+                              std::vector<int32_t>           & framesIdx) const;
+        result_t getJointIdx(std::string const & jointName, 
+                             int32_t           & jointPositionIdx, 
+                             int32_t           & jointVelocityIdx) const;
+        result_t getJointsIdx(std::vector<std::string> const & jointsNames, 
+                              std::vector<int32_t>           & jointsPositionIdx, 
+                              std::vector<int32_t>           & jointsVelocityIdx) const;
+        
     private:
         // Discourage usage of the base initializer
         result_t initialize(std::string          const & urdfPath, 
@@ -85,7 +96,6 @@ namespace exo_simu
         std::vector<std::string> jointsNames_;
 
         std::vector<int32_t> imuFramesIdx_;
-        std::vector<int32_t> jointsIdx_;
     };
 }
 

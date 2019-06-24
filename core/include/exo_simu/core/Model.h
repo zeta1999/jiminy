@@ -19,7 +19,7 @@ namespace exo_simu
 
     class Model
     {
-    protected:
+    public:
         virtual configHolder_t getDefaultJointOptions()
         {
             configHolder_t config;
@@ -45,7 +45,6 @@ namespace exo_simu
             }
         };
 
-    public:
         virtual configHolder_t getDefaultOptions()
         {
             configHolder_t config;
@@ -68,31 +67,29 @@ namespace exo_simu
     public:
         Model(void);
         virtual ~Model(void);
+        virtual Model* clone(void);
 
         result_t initialize(std::string          const & urdfPath, 
-                            std::vector<int32_t> const & contactFramesIdx);
+                            std::vector<int32_t> const & contactFramesIdx, 
+                            std::vector<int32_t> const & jointsIdx, 
+                            std::vector<int32_t> const & jointsVelocityIdx);
 
-        result_t addSensor(AbstractSensor * sensor);
-        result_t removeSensor(std::string const & sensorName);
+        result_t addSensor(std::string    const & sensorType, 
+                           AbstractSensor       * sensor);
+        result_t removeSensor(std::string const & name);
         void removeSensors(void);
 
         configHolder_t getOptions(void) const;
         result_t setOptions(configHolder_t const & mdlOptions);
         bool getIsInitialized(void) const;
         std::string getUrdfPath(void) const;
-        sensorsMap_t const * getSensorsPtr(void) const;
+        sensorsGroupMap_t const * getSensors(void) const;
         std::vector<int32_t> const & getContactFramesIdx(void) const;
+        std::vector<int32_t> const & getJointsPositionIdx(void) const;
+        std::vector<int32_t> const & getJointsVelocityIdx(void) const;
 
     protected:
         result_t setUrdfPath(std::string const & urdfPath);
-        result_t getFrameIdx(std::string const & frameName, 
-                             int32_t           & frameIdx) const;
-        result_t getFramesIdx(std::vector<std::string> const & framesNames, 
-                              std::vector<int32_t>           & framesIdx) const;
-        result_t getJointIdx(std::string const & jointName, 
-                             int32_t           & jointIdx) const;
-        result_t getJointsIdx(std::vector<std::string> const & jointsNames, 
-                              std::vector<int32_t>           & jointsIdx) const;
         
     public:
         pinocchio::Model pncModel_;
@@ -103,9 +100,11 @@ namespace exo_simu
         bool isInitialized_;
         std::string urdfPath_;
         configHolder_t mdlOptionsHolder_;
-        sensorsMap_t sensors_;
+        sensorsGroupMap_t sensors_;
 
-        std::vector<int32_t> contactFramesIdx_;
+        std::vector<int32_t> contactFramesIdx_; // Indices of the contact frame in the model
+        std::vector<int32_t> jointsPositionIdx_; // Indices of the actuated joints in the configuration representation
+        std::vector<int32_t> jointsVelocityIdx_; // Indices of the actuated joints in the velocity vector representation
     };
 }
 

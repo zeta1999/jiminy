@@ -9,35 +9,46 @@
 #include <getopt.h>
 #include <string>
 
-#include "exo_simu/core/Engine.h"
+#include "exo_simu/core/Types.h"
 #include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/Engine.h"
+#include "exo_simu/wdc/ExoModel.h"
+#include "exo_simu/wdc/ExoController.h"
+
 
 using namespace exo_simu;
 
-const uint32_t nx_ = 37;
-const uint32_t nu_ = 12;
+// =====================================================================
+// ================= Defines the command and callback ==================
+// =====================================================================
 
-vectorN_t Kp = (vectorN_t(12) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
-                                 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
-vectorN_t Kd = (vectorN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
-                                 500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
+vectorN_t Kp = (vectorN_t(14) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0, 0.0,
+                                 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0, 0.0).finished();
+vectorN_t Kd = (vectorN_t(14) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 0.0, 
+                                 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 0.0).finished();
 
-void controller(const double t,
-                const Eigen::VectorXd &x,
-                const Eigen::MatrixXd &optoforces,
-                const Eigen::MatrixXd &IMUs,
-                      Eigen::VectorXd &u)
+void compute_command(float64_t const & t,
+                     vectorN_t const & q,
+                     vectorN_t const & v,
+                     matrixN_t const & optoforces,
+                     matrixN_t const & IMUs,
+                     vectorN_t       & u)
 {
-    u = -(Kp.array() * x.segment<12>(7).array() + Kd.array() * x.segment<12>(25).array());
+    u = -(Kp.array() * q.segment<14>(7).array() + Kd.array() * v.segment<14>(6).array());
 }
 
-bool monitor(const double t, const Eigen::VectorXd &x)
+bool callback(float64_t const & t, 
+              vectorN_t const & x)
 {
     return true;
 }
 
 int main(int argc, char *argv[])
 {
+    // =====================================================================
+    // ==================== Extract the user paramaters ====================
+    // =====================================================================
+
     // Default argument(s)
     struct passwd *pw = getpwuid(getuid());
     const char *homedir = pw->pw_dir;
@@ -47,10 +58,10 @@ int main(int argc, char *argv[])
     // Parsing of the user argument(s)
     const char* const short_opts = "u:o:h";
     const option long_opts[] = {
-            {"urdf", required_argument, nullptr, 'u'},
-            {"output", required_argument, nullptr, 'o'},
-            {"help", no_argument, nullptr, 'h'},
-            {nullptr, no_argument, nullptr, 0}
+        {"urdf", required_argument, nullptr, 'u'},
+        {"output", required_argument, nullptr, 'o'},
+        {"help", no_argument, nullptr, 'h'},
+        {nullptr, no_argument, nullptr, 0}
     };
 
     int opt;
@@ -78,69 +89,84 @@ int main(int argc, char *argv[])
     std::cout << "URDF path: "<< urdfPath << std::endl;
     std::cout << "Log directory: "<< outputDirPath << std::endl;
 
-    // Prepare log file
+    // =====================================================================
+    // ============= Instantiate and configure the simulator ===============
+    // =====================================================================
+
+    // Instantiate timer
+    Timer timer;
+
+    timer.tic();
+
+    // Instantiate and configuration the exoskeleton model
+    ExoModel model;
+    model.initialize(urdfPath);
+    configHolder_t mdlOptions = model.getOptions();
+    model.setOptions(mdlOptions);
+
+    // Instantiate and configuration the exoskeleton controller
+    ExoController controller;
+    controller.initialize(compute_command);
+    configHolder_t ctrlOptions = controller.getOptions();
+    controller.setOptions(ctrlOptions);
+
+    // Instantiate and configuration the simulator
+    Engine simulator;
+    simulator.initialize(model, controller, callback);
+    configHolder_t simuOptions = simulator.getDefaultOptions();
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("frictionDry")) = 5.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("frictionViscous")) = 5.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("transitionEps")) = 0.001;
+    boost::get<vectorN_t>(simuOptions.at("gravity"))(2) = -9.81;
+    // boost::get<bool>(simOpts.at("isLogControllerEnable")) = false;
+    // boost::get<bool>(simOpts.at("isLogLogForceSensorsEnable")) = false;
+    // boost::get<bool>(simOpts.at("isLogLogImuSensorsEnable")) = false;
+    simulator.setOptions(simuOptions);
+
+    timer.toc();
+    std::cout << "Instantiation time: " << timer.dt*1.0e3 << "ms" << std::endl;
+
+    // =====================================================================
+    // ======================== Run the simulator ==========================
+    // =====================================================================
+
+    // Prepare options
+    Eigen::VectorXd x0 = Eigen::VectorXd::Zero(41);
+    x0(2) = 1.0;
+    x0(6) = 1.0;
+
+    float64_t tf = 5.0;
+    float64_t dt = 0.001;
+
+    // Run simulation
+    timer.tic();
+    simulator.simulate(x0,tf,dt);
+    timer.toc();
+    std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
+
+    // TODO: Write the log file
+    std::cout << simulator.log.size() << " log points" << std::endl;
+
     std::ofstream myfile;
     myfile.open(outputDirPath + std::string("/log.csv"), std::ofstream::out | std::ofstream::trunc);
     myfile << std::fixed;
     myfile << std::setprecision(10);
 
-    // Prepare options
-    Eigen::VectorXd x0 = Eigen::VectorXd::Zero(nx_);
-    x0(2) = 1.0;
-    x0(3) = 1.0;
-
-    double t0 = 0.0;
-    double tf = 3.0;
-    double dt = 0.001;
-
-    configHolder_t simOpts = Engine::getDefaultSimulationOptions();
-    boost::get<float64_t>(simOpts.at("tolRel")) = 1.0e-5;
-    boost::get<float64_t>(simOpts.at("tolAbs")) = 1.0e-4;
-    boost::get<bool>(simOpts.at("logController")) = false;
-    boost::get<bool>(simOpts.at("logOptoforces")) = false;
-    boost::get<bool>(simOpts.at("logIMUs")) = false;
-
-    configHolder_t modelOpts = Engine::getDefaultModelOptions();
-    // boost::get<vectorN_t>(modelOpts.at("gravity"))(2) = 9.81;
-    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("stiffness")) = 1e6;
-    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("damping")) = 2000.0;
-    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("dryFrictionVelEps")) = 0.01;
-    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("frictionDry")) = 5.0;
-    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("frictionViscous")) = 5.0;
-    boost::get<float64_t>(boost::get<configHolder_t>(modelOpts.at("contacts")).at("transitionEps")) = 0.001;
-
-
-    // ############################################################
-
-    // Instantiate timer
-    Timer timer;
-
-    // Instanciate simulator
-    timer.tic();
-    Engine exoSim(urdfPath);
-    exoSim.setModelOptions(modelOpts);
-    timer.toc();
-    std::cout << "Instanciation time: " << timer.dt*1.0e3 << "ms" << std::endl;
-
-    // Run simulation
-    exoSim.setSimulationOptions(simOpts);
-    timer.tic();
-    exoSim.simulate(x0,t0,tf,dt,controller,monitor);
-    timer.toc();
-    std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
-
-    // Retreive log
-    std::cout << exoSim.log.size() << " log points" << std::endl;
-    for(uint64_t i = 0; i<exoSim.log.size(); i++)
+    std::cout << simulator.log.size() << " log points" << std::endl;
+    for(uint64_t i = 0; i<simulator.log.size(); i++)
     {
-        for(uint64_t j = 0; j<exoSim.log[0].size()-1; j++)
+        for(uint64_t j = 0; j<simulator.log[0].size()-1; j++)
         {
-            myfile << exoSim.log[i][j] << ',';
+            myfile << simulator.log[i][j] << ',';
         }
-        myfile << exoSim.log[i].back() << std::endl;
+        myfile << simulator.log[i].back() << std::endl;
     }
-
-    // Close log file
     myfile.close();
+
     return 0;
 }

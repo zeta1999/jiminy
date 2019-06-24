@@ -49,7 +49,8 @@ namespace exo_simu
                                  vectorN_t const & v,
                                  vectorN_t       & u);
 
-        virtual void compute_command(float64_t const & t,
+        virtual void compute_command(Engine    const & engine,
+                                     float64_t const & t,
                                      vectorN_t const & q,
                                      vectorN_t const & v,
                                      vectorN_t       & u) = 0;

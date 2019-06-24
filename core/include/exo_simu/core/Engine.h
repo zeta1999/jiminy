@@ -11,7 +11,6 @@
 
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Model.h"
-#include "exo_simu/core/Logger.h"
 
 
 namespace exo_simu
@@ -23,19 +22,13 @@ namespace exo_simu
     class Engine
     {
     protected:
-        typedef std::function<void(float64_t const &/*t*/,
-                                   vectorN_t const &/*x*/,
-                                   matrixN_t const &/*optoforces*/,
-                                   matrixN_t const &/*IMUs*/,
-                                   vectorN_t       &/*u*/)> controller_t;
-
         typedef std::function<bool(float64_t const &/*t*/,
                                    vectorN_t const &/*x*/)> callbackFct_t;
 
         typedef runge_kutta_dopri5<state_t> stepper_t;
 
-    protected:
-        virtual configHolder_t getDefaultContactOptions()
+    public:
+        configHolder_t getDefaultContactOptions()
         {
             configHolder_t config;
             config["frictionViscous"] = 0.8;
@@ -69,7 +62,7 @@ namespace exo_simu
             }
         };
 
-        virtual configHolder_t getDefaultJointOptions()
+        configHolder_t getDefaultJointOptions()
         {
             configHolder_t config;
             config["boundStiffness"] = 5.0e5;
@@ -94,11 +87,11 @@ namespace exo_simu
             }
         };
 
-        virtual configHolder_t getDefaultStepperOptions()
+        configHolder_t getDefaultStepperOptions()
         {
             configHolder_t config;
-            config["tolAbs"] = 1.0e-6;
-            config["tolRel"] = 1.0e-6;
+            config["tolAbs"] = 1.0e-5;
+            config["tolRel"] = 1.0e-4;
 
             return config;
         };
@@ -116,8 +109,7 @@ namespace exo_simu
             }
         };
 
-    public:
-        virtual configHolder_t getDefaultOptions()
+        configHolder_t getDefaultOptions()
         {
             configHolder_t config;
             config["stepper"] = getDefaultStepperOptions();
@@ -127,7 +119,6 @@ namespace exo_simu
 
             return config;
         };
-
 
         struct engineOptions_t
         {
@@ -148,43 +139,52 @@ namespace exo_simu
         
     public:
         Engine(void);
-        virtual ~Engine(void);
+        ~Engine(void);
 
         result_t initialize(Model              & model,
-                            AbstractController & controller);
+                            AbstractController & controller,
+                            callbackFct_t        callbackFct);
 
-        vectorN_t const & contactDynamics(int32_t const & frameId) const;
+        vectorN_t contactDynamics(int32_t const & frameId) const;
 
-        result_t simulate(vectorN_t    const & x0,
-                          float64_t    const & tf,
-                          float64_t    const & dt);
-        result_t simulate(vectorN_t     const & x0,
-                          float64_t     const & tf,
-                          float64_t     const & dt,
-                          callbackFct_t         callbackFct);
+        result_t simulate(vectorN_t const & x0,
+                          float64_t const & tf,
+                          float64_t const & dt);
 
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & engineOptions);
         bool getIsInitialized(void) const;
-        std::string getLog(bool const & isHeaderEnable = true, 
-                           bool const & isDataEnable = true) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
+        uint32_t nq(void) const; // no get keyword for consistency with pinocchio C++ API
+        uint32_t nv(void) const;
+        uint32_t nx(void) const;
 
     protected:
         void dynamicsCL(float64_t const & t,
-                        state_t   const & x,
-                        state_t         & xDot);
+                        state_t   const & xVect,
+                        state_t         & xVectDot);
+
+        void internalDynamics(float64_t const & t,
+                              vectorN_t const & q,
+                              vectorN_t const & v,
+                              vectorN_t       & u);
 
     public:
+        log_t log; // To be removed
         std::shared_ptr<engineOptions_t const> engineOptions_;
 
     protected:
         bool isInitialized_;
-        Model model_;
+        std::shared_ptr<Model> model_;
         std::shared_ptr<AbstractController> controller_;
-        Logger logger_;
         configHolder_t engineOptionsHolder_;
+        callbackFct_t callbackFct_;
+
+    private:
+        uint32_t nq_;
+        uint32_t nv_;
+        uint32_t nx_;
     };
 }
 

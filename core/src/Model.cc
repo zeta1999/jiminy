@@ -19,7 +19,9 @@ namespace exo_simu
     urdfPath_(),
     mdlOptionsHolder_(),
     sensors_(),
-    contactFramesIdx_()
+    contactFramesIdx_(),
+    jointsPositionIdx_(),
+    jointsVelocityIdx_()
     {
         setOptions(getDefaultOptions());
     }
@@ -29,13 +31,22 @@ namespace exo_simu
         // Empty.
     }
 
+    Model* Model::clone(void)
+    {
+        return new Model(*this);
+    }
+
     result_t Model::initialize(std::string          const & urdfPath, 
-                               std::vector<int32_t> const & contactFramesIdx)
+                               std::vector<int32_t> const & contactFramesIdx, 
+                               std::vector<int32_t> const & jointsPositionIdx, 
+                               std::vector<int32_t> const & jointsVelocityIdx)
     {
         result_t returnCode = result_t::SUCCESS;
 
         removeSensors();
         contactFramesIdx_ = contactFramesIdx;
+        jointsPositionIdx_ = jointsPositionIdx;
+        jointsVelocityIdx_ = jointsVelocityIdx;
         returnCode = setUrdfPath(urdfPath);
 
         if (returnCode == result_t::SUCCESS)
@@ -47,22 +58,27 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Model::addSensor(AbstractSensor * sensor)
+    result_t Model::addSensor(std::string    const & sensorType, 
+                              AbstractSensor       * sensor)
     {
+        // The sensor name must be unique, even if there types are different
         result_t returnCode = result_t::SUCCESS;
 
         std::string sensorName = sensor->getName();
 
-        sensorsMap_t::iterator it = sensors_.find(sensorName);
-        if (it != sensors_.end())
+        for (sensorsGroupMap_t::value_type const & sensorGroup : sensors_)
         {
-            std::cout << "Error - Model::addSensor - Sensor with the same name already exists." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
+            sensorsMap_t::const_iterator it = sensorGroup.second.find(sensorName);
+            if (it != sensorGroup.second.end())
+            {
+                std::cout << "Error - Model::addSensor - Sensor with the same name already exists." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
         }
 
         if (returnCode == result_t::SUCCESS)
         {
-            sensors_[sensorName] = std::shared_ptr<AbstractSensor>(sensor->clone());
+            sensors_[sensorType][sensorName] = std::shared_ptr<AbstractSensor>(sensor->clone());
         }
 
         return returnCode;
@@ -70,18 +86,33 @@ namespace exo_simu
 
     result_t Model::removeSensor(std::string const & sensorName)
     {
+        // Can be used to remove either a sensor or a sensor type
         result_t returnCode = result_t::SUCCESS;
 
-        sensorsMap_t::iterator it = sensors_.find(sensorName);
-        if (it == sensors_.end())
+        sensorsGroupMap_t::iterator sensorGroupIt = sensors_.find(sensorName);
+        if (sensorGroupIt != sensors_.end())
         {
-            std::cout << "Error - Model::removeSensor - Sensor with this name does not exist." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
+            sensors_.erase(sensorGroupIt);
         }
-
-        if (returnCode == result_t::SUCCESS)
+        else
         {
-            sensors_.erase(it);
+            bool isSensorDeleted = false;
+            for (sensorsGroupMap_t::value_type & sensorGroup : sensors_)
+            {
+                sensorsMap_t::iterator sensorIt = sensorGroup.second.find(sensorName);
+                if (sensorIt != sensorGroup.second.end())
+                {
+                    sensorGroup.second.erase(sensorIt);
+                    isSensorDeleted = true;
+                    break;
+                }
+            }
+
+            if (!isSensorDeleted)
+            {
+                std::cout << "Error - Model::removeSensor - Sensor with this name does not exist." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
         }
 
         return returnCode;
@@ -102,22 +133,25 @@ namespace exo_simu
         result_t returnCode = result_t::SUCCESS;
 
         mdlOptionsHolder_ = mdlOptions;
-        pncModel_.gravity = boost::get<vectorN_t>(mdlOptions.at("gravity"));
 
-        configHolder_t& jointOptionsHolder_ = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
-        bool boundsFromUrdf = boost::get<bool>(jointOptionsHolder_.at("boundsFromUrdf"));
+        configHolder_t & jointOptionsHolder_ = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
         vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMin"));
         vectorN_t & boundsMax = boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMax"));
         if (isInitialized_)
         {
-            if (boundsFromUrdf)
+            if (boost::get<bool>(jointOptionsHolder_.at("boundsFromUrdf")))
             {
-                boundsMin = pncModel_.lowerPositionLimit;
-                boundsMax = pncModel_.upperPositionLimit;
+                boundsMin = vectorN_t::Zero(jointsPositionIdx_.size());
+                boundsMax = vectorN_t::Zero(jointsPositionIdx_.size());
+                for (uint32_t i=0; i < jointsPositionIdx_.size(); i++)
+                {
+                    boundsMin[i] = pncModel_.lowerPositionLimit[jointsPositionIdx_[i]];
+                    boundsMax[i] = pncModel_.upperPositionLimit[jointsPositionIdx_[i]];
+                }
             }
             else
             {
-                if(pncModel_.nq != boundsMin.size() || pncModel_.nq != boundsMax.size())
+                if(jointsPositionIdx_.size() != boundsMin.size() || jointsPositionIdx_.size() != boundsMax.size())
                 {
                     std::cout << "Error - Model::setOptions - Wrong vector size for boundsMin or boundsMax." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
@@ -174,7 +208,7 @@ namespace exo_simu
         return returnCode;
     }
  
-    sensorsMap_t const * Model::getSensorsPtr(void) const
+    sensorsGroupMap_t const * Model::getSensors(void) const
     {
         return &sensors_;
     }
@@ -184,79 +218,13 @@ namespace exo_simu
         return contactFramesIdx_;
     }
 
-    result_t Model::getFrameIdx(std::string const & frameName, 
-                                int32_t           & frameIdx) const
+    std::vector<int32_t> const & Model::getJointsPositionIdx(void) const
     {
-        result_t returnCode = result_t::SUCCESS;
-
-        if (!pncModel_.existFrame(frameName))
-        {
-            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << frameName << "' not found in urdf." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
-            frameIdx = pncModel_.getFrameId(frameName);
-        }
-
-        return returnCode;
+        return jointsPositionIdx_;
     }
 
-    result_t Model::getFramesIdx(std::vector<std::string> const & framesNames, 
-                                 std::vector<int32_t>           & framesIdx) const
+    std::vector<int32_t> const & Model::getJointsVelocityIdx(void) const
     {
-        result_t returnCode = result_t::SUCCESS;
-
-        framesIdx.resize(0);
-        for (std::string const & name : framesNames)
-        {
-            if (returnCode == result_t::SUCCESS)
-            {
-                int32_t idx;
-                returnCode = getFrameIdx(name, idx);
-                framesIdx.push_back(idx);
-            }
-        }
-
-        return returnCode;
-    }
-
-    result_t Model::getJointIdx(std::string const & jointName, 
-                                int32_t           & jointIdx) const
-    {
-        result_t returnCode = result_t::SUCCESS;
-
-        if (!pncModel_.existJointName(jointName))
-        {
-            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << jointName << "' not found in urdf." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
-            jointIdx = pncModel_.getFrameId(jointName);
-        }
-
-        return returnCode;
-    }
-
-    result_t Model::getJointsIdx(std::vector<std::string> const & jointsNames, 
-                                 std::vector<int32_t>           & jointsIdx) const
-    {
-        result_t returnCode = result_t::SUCCESS;
-
-        jointsIdx.resize(0);
-        for (std::string const & name : jointsNames)
-        {
-            if (returnCode == result_t::SUCCESS)
-            {
-                int32_t idx;
-                returnCode = getJointIdx(name, idx);
-                jointsIdx.push_back(idx);
-            }
-        }
-
-        return returnCode;
+        return jointsVelocityIdx_;
     }
 }

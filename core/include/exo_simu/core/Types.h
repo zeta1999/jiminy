@@ -49,9 +49,10 @@ namespace exo_simu
                                           std::map<std::string, boost::recursive_variant_> >::type configField_t;
     typedef std::map<std::string, configField_t> configHolder_t;
     typedef std::map<std::string, std::shared_ptr<AbstractSensor>> sensorsMap_t;
+    typedef std::map<std::string, sensorsMap_t> sensorsGroupMap_t;
 
     typedef std::vector<float64_t> state_t;
-    typedef std::vector<state_t> log_t;
+    typedef std::vector<state_t> log_t; // To be removed
 }
 
 #endif  // WDC_OPTIMAL_TYPES_H

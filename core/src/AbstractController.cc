@@ -1,4 +1,5 @@
 #include <iostream>
+#include "exo_simu/core/Engine.h"
 #include "exo_simu/core/AbstractController.h"
 
 namespace exo_simu
@@ -32,11 +33,16 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            vectorN_t uCommand = u;
-            compute_command(t, q, v, uCommand);
-            vectorN_t uInternal = u;
+            std::vector<int32_t> jointsVelocityIdx = engine.getModel().getJointsVelocityIdx();
+            vectorN_t uCommand = vectorN_t::Zero(jointsVelocityIdx.size());
+            compute_command(engine, t, q, v, uCommand);
+            vectorN_t uInternal = vectorN_t::Zero(engine.nv());
             internalDynamics(engine, t, q, v, uInternal);
-            u = uCommand + uInternal;
+            u = uInternal;
+            for (uint32_t i=0; i < jointsVelocityIdx.size(); i++)
+            {
+                u[jointsVelocityIdx[i]] += uCommand[i];
+            }
         }
         
         return returnCode;

@@ -10,12 +10,9 @@ namespace exo_simu
 {
     // ===================== ImuSensor =========================
 
-    ImuSensor::ImuSensor(std::string              const & name, 
-                         std::vector<std::string> const & headerSuffixes) :
-    AbstractSensor(name, headerSuffixes),
+    ImuSensor::ImuSensor(std::string const & name) :
+    AbstractSensor(name),
     imuSensorOptions_(nullptr),
-    data_(vectorN_t::Zero(7)),
-    dataStrings_(),
     framesIdx_()
     {
         setOptions(getDefaultOptions());
@@ -33,6 +30,7 @@ namespace exo_simu
 
     void ImuSensor::initialize(int32_t const & framesIdx)
     {
+        data_ = vectorN_t::Zero(7);
         framesIdx_ = framesIdx;
         isInitialized_ = true;
     }
@@ -78,20 +76,11 @@ namespace exo_simu
         return returnCode;
     }
 
-    std::vector<std::string> const & ImuSensor::getDataStrings(void)
-    {
-        toVectorString(data_, dataStrings_);
-        return dataStrings_;
-    }
-
     // ===================== ForceSensor =========================
 
-    ForceSensor::ForceSensor(std::string              const & name, 
-                             std::vector<std::string> const & headerSuffixes) :
-    AbstractSensor(name, headerSuffixes),
+    ForceSensor::ForceSensor(std::string const & name) :
+    AbstractSensor(name),
     forceSensorOptions_(nullptr),
-    data_(vectorN_t::Zero(3)),
-    dataStrings_(),
     framesIdx_()
     {
         setOptions(getDefaultOptions());
@@ -109,6 +98,7 @@ namespace exo_simu
 
     void ForceSensor::initialize(int32_t const & framesIdx)
     {
+        data_ = vectorN_t::Zero(3);
         framesIdx_ = framesIdx;
         isInitialized_ = true;
     }
@@ -146,11 +136,5 @@ namespace exo_simu
         }
 
         return returnCode;
-    }
-
-    std::vector<std::string> const & ForceSensor::getDataStrings(void)
-    {
-        toVectorString(data_, dataStrings_);
-        return dataStrings_;
     }
 }

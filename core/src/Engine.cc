@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/algorithm/kinematics.hpp"
@@ -13,12 +14,17 @@
 namespace exo_simu
 {
     Engine::Engine(void):
+    log(),
     engineOptions_(nullptr),
     isInitialized_(false),
-    model_(),
+    model_(nullptr),
     controller_(nullptr),
-    logger_(),
-    engineOptionsHolder_()
+    engineOptionsHolder_(),
+    callbackFct_([](float64_t const & t, 
+                    vectorN_t const & x)->bool{ return true; }),
+    nq_(),
+    nv_(),
+    nx_()
     {
         setOptions(getDefaultOptions());
     }
@@ -29,7 +35,8 @@ namespace exo_simu
     }
 
     result_t Engine::initialize(Model              & model,
-                                AbstractController & controller)
+                                AbstractController & controller,
+                                callbackFct_t        callbackFct)
     {
         result_t returnCode = result_t::SUCCESS;
 
@@ -38,7 +45,10 @@ namespace exo_simu
             std::cout << "Error - Engine::initialize - Model not initialized." << std::endl;
             return result_t::ERROR_INIT_FAILED;
         }
-        model_ = model;
+        model_ = std::shared_ptr<Model>(model.clone());
+        nq_ = model_->pncModel_.nq;
+        nv_ = model_->pncModel_.nv;
+        nx_ = nq_ + nv_;
 
         if (!controller.getIsInitialized())
         {
@@ -47,15 +57,14 @@ namespace exo_simu
         }
         if (returnCode == result_t::SUCCESS)
         {
-            float64_t t = 0;
-            vectorN_t q = vectorN_t::Zero(model.pncModel_.nq);
-            vectorN_t v = vectorN_t::Zero(model.pncModel_.nv);
-            vectorN_t u = vectorN_t::Zero(model.pncModel_.nv);
-
             try
             {
+                float64_t t = 0;
+                vectorN_t q = vectorN_t::Zero(nq_);
+                vectorN_t v = vectorN_t::Zero(nv_);
+                vectorN_t u = vectorN_t::Zero(nv_);
                 returnCode = controller.compute_efforts(*this, t, q, v, u);
-                if(u.rows() != model.pncModel_.nv)
+                if(u.size() != nv_)
                 {
                     std::cout << "Error - Engine::initialize - The controller returns command with wrong size." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
@@ -74,12 +83,14 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            returnCode = logger_.initialize(model_);
+            // TODO: Check that the callback function is working as expected
+            callbackFct_ = callbackFct;
         }
 
         if (returnCode == result_t::SUCCESS)
         {
             isInitialized_ = true;
+            setOptions(engineOptionsHolder_); // Make sure the gravity is properly set at model level
         }
 
         return returnCode;
@@ -89,15 +100,8 @@ namespace exo_simu
                               float64_t const & tf,
                               float64_t const & dt)
     {
-        auto callbackFct = [](float64_t const t, vectorN_t const & x)->bool{ return true; };
-        return simulate(x0,tf,dt,callbackFct);
-    }
+        result_t returnCode = result_t::SUCCESS;
 
-    result_t Engine::simulate(vectorN_t     const & x0,
-                              float64_t     const & tf,
-                              float64_t     const & dt,
-                              callbackFct_t         callbackFct)
-    {
         if(!isInitialized_)
         {
             std::cout << "Error - Engine::simulate - Engine not initialized. Impossible to run the simulation." << std::endl;
@@ -109,7 +113,7 @@ namespace exo_simu
             std::cout << "Error - Engine::simulate - Size of x0 (" << x0.size() << ") inconsistent with model size (" << nx_ << ")." << std::endl;
             return result_t::ERROR_BAD_INPUT;
         }
-        state_t xx0(x0.data(), x0.data() + x0.size());
+        state_t x0Vect(x0.data(), x0.data() + x0.size());
 
         if(tf <= 0)
         {
@@ -124,87 +128,66 @@ namespace exo_simu
             return result_t::ERROR_GENERIC;
         }
 
-        auto rhsBind = bind(&Engine::dynamicsCL, this,
-                            std::placeholders::_1,
-                            std::placeholders::_2,
-                            std::placeholders::_3);
-        auto stepper = make_controlled(simOptions_->tolAbs, simOptions_->tolRel, stepper_t()); // make_dense_output, make_controlled
-        auto itBegin = make_adaptive_time_iterator_begin(stepper, rhsBind, xx0, 0, tf, dt); // const_step_time, adaptive_time
-        auto itEnd = make_adaptive_time_iterator_end(stepper, rhsBind, xx0);
+        log.resize(0);
+        log.reserve(nPts); // Reserve the estimated average number of pts required.
 
-        logger.clear();
-        model.pncData_ = pinocchio::Data(model.pncModel_); // Initialize the internal state
+        auto rhsBind = bind(&Engine::dynamicsCL, this,
+                            std::placeholders::_3,
+                            std::placeholders::_1,
+                            std::placeholders::_2);
+        auto stepper = make_controlled(engineOptions_->stepper.tolAbs, 
+                                       engineOptions_->stepper.tolRel,
+                                       stepper_t()); // make_dense_output, make_controlled
+        auto itBegin = make_adaptive_time_iterator_begin(stepper, rhsBind, x0Vect, 0, tf, dt); // const_step_time, adaptive_time
+        auto itEnd = make_adaptive_time_iterator_end(stepper, rhsBind, x0Vect);
+
+        model_->pncData_ = pinocchio::Data(model_->pncModel_); // Initialize the internal state
         for(auto it = itBegin; it != itEnd; it++)
         {
-            logger.fetch();
-
             float64_t const & t = it->second;
-            state_t const & x = it->first;
-            Eigen::Map<vectorN_t const> xEigen(x.data(), nx_);
-            if(!callbackFct(t,xEigen))
+            state_t const & xVect = it->first;
+
+            state_t log_data(nx_ + 1);
+            log_data[0] = t;
+            copy(xVect.begin(), xVect.end(), log_data.begin() + 1);
+            log.push_back(log_data);
+
+            Eigen::Map<vectorN_t const> x(xVect.data(), nx_);
+            if(!callbackFct_(t, x))
             {
                 break;
             }
         }
+
+        log.shrink_to_fit();
         
-        return result_t::SUCCESS;
+        return returnCode;
     }
 
-    configHolder_t Engine::getOptions(void) const
+    void Engine::dynamicsCL(float64_t const & t,
+                            state_t   const & xVect,
+                            state_t         & xVectDot)
     {
-        return engineOptionsHolder_;
-    }
+        xVectDot.resize(nx_);
 
-    void Engine::setOptions(configHolder_t const & engineOptions)
-    {
-        engineOptionsHolder_ = engineOptions;
-        model_.pncModel_.gravity = boost::get<vectorN_t>(engineOptions.at("gravity"));
-        engineOptions_ = std::shared_ptr<engineOptions_t const>(new engineOptions_t(engineOptionsHolder_));
-    }
-
-    bool Engine::getIsInitialized(void) const
-    {
-        return isInitialized_;
-    }
-
-    std::string Engine::getLog(bool const & isHeaderEnable, 
-                               bool const & isDataEnable) const
-    {
-        return logger_.get(isHeaderEnable, isDataEnable);
-    }
-
-    Model const & Engine::getModel(void) const
-    {
-        return model_;
-    }
-
-    void Engine::dynamicsCL(state_t   const & x,
-                            state_t         & xDot,
-                            float64_t const   t)
-    {
-        xDot.resize(nx_);
-
-        Eigen::Map<vectorN_t const> xEig(x.data(),nx_);
-        Eigen::Map<vectorN_t> xDotEig(xDot.data(),nx_);
-        Eigen::Map<vectorN_t const> q(x.data(),nq_);
-        Eigen::Map<vectorN_t const> dq(x.data() + nq_,ndq_);
-        Eigen::Map<vectorN_t> ddq(xDot.data() + nq_,ndq_);
-        vectorN_t u = vectorN_t::Zero(nu_);
-        vectorN_t uWithFF = vectorN_t::Zero(ndq_);
-        vectorN_t uInternal = vectorN_t::Zero(ndq_);
+        Eigen::Map<const vectorN_t> xEig(xVect.data(),nx_);
+        Eigen::Map<vectorN_t> xDotEig(xVectDot.data(),nx_);
+        Eigen::Map<const vectorN_t> q(xVect.data(),nq_);
+        Eigen::Map<const vectorN_t> dq(xVect.data() + nq_,nv_);
+        Eigen::Map<vectorN_t> ddq(xVectDot.data() + nq_,nv_);
 
         // Compute quaternion derivative
-        Eigen::Vector3d const omega = dq.segment<3>(3);
+        const Eigen::Vector3d omega = dq.segment<3>(3);
         Eigen::Vector4d quatVec = q.segment<4>(3);
         quatVec.normalize();
-        quaternion_t const quat(quatVec(0),quatVec(1),quatVec(2),quatVec(3));
+        const Eigen::Quaterniond quat(quatVec(0),quatVec(1),quatVec(2),quatVec(3));
         Eigen::Matrix<float64_t,4,4> quat2quatDot;
         quat2quatDot << 0        , omega(0), omega(1), omega(2),
                         -omega(0),        0,-omega(2), omega(1),
                         -omega(1), omega(2),        0,-omega(0),
                         -omega(2), -omega(1), omega(0),       0;
         quat2quatDot *= -0.5;
-        Eigen::Vector4d const quatDot = quat2quatDot*quatVec;
+        const Eigen::Vector4d quatDot = quat2quatDot*quatVec;
 
         // Put quaternion in [x y z w] order
         vectorN_t qPinocchio = q;
@@ -213,66 +196,30 @@ namespace exo_simu
 
         // Compute body velocity
         vectorN_t dqPinocchio = dq;
-        Eigen::Matrix3d const Rb2w = quat.toRotationMatrix();
+        const Eigen::Matrix3d Rb2w = quat.toRotationMatrix();
         dqPinocchio.head<3>() = Rb2w.transpose()*dqPinocchio.head<3>();
 
-        // Stuff Specific to wandercraft urdf
-        vectorN_t qFull(nqFull_);
-        vectorN_t dqFull(ndqFull_);
-        vectorN_t ddqFull(ndqFull_);
-        vectorN_t uFull = vectorN_t::Zero(nuFull_);
+        // Compute kinematics information
+        pinocchio::forwardKinematics(model_->pncModel_, model_->pncData_, qPinocchio, dqPinocchio);
+        pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
 
-        qFull.head<13>() = qPinocchio.head<13>();
-        qFull.segment<6>(14) = qPinocchio.tail<6>();
-        qFull(13) = 0.0;
-        qFull(20) = 0.0;
-
-        dqFull.head<12>() = dqPinocchio.head<12>();
-        dqFull.segment<6>(13) = dqPinocchio.tail<6>();
-        dqFull(12) = 0.0;
-        dqFull(19) = 0.0;
-
-        // Compute foot contact forces
-        pinocchio::forwardKinematics(model.pncModel_, model.pncData_, qFull, dqFull);
-        pinocchio::framesForwardKinematics(model.pncModel_, model.pncData_);
-        Eigen::Matrix<float64_t,3,8> optoforces;
-        pinocchio::container::aligned_vector<pinocchio::Force> fext(model.pncModel_.joints.size(), 
-                                                                    pinocchio::Force::Zero());
-        for(uint32_t i = 0; i<contactFramesIdx_.size(); i++)
+        // Compute the external forces
+        pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(), pinocchio::Force::Zero());
+        for(int32_t const & contactFrameIdx : model_->getContactFramesIdx())
         {
-            int32_t const parentIdx = model.pncModel_.frames[contactFramesIdx_[i]].parent;
-            pinocchio::Force const fFrame(contactDynamics(contactFramesIdx_[i]));
-            optoforces.block<3,1>(0,i) = fFrame.linear();
+            pinocchio::Force const fFrame(contactDynamics(contactFrameIdx));
+            int32_t const parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
             fext[parentIdx] += fFrame;
         }
 
-        // Get IMUs data
-        Eigen::Matrix<float64_t,7,4> IMUs;
-        for(uint32_t i = 0; i < imuFramesIdx_.size(); i++)
-        {
-            Eigen::Matrix4d const tformIMU = model.pncData_.oMf[imuFramesIdx_[i]].toHomogeneousMatrix();
-            Eigen::Matrix3d const rotIMU = tformIMU.topLeftCorner<3,3>();
-            quaternion_t const quatIMU(rotIMU);
-            pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model.pncModel_, 
-                                                                      model.pncData_, 
-                                                                      imuFramesIdx_[i]);
-            Eigen::Vector3d omegaIMU = motionIMU.angular();
-            IMUs(0,i) = quatIMU.w();
-            IMUs(1,i) = quatIMU.x();
-            IMUs(2,i) = quatIMU.y();
-            IMUs(3,i) = quatIMU.z();
-            IMUs.block<3,1>(4,i) = omegaIMU;
-        }
-
         // Compute command and internal dynamics
-        controller_->compute_efforts(engine, t, q, v, u);
+        vectorN_t uCommand;
+        controller_->compute_efforts(*this, t, qPinocchio, dqPinocchio, uCommand);
+        vectorN_t uInternal;
+        internalDynamics(t, qPinocchio, dqPinocchio, uInternal);
 
         // Compute dynamics
-        ddqFull = pinocchio::aba(model.pncModel_, model.pncData_, q, v, u, fext);
-
-        // Stuf Specific to wandercraft urdf
-        ddq.head<12>() = ddqFull.head<12>();
-        ddq.tail<6>() = ddqFull.segment<6>(13);
+        ddq = pinocchio::aba(model_->pncModel_, model_->pncData_, qPinocchio, dqPinocchio, uCommand + uInternal, fext);
 
         // Compute world frame acceleration
         Eigen::Matrix3d Rw2bDot;
@@ -290,17 +237,63 @@ namespace exo_simu
         // Fill up xDot
         xDotEig.head<3>() = dq.head<3>();
         xDotEig.segment<4>(3) = quatDot;
-        xDotEig.segment(7,nq_-7) = dq.tail(ndq_-6);
-        xDotEig.segment(nq_,ndq_) = ddq;
+        xDotEig.segment(7,nq_-7) = dq.tail(nv_-6);
+        xDotEig.segment(nq_,nv_) = ddq;
+
+        // // Make sure that the output has the right shape
+        // xVectDot.resize(nx_);
+
+        // // Map std::vector input data to Eigen::VectorXd
+        // Eigen::Map<vectorN_t const> x(xVect.data(),nx_);
+        // Eigen::Map<vectorN_t const> q(x.data(),nq_);
+        // Eigen::Map<vectorN_t const> v(x.data() + nq_, nv_);
+        // Eigen::Map<vectorN_t> xDot(xVectDot.data(),nx_);
+
+        // // Convert the body angular velocity in the right frame
+
+        // // Compute true quaternion derivative
+        // // It is not possible to use directly pinocchio::integrate method since it requires dt
+        // // One way would be to save the time of the last successful iteration has a private property of the engine
+        // Eigen::Vector3d const omega = v.segment<3>(3);
+        // quaternion_t quat(q.segment<4>(3).data()); // Only way to initialize with [x,y,z,w] order
+        // quat.normalize();
+        // quaternion_t quatDot = quat * quaternion_t(0, 0.5 * omega(0), 0.5 * omega(1), 0.5 * omega(2));
+
+        // // Compute kinematics information
+        // pinocchio::forwardKinematics(model_->pncModel_, model_->pncData_, q, v);
+        // pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
+
+        // // Compute the external forces
+        // pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(), 
+        //                                                             pinocchio::Force::Zero());
+        // for(int32_t const & contactFrameIdx : model_->getContactFramesIdx())
+        // {
+        //     pinocchio::Force const fFrame(contactDynamics(contactFrameIdx));
+        //     int32_t const parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
+        //     fext[parentIdx] += fFrame;
+        // }
+
+        // // Compute command and internal dynamics
+        // vectorN_t u = vectorN_t::Zero(nv_);
+        // controller_->compute_efforts(*this, t, q, v, u);
+
+        // // Compute dynamics
+        // vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, v, u, fext);
+
+        // // Fill up xDot
+        // xDot.head<3>() = v.head<3>();
+        // xDot.segment<4>(3) = quatDot.coeffs(); // coeffs returns a vector [x,y,z,w]
+        // xDot.segment(7, nq_ - 7) = v.tail(nv_ - 6);
+        // xDot.segment(nq_, nv_) = a;
     }
  
-    vectorN_t const & Engine::contactDynamics(int32_t const & frameId) const
+    vectorN_t Engine::contactDynamics(int32_t const & frameId) const
     {
-        /* /!\ Note that the contact dynamics depends only on kinematics data. /!\ */
+        // /* /!\ Note that the contact dynamics depends only on kinematics data. /!\ */
 
-        contactOptions_t const * const contactOptions_ = &mdlOptions_->contacts;
+        contactOptions_t const * const contactOptions_ = &engineOptions_->contacts;
         
-        Eigen::Matrix4d tformFrame = model.pncData_.oMf[frameId].toHomogeneousMatrix();
+        Eigen::Matrix4d tformFrame = model_->pncData_.oMf[frameId].toHomogeneousMatrix();
         Eigen::Vector3d posFrame = tformFrame.topRightCorner<3,1>();
 
         vectorN_t fextLocal = vectorN_t::Zero(6);
@@ -308,24 +301,21 @@ namespace exo_simu
         if(posFrame(2) < 0.0)
         {
             // Get various transformations
-            Eigen::Matrix4d const tformFrame2Jt = model.pncModel_.frames[frameId].placement.toHomogeneousMatrix();
+            Eigen::Matrix4d const tformFrame2Jt = model_->pncModel_.frames[frameId].placement.toHomogeneousMatrix();
             Eigen::Vector3d fextInWorld(0.0,0.0,0.0);
             Eigen::Vector3d const posFrameJoint = tformFrame2Jt.topRightCorner<3,1>();
-            pinocchio::Motion const motionFrame = pinocchio::getFrameVelocity(model.pncModel_, 
-                                                                              model.pncData_,
+            pinocchio::Motion const motionFrame = pinocchio::getFrameVelocity(model_->pncModel_, 
+                                                                              model_->pncData_,
                                                                               frameId);
-            Eigen::Vector3d const vFrameInWorld = tformFrame.topLeftCorner<3,3>()*motionFrame.linear();
+            Eigen::Vector3d const vFrameInWorld = tformFrame.topLeftCorner<3,3>() * motionFrame.linear();
 
             // Compute normal force
             float64_t damping = 0;
-            if(vFrameInWorld(2)<0)
+            if(vFrameInWorld(2) < 0)
             {
                 damping = -contactOptions_->damping * vFrameInWorld(2);
             }
             fextInWorld(2) = -contactOptions_->stiffness * posFrame(2) + damping;
-
-            // std::cout << contactOptions_->damping << std::endl;
-            // std::cout << contactOptions_->stiffness << std::endl;
 
             // Compute friction force
             Eigen::Vector2d const vxy = vFrameInWorld.head<2>();
@@ -364,5 +354,87 @@ namespace exo_simu
         }
 
         return fextLocal;
+    }
+
+    void Engine::internalDynamics(float64_t const & t,
+                                  vectorN_t const & q,
+                                  vectorN_t const & v,
+                                  vectorN_t       & u)
+    {
+        // Enforce the bounds of the actuated joints of the model
+        u = vectorN_t::Zero(nv_);
+
+        Model::jointOptions_t const & mdlJointOptions_ = model_->mdlOptions_->joints;
+        Engine::jointOptions_t const & engineJointOptions_ = engineOptions_->joints;
+
+        std::vector<int32_t> jointsPositionIdx = model_->getJointsPositionIdx();
+        std::vector<int32_t> jointsVelocityIdx = model_->getJointsVelocityIdx();
+        for (uint32_t i = 0; i<jointsPositionIdx.size(); i++)
+        {
+            float64_t const qJoint = q(jointsPositionIdx[i]);
+            float64_t const vJoint = v(jointsVelocityIdx[i]);
+            float64_t const qJointMin = mdlJointOptions_.boundsMin(i);
+            float64_t const qJointMax = mdlJointOptions_.boundsMax(i);
+
+            float64_t forceJoint = 0;
+            float64_t qJointError = 0;
+            if (qJoint > qJointMax)
+            {
+                qJointError = qJoint - qJointMax;
+                float64_t damping = -engineJointOptions_.boundDamping * std::max(vJoint, 0.0);
+                forceJoint = -engineJointOptions_.boundStiffness * qJointError + damping;
+            }
+            else if (qJoint < qJointMin)
+            {
+                qJointError = qJointMin - qJoint;
+                float64_t damping = -engineJointOptions_.boundDamping * std::min(vJoint, 0.0);
+                forceJoint = engineJointOptions_.boundStiffness * qJointError + damping;
+            }
+
+            float64_t blendingFactor = std::min(qJointError / engineJointOptions_.boundTransitionEps, 1.0);
+            forceJoint *= blendingFactor;
+
+            u(jointsVelocityIdx[i]) += forceJoint;
+        }
+    }
+
+    configHolder_t Engine::getOptions(void) const
+    {
+        return engineOptionsHolder_;
+    }
+
+    void Engine::setOptions(configHolder_t const & engineOptions)
+    {
+        engineOptionsHolder_ = engineOptions;
+        if (isInitialized_)
+        {
+            model_->pncModel_.gravity = boost::get<vectorN_t>(engineOptions.at("gravity")); // It is reversed (Third Newton law)
+        }
+        engineOptions_ = std::shared_ptr<engineOptions_t const>(new engineOptions_t(engineOptionsHolder_));
+    }
+
+    bool Engine::getIsInitialized(void) const
+    {
+        return isInitialized_;
+    }
+
+    Model const & Engine::getModel(void) const
+    {
+        return *model_.get();
+    }
+
+    uint32_t Engine::nq(void) const
+    {
+        return nq_;
+    }
+
+    uint32_t Engine::nv(void) const
+    {
+        return nv_;
+    }
+
+    uint32_t Engine::nx(void) const
+    {
+        return nx_;
     }
 }

@@ -16,6 +16,7 @@ namespace exo_simu
         configHolder_t getDefaultOptions(void)
         {
             configHolder_t config = AbstractSensor::getDefaultOptions();
+            // No extra configuration parameter
 
             return config;
         };
@@ -30,8 +31,7 @@ namespace exo_simu
         };
 
     public:
-        ImuSensor(std::string              const & name, 
-                  std::vector<std::string> const & headerSuffixes);
+        ImuSensor(std::string const & name);
         ~ImuSensor(void);
         AbstractSensor* clone(void);
 
@@ -39,7 +39,6 @@ namespace exo_simu
 
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
-        std::vector<std::string> const & getDataStrings(void);
 
     protected:
         result_t set(Engine    const & engine,
@@ -53,8 +52,6 @@ namespace exo_simu
         std::shared_ptr<imuSensorOptions_t const> imuSensorOptions_;
 
     private:
-        vectorN_t data_;
-        std::vector<std::string> dataStrings_;
         int32_t framesIdx_;
     };
 
@@ -64,6 +61,7 @@ namespace exo_simu
         configHolder_t getDefaultOptions(void)
         {
             configHolder_t config = AbstractSensor::getDefaultOptions();
+            // No extra configuration parameter
 
             return config;
         };
@@ -78,8 +76,7 @@ namespace exo_simu
         };
 
     public:
-        ForceSensor(std::string              const & name, 
-                    std::vector<std::string> const & headerSuffixes);
+        ForceSensor(std::string const & name);
         ~ForceSensor(void);
         AbstractSensor* clone(void);
 
@@ -87,8 +84,6 @@ namespace exo_simu
 
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
-        
-        std::vector<std::string> const & getDataStrings(void);
         
     protected:
         result_t set(Engine    const & engine,
@@ -102,8 +97,6 @@ namespace exo_simu
         std::shared_ptr<forceSensorOptions_t const> forceSensorOptions_;
 
     private:
-        vectorN_t data_;
-        std::vector<std::string> dataStrings_;
         int32_t framesIdx_;
     };
 }

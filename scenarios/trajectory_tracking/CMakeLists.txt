@@ -11,7 +11,7 @@ find_package(urdfdom REQUIRED)
 set(SRC 
     "${CMAKE_CURRENT_SOURCE_DIR}/src/trajectory_tracking.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoModel.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Controller.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoController.cc"
 )
 
 # Make executables

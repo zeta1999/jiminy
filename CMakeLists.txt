@@ -16,7 +16,7 @@ set(WARN_FULL "-Wall -Wextra -Weffc++ -pedantic -pedantic-errors \
                -Wunreachable-code -Wunused -Wunused-parameter"
 )
 set(default_build_type "Release")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -Werror ${WARN_FULL}")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -Wfatal-errors ${WARN_FULL}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${WARN_FULL} -Wno-unused-parameter")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 

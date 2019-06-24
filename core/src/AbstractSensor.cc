@@ -2,12 +2,11 @@
 
 namespace exo_simu
 {
-    AbstractSensor::AbstractSensor(std::string              const & name, 
-                                   std::vector<std::string> const & headersSuffix) :
+    AbstractSensor::AbstractSensor(std::string const & name) :
     sensorOptions_(nullptr),
     name_(name),
-    headersSuffix_(headersSuffix),
     isInitialized_(false),
+    data_(),
     sensorOptionsHolder_()
     {
         AbstractSensor::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
@@ -39,14 +38,8 @@ namespace exo_simu
         return name_;
     }
 
-    std::vector<std::string> AbstractSensor::getHeaders(void) const
+    vectorN_t AbstractSensor::get(void) const
     {
-        std::vector<std::string> headers;
-        for (std::string const & suffix : headersSuffix_) 
-        {
-            headers.push_back(name_ + "_" + suffix);
-        }
-
-        return headers;
+        return data_;
     }
 }

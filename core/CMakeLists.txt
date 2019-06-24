@@ -17,13 +17,12 @@ add_definitions(${COMPILE_FLAGS})
 
 # Add sources
 set(SRC 
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Utilities.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractSensor.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractController.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Sensor.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Model.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractController.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Logger.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Utilities.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cc"
 )
 
 # Make library

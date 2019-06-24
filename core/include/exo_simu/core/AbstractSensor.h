@@ -6,9 +6,6 @@
 
 namespace exo_simu
 {
-    /* T data_ attribute is not defined to avoid having to define another level of 
-       abstraction template<typename T> class AbstractSensorTpl: public AbstractSensor */
-
     class Engine;
 
     class AbstractSensor
@@ -19,25 +16,21 @@ namespace exo_simu
         virtual configHolder_t getDefaultOptions(void)
         {
             configHolder_t config;
-            config["isLoggingEnable"] = true;
+            // No default configuration parameter
 
             return config;
         };
 
         struct abstractSensorOptions_t
         {
-            bool const isLoggingEnable;
-
-            abstractSensorOptions_t(configHolder_t const & options) :
-            isLoggingEnable(boost::get<bool>(options.at("isLoggingEnable")))
+            abstractSensorOptions_t(configHolder_t const & options)
             {
                 // Empty.
             }
         };
 
     public:
-        AbstractSensor(std::string              const & name, 
-                       std::vector<std::string> const & headersSuffix);
+        AbstractSensor(std::string const & name);
         virtual ~AbstractSensor(void);
         virtual AbstractSensor* clone(void) = 0;
 
@@ -45,9 +38,7 @@ namespace exo_simu
         void setOptions(configHolder_t const & sensorOptions);
         bool getIsInitialized(void) const;
         std::string getName(void) const;
-        std::vector<std::string> getHeaders(void) const;
-
-        virtual std::vector<std::string> const & getDataStrings(void) = 0;
+        vectorN_t get(void) const;
 
     protected:
         // It assumes that the engine internal state is consistent with other input arguments
@@ -63,10 +54,12 @@ namespace exo_simu
 
     private:
         std::string name_;
-        std::vector<std::string> headersSuffix_;
 
     protected:
         bool isInitialized_;
+        /* vectorN_t data_ attribute only to avoid having to define another level of 
+        abstraction template<typename T> class AbstractSensorTpl: public AbstractSensor */
+        vectorN_t data_;
         configHolder_t sensorOptionsHolder_;
     };
 }
