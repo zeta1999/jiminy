@@ -7,8 +7,6 @@
 
 namespace exo_simu
 {
-    class Engine;
-
     class ExoController : public AbstractController
     {
     protected:
@@ -22,25 +20,21 @@ namespace exo_simu
     public:
         ExoController(void);
         ~ExoController(void);
-        AbstractController* clone(void);
+        AbstractController* clone(void) override;
 
         result_t initialize(commandFct_t commandFct);
 
-    protected:
-        void compute_command(Engine    const & engine,
+        void compute_command(Model     const & model,
                              float64_t const & t,
                              vectorN_t const & q,
                              vectorN_t const & v,
-                             vectorN_t       & u);
+                             vectorN_t       & u) override;
 
-        void internalDynamics(Engine    const & engine,
+        void internalDynamics(Model     const & model,
                               float64_t const & t,
                               vectorN_t const & q,
                               vectorN_t const & v,
-                              vectorN_t       & u);
-
-    private:
-        static std::map<std::string, matrixN_t> getSensorsData(sensorsGroupMap_t const * sensors);
+                              vectorN_t       & u) override;
 
     private:
         commandFct_t commandFct_;

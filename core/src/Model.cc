@@ -15,13 +15,19 @@ namespace exo_simu
     pncModel_(),
     pncData_(pncModel_),
     mdlOptions_(nullptr),
+    contactForces_(),
     isInitialized_(false),
     urdfPath_(),
     mdlOptionsHolder_(),
-    sensors_(),
+    sensorsGroupHolder_(),
+    contactFramesNames_(),
+    jointsNames_(),
     contactFramesIdx_(),
     jointsPositionIdx_(),
-    jointsVelocityIdx_()
+    jointsVelocityIdx_(),
+    nq_(0),
+    nv_(0),
+    nx_(0)
     {
         setOptions(getDefaultOptions());
     }
@@ -36,23 +42,38 @@ namespace exo_simu
         return new Model(*this);
     }
 
-    result_t Model::initialize(std::string          const & urdfPath, 
-                               std::vector<int32_t> const & contactFramesIdx, 
-                               std::vector<int32_t> const & jointsPositionIdx, 
-                               std::vector<int32_t> const & jointsVelocityIdx)
+    result_t Model::initialize(std::string              const & urdfPath, 
+                               std::vector<std::string> const & contactFramesNames, 
+                               std::vector<std::string> const & jointsNames)
     {
         result_t returnCode = result_t::SUCCESS;
 
+        // Initialize the URDF model
         removeSensors();
-        contactFramesIdx_ = contactFramesIdx;
-        jointsPositionIdx_ = jointsPositionIdx;
-        jointsVelocityIdx_ = jointsVelocityIdx;
+        contactFramesNames_ = contactFramesNames;
+        jointsNames_ = jointsNames;
         returnCode = setUrdfPath(urdfPath);
 
+        // Update the bounds if necessary
         if (returnCode == result_t::SUCCESS)
         {
+            nq_ = pncModel_.nq;
+            nv_ = pncModel_.nv;
+            nx_ = nq_ + nv_;
             isInitialized_ = true;
-            returnCode = setOptions(mdlOptionsHolder_); // Update the bounds if necessary
+            returnCode = setOptions(mdlOptionsHolder_);
+        }
+
+        // Extract some joint and frame indices
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = getFramesIdx(contactFramesNames_, contactFramesIdx_);
+            contactForces_ = pinocchio::container::aligned_vector<pinocchio::Force>(contactFramesNames_.size(), 
+                                                                                    pinocchio::Force::Zero());
+        }
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = getJointsIdx(jointsNames_, jointsPositionIdx_, jointsVelocityIdx_);
         }
 
         return returnCode;
@@ -66,9 +87,9 @@ namespace exo_simu
 
         std::string sensorName = sensor->getName();
 
-        for (sensorsGroupMap_t::value_type const & sensorGroup : sensors_)
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
         {
-            sensorsMap_t::const_iterator it = sensorGroup.second.find(sensorName);
+            sensorsHolder_t::const_iterator it = sensorGroup.second.find(sensorName);
             if (it != sensorGroup.second.end())
             {
                 std::cout << "Error - Model::addSensor - Sensor with the same name already exists." << std::endl;
@@ -78,7 +99,7 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            sensors_[sensorType][sensorName] = std::shared_ptr<AbstractSensor>(sensor->clone());
+            sensorsGroupHolder_[sensorType][sensorName] = std::shared_ptr<AbstractSensor>(sensor->clone());
         }
 
         return returnCode;
@@ -89,17 +110,17 @@ namespace exo_simu
         // Can be used to remove either a sensor or a sensor type
         result_t returnCode = result_t::SUCCESS;
 
-        sensorsGroupMap_t::iterator sensorGroupIt = sensors_.find(sensorName);
-        if (sensorGroupIt != sensors_.end())
+        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorName);
+        if (sensorGroupIt != sensorsGroupHolder_.end())
         {
-            sensors_.erase(sensorGroupIt);
+            sensorsGroupHolder_.erase(sensorGroupIt);
         }
         else
         {
             bool isSensorDeleted = false;
-            for (sensorsGroupMap_t::value_type & sensorGroup : sensors_)
+            for (sensorsGroupHolder_t::value_type & sensorGroup : sensorsGroupHolder_)
             {
-                sensorsMap_t::iterator sensorIt = sensorGroup.second.find(sensorName);
+                sensorsHolder_t::iterator sensorIt = sensorGroup.second.find(sensorName);
                 if (sensorIt != sensorGroup.second.end())
                 {
                     sensorGroup.second.erase(sensorIt);
@@ -120,7 +141,7 @@ namespace exo_simu
 
     void Model::removeSensors(void)
     {
-        sensors_.clear();
+        sensorsGroupHolder_.clear();
     }
 
     configHolder_t Model::getOptions(void) const
@@ -151,7 +172,7 @@ namespace exo_simu
             }
             else
             {
-                if(jointsPositionIdx_.size() != boundsMin.size() || jointsPositionIdx_.size() != boundsMax.size())
+                if((int32_t) jointsPositionIdx_.size() != boundsMin.size() || (uint32_t) jointsPositionIdx_.size() != boundsMax.size())
                 {
                     std::cout << "Error - Model::setOptions - Wrong vector size for boundsMin or boundsMax." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
@@ -159,7 +180,7 @@ namespace exo_simu
             }
         }
 
-        mdlOptions_ = std::shared_ptr<modelOptions_t const>(new modelOptions_t(mdlOptionsHolder_));
+        mdlOptions_ = std::make_shared<modelOptions_t const>(mdlOptionsHolder_);
 
         return returnCode;
     }
@@ -207,10 +228,26 @@ namespace exo_simu
 
         return returnCode;
     }
- 
-    sensorsGroupMap_t const * Model::getSensors(void) const
+
+    matrixN_t const & Model::getSensorsData(std::string const & sensorType) const
     {
-        return &sensors_;
+        sensorsHolder_t const & sensorGroup = sensorsGroupHolder_.at(sensorType);
+        return sensorGroup.begin()->second->getAll();
+    }
+
+    void Model::setSensorsData(float64_t const & t,
+                               vectorN_t const & q,
+                               vectorN_t const & v,
+                               vectorN_t const & a,
+                               vectorN_t const & u)
+    {
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        {
+            if (!sensorGroup.second.empty())
+            {
+                sensorGroup.second.begin()->second->setAll(*this, t, q, v, a, u); // Access static member of the sensor Group through the first instance
+            }
+        }
     }
 
     std::vector<int32_t> const & Model::getContactFramesIdx(void) const
@@ -226,5 +263,114 @@ namespace exo_simu
     std::vector<int32_t> const & Model::getJointsVelocityIdx(void) const
     {
         return jointsVelocityIdx_;
+    }
+
+    result_t Model::getFrameIdx(std::string const & frameName, 
+                                int32_t           & frameIdx) const
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!pncModel_.existFrame(frameName))
+        {
+            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << frameName << "' not found in urdf." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            frameIdx = pncModel_.getFrameId(frameName);
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::getFramesIdx(std::vector<std::string> const & framesNames, 
+                                 std::vector<int32_t>           & framesIdx) const
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        framesIdx.resize(0);
+        for (std::string const & name : framesNames)
+        {
+            if (returnCode == result_t::SUCCESS)
+            {
+                int32_t idx;
+                returnCode = getFrameIdx(name, idx);
+                framesIdx.push_back(idx);
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::getJointIdx(std::string const & jointName, 
+                                int32_t           & jointPositionIdx, 
+                                int32_t           & jointVelocityIdx) const
+    {
+        // It only return the index of the first element if the joint has multiple degrees of freedom
+
+        /* Obtained using the cumulative sum of number of variables for each joint previous 
+            to the desired one in the kinematic chain but skipping the first joint, which 
+            is always the "universe" and is irrelevant (enforced by pinocchio itself). */
+
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!pncModel_.existJointName(jointName))
+        {
+            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << jointName << "' not found in urdf." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            int32_t jointModelIdx = pncModel_.getJointId(jointName);
+            jointPositionIdx = 0;
+            jointVelocityIdx = 0;
+            for (auto jointIt = pncModel_.joints.begin() + 1; jointIt != pncModel_.joints.begin() + jointModelIdx; jointIt++)
+            {
+                jointPositionIdx += jointIt->nq();
+                jointVelocityIdx += jointIt->nv();
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::getJointsIdx(std::vector<std::string> const & jointsNames, 
+                                 std::vector<int32_t>           & jointsPositionIdx, 
+                                 std::vector<int32_t>           & jointsVelocityIdx) const
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        jointsPositionIdx.resize(0);
+        jointsVelocityIdx.resize(0);
+        for (std::string const & name : jointsNames)
+        {
+            if (returnCode == result_t::SUCCESS)
+            {
+                int32_t positionIdx;
+                int32_t velocityIdx;
+                returnCode = getJointIdx(name, positionIdx, velocityIdx);
+                jointsPositionIdx.push_back(positionIdx);
+                jointsVelocityIdx.push_back(velocityIdx);
+            }
+        }
+
+        return returnCode;
+    }
+
+    uint32_t Model::nq(void) const
+    {
+        return nq_;
+    }
+
+    uint32_t Model::nv(void) const
+    {
+        return nv_;
+    }
+
+    uint32_t Model::nx(void) const
+    {
+        return nx_;
     }
 }

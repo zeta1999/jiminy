@@ -2,6 +2,8 @@
 #include <cmath>
 #include <algorithm>
 
+#include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
+
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/frames.hpp"
@@ -11,6 +13,7 @@
 
 #include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/AbstractController.h"
+#include "exo_simu/core/AbstractSensor.h"
 #include "exo_simu/core/Engine.h"
 
 namespace exo_simu
@@ -23,11 +26,11 @@ namespace exo_simu
     controller_(nullptr),
     engineOptionsHolder_(),
     callbackFct_([](float64_t const & t, 
-                    vectorN_t const & x)->bool{ return true; }),
-    timePrev_(0),
-    nq_(0),
-    nv_(0),
-    nx_(0)
+                    vectorN_t const & x) -> bool
+                 {
+                     return true;
+                 }),
+    stepperState_()
     {
         setOptions(getDefaultOptions());
     }
@@ -49,9 +52,11 @@ namespace exo_simu
             return result_t::ERROR_INIT_FAILED;
         }
         model_ = std::shared_ptr<Model>(model.clone());
-        nq_ = model_->pncModel_.nq;
-        nv_ = model_->pncModel_.nv;
-        nx_ = nq_ + nv_;
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = stepperState_.initialize(*model_);
+        }
 
         if (!controller.getIsInitialized())
         {
@@ -63,11 +68,11 @@ namespace exo_simu
             try
             {
                 float64_t t = 0;
-                vectorN_t q = vectorN_t::Zero(nq_);
-                vectorN_t v = vectorN_t::Zero(nv_);
-                vectorN_t u = vectorN_t::Zero(nv_);
-                returnCode = controller.compute_efforts(*this, t, q, v, u);
-                if(u.size() != nv_)
+                vectorN_t q = vectorN_t::Zero(model_->nq());
+                vectorN_t v = vectorN_t::Zero(model_->nv());
+                vectorN_t u = vectorN_t::Zero(model_->nv());
+                returnCode = controller.compute_efforts(*model_, t, q, v, u);
+                if(u.size() != model_->nv())
                 {
                     std::cout << "Error - Engine::initialize - The controller returns command with wrong size." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
@@ -99,7 +104,7 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Engine::simulate(vectorN_t const & x0,
+    result_t Engine::simulate(vectorN_t         x0,
                               float64_t const & tf,
                               float64_t const & dt)
     {
@@ -111,12 +116,11 @@ namespace exo_simu
             return result_t::ERROR_INIT_FAILED;
         }
 
-        if(x0.rows() != nx_)
+        if(x0.rows() != model_->nx())
         {
-            std::cout << "Error - Engine::simulate - Size of x0 (" << x0.size() << ") inconsistent with model size (" << nx_ << ")." << std::endl;
+            std::cout << "Error - Engine::simulate - Size of x0 (" << x0.size() << ") inconsistent with model size (" << model_->nx() << ")." << std::endl;
             return result_t::ERROR_BAD_INPUT;
         }
-        state_t x0Vect(x0.data(), x0.data() + x0.size());
 
         if(tf <= 0)
         {
@@ -131,9 +135,6 @@ namespace exo_simu
             return result_t::ERROR_GENERIC;
         }
 
-        log.resize(0);
-        log.reserve(nPts); // Reserve the estimated average number of pts required.
-
         auto rhsBind = bind(&Engine::dynamicsCL, this,
                             std::placeholders::_3,
                             std::placeholders::_1,
@@ -141,49 +142,56 @@ namespace exo_simu
         auto stepper = make_controlled(engineOptions_->stepper.tolAbs, 
                                        engineOptions_->stepper.tolRel,
                                        stepper_t()); // make_dense_output, make_controlled
-        auto itBegin = make_adaptive_time_iterator_begin(stepper, rhsBind, x0Vect, 0, tf, dt); // const_step_time, adaptive_time
-        auto itEnd = make_adaptive_time_iterator_end(stepper, rhsBind, x0Vect);
+        auto itBegin = make_adaptive_time_iterator_begin(stepper, rhsBind, x0, 0, tf, dt); // const_step_time, adaptive_time
+        auto itEnd = make_adaptive_time_iterator_end(stepper, rhsBind, x0);
 
-        timePrev_ = 0;
+        log.resize(0, x0.size() + 1); // Clear the internal log buffer
+        log.conservativeResize(nPts, Eigen::NoChange); // Reserve some rows
+        stepperState_.initialize(*model_); // reset the internal stepper buffer
         model_->pncData_ = pinocchio::Data(model_->pncModel_); // Initialize the internal state
         for(auto it = itBegin; it != itEnd; it++)
         {
+            // Extract the state and time at current iteration
             float64_t const & t = it->second;
-            state_t const & xVect = it->first;
-            timePrev_ = t;
+            vectorN_t const & x = it->first;
+            vectorN_t const & q = x.head(model_->nq());
+            vectorN_t const & v = x.tail(model_->nv());
 
-            state_t log_data(nx_ + 1);
-            log_data[0] = t;
-            copy(xVect.begin(), xVect.end(), log_data.begin() + 1);
-            log.push_back(log_data);
+            // Log the current state and time
+            if (stepperState_.iterPrev > log.rows())
+            {
+                log.conservativeResize(log.rows() + nPts, Eigen::NoChange); // Add a new block of rows
+            }
+            log.row(stepperState_.iterPrev) << t, x;
 
-            Eigen::Map<vectorN_t const> x(xVect.data(), nx_);
-            if(!callbackFct_(t, x))
+            /* Stop the simulation if the callback returns false
+               or if the number of integration steps exceeds 1e5. */
+            if(!callbackFct_(t, x) || stepperState_.iterPrev >= 1e5)
             {
                 break;
             }
+
+            // Update internal state of the stepper
+            stepperState_.updatePrev(t, q, v, stepperState_.aPrev, stepperState_.uPrev); //TODO: How to get a and u ?
         }
 
-        log.shrink_to_fit();
+        // Cleanup any extra rows of the log buffer
+        log.conservativeResize(stepperState_.iterPrev, Eigen::NoChange);
         
         return returnCode;
     }
 
     void Engine::dynamicsCL(float64_t const & t,
-                            state_t   const & xVect,
-                            state_t         & xVectDot)
+                            vectorN_t const & x,
+                            vectorN_t       & xDot)
     {
         /* Note that the position of the free flyer is in world frame,
            whereas the velocities and accelerations are relative to the
            parent body frame. */
-
-        // Make sure that the output has the right shape
-        xVectDot.resize(nx_);
-
-        // Map std::vector input data to Eigen::VectorXd
-        Eigen::Map<vectorN_t const> q(xVect.data(),nq_);
-        Eigen::Map<vectorN_t const> v(xVect.data() + nq_, nv_);
-        Eigen::Map<vectorN_t> xDot(xVectDot.data(),nx_);
+           
+        // Extract configuration and velocity vectors
+        vectorN_t const & q = x.head(model_->nq());
+        vectorN_t const & v = x.tail(model_->nv());
 
         // Compute kinematics information
         pinocchio::forwardKinematics(model_->pncModel_, model_->pncData_, q, v);
@@ -192,34 +200,40 @@ namespace exo_simu
         // Compute the external forces
         pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(), 
                                                                     pinocchio::Force::Zero());
-        for(int32_t const & contactFrameIdx : model_->getContactFramesIdx())
+        std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
+        for(uint32_t i=0; i < contactFramesIdx.size(); i++)
         {
-            pinocchio::Force const fFrame(contactDynamics(contactFrameIdx));
+            int32_t const & contactFrameIdx = contactFramesIdx[i];
+            model_->contactForces_[i] = pinocchio::Force(contactDynamics(contactFrameIdx));
             int32_t parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
-            fext[parentIdx] += fFrame;
+            fext[parentIdx] += model_->contactForces_[i];
         }
 
+        // Update sensors data (make sure that the internal state of model_ is up-to-date.)
+        model_->setSensorsData(t, q, v, stepperState_.aPrev, stepperState_.uPrev);
+
         // Compute command and internal dynamics
-        vectorN_t uCommand = vectorN_t::Zero(nv_);
-        controller_->compute_efforts(*this, t, q, v, uCommand);
-        vectorN_t uInternal = vectorN_t::Zero(nv_);
-        internalDynamics(t, q, v, uInternal);
+        controller_->compute_efforts(*model_, t, q, v, stepperState_.uCommand); // TODO: Send the values at previous iteration instead
+        internalDynamics(t, q, v, stepperState_.uInternal);
+        vectorN_t u = stepperState_.uCommand + stepperState_.uInternal;
 
         // Compute dynamics
-        vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, v, uCommand + uInternal, fext);
+        vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, v, u, fext);
 
         /* Hack to compute the configuration vector derivative,
            including the quaternions on SO3 automatically. Note  
            that the time difference must not be too small to
-           avoid failure. */
-        float64_t dt = std::max(1e-5, t - timePrev_);
-        vectorN_t qNext = vectorN_t::Zero(nq_);
-        pinocchio::integrate(model_->pncModel_, q, v*dt, qNext);
-        vectorN_t qDot = (qNext - q) / dt;
+           avoid failure.
+           Note that pinocchio::integrate is quite slow (more
+           than 5ns, compare to 85ns for pinocchio::aba). */
+        float64_t dt = std::max(1e-5, t - stepperState_.tPrev);
+        pinocchio::integrate(model_->pncModel_, q, v*dt, stepperState_.qNext);
+        vectorN_t qDot = (stepperState_.qNext - q) / dt;
 
         // Fill up xDot
-        xDot.head(nq_) = qDot;
-        xDot.tail(nv_) = a;
+        xDot.resize(model_->nx());
+        xDot.head(model_->nq()) = qDot;
+        xDot.tail(model_->nv()) = a;
     }
  
     vectorN_t Engine::contactDynamics(int32_t const & frameId) const
@@ -297,14 +311,14 @@ namespace exo_simu
                                   vectorN_t       & u)
     {
         // Enforce the bounds of the actuated joints of the model
-        u = vectorN_t::Zero(nv_);
+        u = vectorN_t::Zero(model_->nv());
 
         Model::jointOptions_t const & mdlJointOptions_ = model_->mdlOptions_->joints;
         Engine::jointOptions_t const & engineJointOptions_ = engineOptions_->joints;
 
         std::vector<int32_t> jointsPositionIdx = model_->getJointsPositionIdx();
         std::vector<int32_t> jointsVelocityIdx = model_->getJointsVelocityIdx();
-        for (uint32_t i = 0; i<jointsPositionIdx.size(); i++)
+        for (uint32_t i = 0; i < jointsPositionIdx.size(); i++)
         {
             float64_t const qJoint = q(jointsPositionIdx[i]);
             float64_t const vJoint = v(jointsVelocityIdx[i]);
@@ -327,9 +341,10 @@ namespace exo_simu
             }
 
             float64_t blendingFactor = qJointError / engineJointOptions_.boundTransitionEps;
-            float64_t blendingLaw = std::tanh(2 * blendingFactor);
+            // float64_t blendingLaw = std::tanh(2 * blendingFactor);
+            float64_t blendingLaw = std::min(blendingFactor, 1.0);
             forceJoint *= blendingLaw;
-
+            
             u(jointsVelocityIdx[i]) += forceJoint;
         }
     }
@@ -346,7 +361,7 @@ namespace exo_simu
         {
             model_->pncModel_.gravity = boost::get<vectorN_t>(engineOptions.at("gravity")); // It is reversed (Third Newton law)
         }
-        engineOptions_ = std::shared_ptr<engineOptions_t const>(new engineOptions_t(engineOptionsHolder_));
+        engineOptions_ = std::make_shared<engineOptions_t const>(engineOptionsHolder_);
     }
 
     bool Engine::getIsInitialized(void) const
@@ -357,20 +372,5 @@ namespace exo_simu
     Model const & Engine::getModel(void) const
     {
         return *model_.get();
-    }
-
-    uint32_t Engine::nq(void) const
-    {
-        return nq_;
-    }
-
-    uint32_t Engine::nv(void) const
-    {
-        return nv_;
-    }
-
-    uint32_t Engine::nx(void) const
-    {
-        return nx_;
     }
 }

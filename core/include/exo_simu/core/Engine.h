@@ -7,7 +7,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <boost/numeric/odeint.hpp>
-#include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
+#include <boost/numeric/odeint/external/eigen/eigen_algebra.hpp>
 
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Model.h"
@@ -25,8 +25,93 @@ namespace exo_simu
         typedef std::function<bool(float64_t const &/*t*/,
                                    vectorN_t const &/*x*/)> callbackFct_t;
 
-        typedef runge_kutta_dopri5<state_t> stepper_t;
+        typedef runge_kutta_dopri5<vectorN_t, float64_t, vectorN_t, float64_t, vector_space_algebra> stepper_t;
 
+        struct stepperState_t
+        {
+            // Internal state for the integration loop
+
+        public:
+            stepperState_t(void):
+            iterPrev(),
+            tPrev(),
+            qPrev(),
+            vPrev(),
+            aPrev(),
+            uPrev(),
+            qNext(),
+            fext(),
+            uCommand(),
+            uInternal(),
+            isInitialized()
+            {
+                // Empty.
+            }
+
+            bool getIsInitialized(void) const
+            {
+                return isInitialized;
+            }
+
+            result_t initialize(Model const & model)
+            {
+                result_t returnCode = result_t::SUCCESS;
+
+                if (!model.getIsInitialized())
+                {
+                    std::cout << "Error - stepperState_t::initialize - Something is wrong with the Model." << std::endl;
+                    returnCode = result_t::ERROR_INIT_FAILED;
+                }
+                
+                if (returnCode == result_t::SUCCESS)
+                {
+                    iterPrev = 0;
+                    tPrev = 0;
+                    qPrev = vectorN_t::Zero(model.nq());
+                    vPrev = vectorN_t::Zero(model.nv());
+                    aPrev = vectorN_t::Zero(model.nv());
+                    uPrev = vectorN_t::Zero(model.nv());
+                    qNext = vectorN_t::Zero(model.nq());
+                    fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(), 
+                                                                                  pinocchio::Force::Zero());
+                    uCommand = vectorN_t::Zero(model.getJointsVelocityIdx().size());
+                    uInternal = vectorN_t::Zero(model.nv());
+                    isInitialized = true;
+                }
+
+                return returnCode;
+            }
+
+            void updatePrev(float64_t const & t,
+                            vectorN_t const & q,
+                            vectorN_t const & v,
+                            vectorN_t const & a,
+                            vectorN_t const & u)
+            {
+                tPrev = t;
+                qPrev = q;
+                vPrev = v;
+                aPrev = a;
+                uPrev = u;
+                ++iterPrev;
+            }
+
+        public:
+            uint32_t iterPrev;
+            float64_t tPrev;
+            vectorN_t qPrev;
+            vectorN_t vPrev;
+            vectorN_t aPrev;
+            vectorN_t uPrev;
+            vectorN_t qNext;
+            pinocchio::container::aligned_vector<pinocchio::Force> fext;
+            vectorN_t uCommand;
+            vectorN_t uInternal;
+
+        private:
+            bool isInitialized;
+        };
+        
     public:
         configHolder_t getDefaultContactOptions()
         {
@@ -67,7 +152,7 @@ namespace exo_simu
             configHolder_t config;
             config["boundStiffness"] = 1.0e5;
             config["boundDamping"] = 1.0e2;
-            config["boundTransitionEps"] = 1.0e-2;
+            config["boundTransitionEps"] = 1.0e-2; // about 0.55 degrees
 
             return config;
         };
@@ -147,7 +232,7 @@ namespace exo_simu
 
         vectorN_t contactDynamics(int32_t const & frameId) const;
 
-        result_t simulate(vectorN_t const & x0,
+        result_t simulate(vectorN_t         x0, /* Make a copy */
                           float64_t const & tf,
                           float64_t const & dt);
 
@@ -156,14 +241,11 @@ namespace exo_simu
         bool getIsInitialized(void) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
-        uint32_t nq(void) const; // no get keyword for consistency with pinocchio C++ API
-        uint32_t nv(void) const;
-        uint32_t nx(void) const;
 
     protected:
         void dynamicsCL(float64_t const & t,
-                        state_t   const & xVect,
-                        state_t         & xVectDot);
+                        vectorN_t const & xVect,
+                        vectorN_t       & xVectDot);
 
         void internalDynamics(float64_t const & t,
                               vectorN_t const & q,
@@ -171,7 +253,7 @@ namespace exo_simu
                               vectorN_t       & u);
 
     public:
-        log_t log; // To be removed
+        matrixN_t log; // TODO: To be removed
         std::shared_ptr<engineOptions_t const> engineOptions_;
 
     protected:
@@ -182,10 +264,7 @@ namespace exo_simu
         callbackFct_t callbackFct_;
 
     private:
-        float64_t timePrev_;
-        uint32_t nq_;
-        uint32_t nv_;
-        uint32_t nx_;
+        stepperState_t stepperState_; // Internal state for the integration loop
     };
 }
 

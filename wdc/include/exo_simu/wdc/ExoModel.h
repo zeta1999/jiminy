@@ -5,6 +5,8 @@
 
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Model.h"
+#include "exo_simu/core/Sensor.h"
+#include "exo_simu/core/Utilities.h"
 
 
 namespace exo_simu
@@ -14,17 +16,17 @@ namespace exo_simu
         friend class Controller;
 
     public:
-        configHolder_t getDefaultJointOptions()
+        configHolder_t getDefaultJointOptions() override
         {
             // Add extra options or update default values
             configHolder_t config = Model::getDefaultJointOptions();
             config["boundsFromUrdf"] = true;
-            config["boundsMin"] = (vectorN_t) (-M_PI * vectorN_t::Ones(14));
-            config["boundsMax"] = (vectorN_t) ( M_PI * vectorN_t::Ones(14));
-            config["frictionViscous"] = (vectorN_t) (0*(vectorN_t(14) << 100.0,100.0,100.0,100.0,20.0,20.0,0.0,
-                                                                         100.0,100.0,100.0,100.0,20.0,20.0,0.0).finished());
-            config["frictionDry"] = (vectorN_t) (0*(vectorN_t(14) << 10.0,10.0,10.0,10.0,2.0,2.0,0.0,
-                                                                     10.0,10.0,10.0,10.0,2.0,2.0,0.0).finished());
+            config["boundsMin"] = (vectorN_t) (-M_PI * vectorN_t::Ones(12));
+            config["boundsMax"] = (vectorN_t) ( M_PI * vectorN_t::Ones(12));
+            config["frictionViscous"] = (vectorN_t) (0*(vectorN_t(12) << 100.0,100.0,100.0,100.0,20.0,20.0,
+                                                                         100.0,100.0,100.0,100.0,20.0,20.0).finished());
+            config["frictionDry"] = (vectorN_t) (0*(vectorN_t(12) << 10.0,10.0,10.0,10.0,2.0,2.0,
+                                                                     10.0,10.0,10.0,10.0,2.0,2.0).finished());
             config["dryFrictionVelEps"] = 1.0e-2;
             return config;
         };
@@ -57,9 +59,10 @@ namespace exo_simu
             }
         };
 
+    public:
         ExoModel(void);
         ~ExoModel(void);
-        Model* clone(void);
+        Model* clone(void) override;
 
         result_t initialize(std::string const & urdfPath);
 
@@ -67,16 +70,6 @@ namespace exo_simu
 
     protected:
         result_t setUrdfPath(std::string const & urdfPath);
-        result_t getFrameIdx(std::string const & frameName, 
-                             int32_t           & frameIdx) const;
-        result_t getFramesIdx(std::vector<std::string> const & framesNames, 
-                              std::vector<int32_t>           & framesIdx) const;
-        result_t getJointIdx(std::string const & jointName, 
-                             int32_t           & jointPositionIdx, 
-                             int32_t           & jointVelocityIdx) const;
-        result_t getJointsIdx(std::vector<std::string> const & jointsNames, 
-                              std::vector<int32_t>           & jointsPositionIdx, 
-                              std::vector<int32_t>           & jointsVelocityIdx) const;
         
     private:
         // Discourage usage of the base initializer
@@ -89,13 +82,6 @@ namespace exo_simu
 
     public:
         std::shared_ptr<exoModelOptions_t const> exoMdlOptions_;
-        
-    private:
-        std::vector<std::string> contactFramesNames_;
-        std::vector<std::string> imuFramesNames_;
-        std::vector<std::string> jointsNames_;
-
-        std::vector<int32_t> imuFramesIdx_;
     };
 }
 

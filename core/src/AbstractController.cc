@@ -1,5 +1,8 @@
 #include <iostream>
-#include "exo_simu/core/Engine.h"
+
+#include <boost/algorithm/clamp.hpp>
+
+#include "exo_simu/core/Model.h"
 #include "exo_simu/core/AbstractController.h"
 
 namespace exo_simu
@@ -17,7 +20,7 @@ namespace exo_simu
         // Empty.
     }
                                         
-    result_t AbstractController::compute_efforts(Engine    const & engine,
+    result_t AbstractController::compute_efforts(Model     const & model,
                                                  float64_t const & t,
                                                  vectorN_t const & q,
                                                  vectorN_t const & v,
@@ -33,15 +36,17 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            std::vector<int32_t> jointsVelocityIdx = engine.getModel().getJointsVelocityIdx();
+            std::vector<int32_t> jointsVelocityIdx = model.getJointsVelocityIdx();
             vectorN_t uCommand = vectorN_t::Zero(jointsVelocityIdx.size());
-            compute_command(engine, t, q, v, uCommand);
-            vectorN_t uInternal = vectorN_t::Zero(engine.nv());
-            internalDynamics(engine, t, q, v, uInternal);
+            compute_command(model, t, q, v, uCommand); //TODO: Send the values at the previous iteration
+            vectorN_t uInternal = vectorN_t::Zero(model.nv());
+            internalDynamics(model, t, q, v, uInternal);
             u = uInternal;
             for (uint32_t i=0; i < jointsVelocityIdx.size(); i++)
             {
-                u[jointsVelocityIdx[i]] += uCommand[i];
+                uint32_t jointId = jointsVelocityIdx[i];
+                float64_t torque_max = model.pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
+                u[jointId] += boost::algorithm::clamp(uCommand[i], -torque_max, torque_max);
             }
         }
         
@@ -56,7 +61,7 @@ namespace exo_simu
     void AbstractController::setOptions(configHolder_t const & ctrlOptions)
     {
         ctrlOptionsHolder_ = ctrlOptions;
-        ctrlOptions_ = std::shared_ptr<controllerOptions_t const>(new controllerOptions_t(ctrlOptionsHolder_));
+        ctrlOptions_ = std::make_shared<controllerOptions_t const>(ctrlOptionsHolder_);
     }
 
     bool AbstractController::getIsInitialized(void) const

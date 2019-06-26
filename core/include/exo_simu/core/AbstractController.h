@@ -6,12 +6,10 @@
 
 namespace exo_simu
 {
-    class Engine;
+    class Model;
 
     class AbstractController
     {
-        friend class Engine;
-
     public:
         virtual configHolder_t getDefaultOptions()
         {
@@ -41,21 +39,20 @@ namespace exo_simu
         void setOptions(configHolder_t const & ctrlOptions);
         bool getIsInitialized(void) const;
 
-    protected:
-        // It assumes that the engine internal state is consistent with other input arguments
-        result_t compute_efforts(Engine    const & engine,
+        // It assumes that the model internal state is consistent with other input arguments
+        result_t compute_efforts(Model     const & model,
                                  float64_t const & t,
                                  vectorN_t const & q,
                                  vectorN_t const & v,
                                  vectorN_t       & u);
 
-        virtual void compute_command(Engine    const & engine,
+        virtual void compute_command(Model     const & model,
                                      float64_t const & t,
                                      vectorN_t const & q,
                                      vectorN_t const & v,
                                      vectorN_t       & u) = 0;
 
-        virtual void internalDynamics(Engine    const & engine,
+        virtual void internalDynamics(Model     const & model,
                                       float64_t const & t,
                                       vectorN_t const & q,
                                       vectorN_t const & v,

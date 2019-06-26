@@ -22,10 +22,10 @@ using namespace exo_simu;
 // ================= Defines the command and callback ==================
 // =====================================================================
 
-vectorN_t Kp = (vectorN_t(14) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0, 0.0,
-                                 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0, 0.0).finished();
-vectorN_t Kd = (vectorN_t(14) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 0.0, 
-                                 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 0.0).finished();
+vectorN_t Kp = (vectorN_t(12) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
+                                 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
+vectorN_t Kd = (vectorN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
+                                 500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
 
 void compute_command(float64_t const & t,
                      vectorN_t const & q,
@@ -34,7 +34,8 @@ void compute_command(float64_t const & t,
                      matrixN_t const & IMUs,
                      vectorN_t       & u)
 {
-    u = -(Kp.array() * q.segment<14>(7).array() + Kd.array() * v.segment<14>(6).array());
+    u.head<6>() = -(Kp.head<6>().array() * q.segment<6>(7).array() + Kd.head<6>().array() * v.segment<6>(6).array());
+    u.tail<6>() = -(Kp.tail<6>().array() * q.segment<6>(14).array() + Kd.tail<6>().array() * v.segment<6>(13).array());
 }
 
 bool callback(float64_t const & t, 
@@ -116,7 +117,7 @@ int main(int argc, char *argv[])
     configHolder_t simuOptions = simulator.getDefaultOptions();
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
-    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e3;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("frictionDry")) = 5.0;
@@ -150,22 +151,12 @@ int main(int argc, char *argv[])
     std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // TODO: Write the log file
-    std::cout << simulator.log.size() << " log points" << std::endl;
+    std::cout << simulator.log.rows() << " log points" << std::endl;
 
     std::ofstream myfile;
+    Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
     myfile.open(outputDirPath + std::string("/log.csv"), std::ofstream::out | std::ofstream::trunc);
-    myfile << std::fixed;
-    myfile << std::setprecision(10);
-
-    std::cout << simulator.log.size() << " log points" << std::endl;
-    for(uint64_t i = 0; i<simulator.log.size(); i++)
-    {
-        for(uint64_t j = 0; j<simulator.log[0].size()-1; j++)
-        {
-            myfile << simulator.log[i][j] << ',';
-        }
-        myfile << simulator.log[i].back() << std::endl;
-    }
+    myfile << simulator.log.format(CSVFormat);
     myfile.close();
 
     return 0;

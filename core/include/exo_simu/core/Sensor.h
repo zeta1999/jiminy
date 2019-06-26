@@ -8,12 +8,12 @@
 
 namespace exo_simu
 {
-    class Engine;
+    class Model;
 
-    class ImuSensor : public AbstractSensor
+    class ImuSensor : public virtual AbstractSensor, public SensorDataHolder<ImuSensor>
     {
     public:
-        configHolder_t getDefaultOptions(void)
+        configHolder_t getDefaultOptions(void) override
         {
             configHolder_t config = AbstractSensor::getDefaultOptions();
             // No extra configuration parameter
@@ -33,20 +33,19 @@ namespace exo_simu
     public:
         ImuSensor(std::string const & name);
         ~ImuSensor(void);
-        AbstractSensor* clone(void);
+        AbstractSensor* clone(void) override;
 
         void initialize(int32_t const & framesIdx);
 
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
 
-    protected:
-        result_t set(Engine    const & engine,
+        result_t set(Model     const & model,
                      float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
                      vectorN_t const & a,
-                     vectorN_t const & u);
+                     vectorN_t const & u) override;
 
     public:
         std::shared_ptr<imuSensorOptions_t const> imuSensorOptions_;
@@ -55,10 +54,10 @@ namespace exo_simu
         int32_t framesIdx_;
     };
 
-    class ForceSensor : public AbstractSensor
+    class ForceSensor : public virtual AbstractSensor, public SensorDataHolder<ForceSensor>
     {
     public:
-        configHolder_t getDefaultOptions(void)
+        configHolder_t getDefaultOptions(void) override
         {
             configHolder_t config = AbstractSensor::getDefaultOptions();
             // No extra configuration parameter
@@ -85,8 +84,7 @@ namespace exo_simu
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
         
-    protected:
-        result_t set(Engine    const & engine,
+        result_t set(Model     const & model,
                      float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,

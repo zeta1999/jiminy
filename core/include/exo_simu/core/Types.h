@@ -48,11 +48,8 @@ namespace exo_simu
     typedef boost::make_recursive_variant<bool_t, int32_t, real_t, std::string, vectorN_t, matrixN_t, 
                                           std::map<std::string, boost::recursive_variant_> >::type configField_t;
     typedef std::map<std::string, configField_t> configHolder_t;
-    typedef std::map<std::string, std::shared_ptr<AbstractSensor>> sensorsMap_t;
-    typedef std::map<std::string, sensorsMap_t> sensorsGroupMap_t;
-
-    typedef std::vector<float64_t> state_t;
-    typedef std::vector<state_t> log_t; // To be removed
+    typedef std::map<std::string, std::shared_ptr<AbstractSensor>> sensorsHolder_t;
+    typedef std::map<std::string, sensorsHolder_t> sensorsGroupHolder_t;
 }
 
 #endif  // WDC_OPTIMAL_TYPES_H

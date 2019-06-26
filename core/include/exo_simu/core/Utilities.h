@@ -30,6 +30,14 @@ namespace exo_simu
                            float64_t const & mi,
                            float64_t const & ma,
                            float64_t const & r);
+
+	template<typename KeyType, typename ValueType>
+	std::vector<ValueType> getMapValues(std::map<KeyType, ValueType> m);
+
+	template<typename typeOut, typename typeIn>
+	std::vector<std::shared_ptr<typeOut>> staticCastSharedPtrVector(std::vector<std::shared_ptr<typeIn>> vIn);
 }
+
+#include "exo_simu/core/Utilities.tcc"
 
 #endif  // SIMU_UTILITIES_H

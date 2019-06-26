@@ -1,0 +1,15 @@
+1. Faire une 1ere version sans aucun logger.
+
+- Ajouter le type de capteur "encoder"
+- faire un sensor map holder et un sensor map pour accelerer l'accès aux données
+- Update the sensors 
+---> when to update them ? Currently it depends on u and a, which are only known after computing the command, which requires the sensors values...
+------> Either remove u and a, or take the values at the previous integration step (but it introduces an inconsistent time delay while using adaptive stepper).
+- Add helpers to convert the linear velocity and acceleration of the freeflyer from body frame to world frame.
+
+2. Ajouter le logger
+
+-> Le logger va devenir un singleton, accompagné d'une classe héritée par toutes les classes qui doivent être en mesure de logger des informations
+---> Ne pas oublier qu'il serait bien d'avoir comme pour wanderbrain un niveau de hierarchie par module dans les info logger (séparation avec "." !)
+---> Trouver un moyen d'avoir depuis l' "Engine" le moyen d'activer ou desactiver le logging de chaque "module"
+

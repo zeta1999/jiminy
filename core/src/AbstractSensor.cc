@@ -6,7 +6,6 @@ namespace exo_simu
     sensorOptions_(nullptr),
     name_(name),
     isInitialized_(false),
-    data_(),
     sensorOptionsHolder_()
     {
         AbstractSensor::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
@@ -25,7 +24,7 @@ namespace exo_simu
     void AbstractSensor::setOptions(configHolder_t const & sensorOptions)
     {
         sensorOptionsHolder_ = sensorOptions;
-        sensorOptions_ = std::shared_ptr<abstractSensorOptions_t const>(new abstractSensorOptions_t(sensorOptionsHolder_));
+        sensorOptions_ = std::make_shared<abstractSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     bool AbstractSensor::getIsInitialized(void) const
@@ -36,10 +35,5 @@ namespace exo_simu
     std::string AbstractSensor::getName(void) const
     {
         return name_;
-    }
-
-    vectorN_t AbstractSensor::get(void) const
-    {
-        return data_;
     }
 }
