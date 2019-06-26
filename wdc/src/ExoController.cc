@@ -48,7 +48,7 @@ namespace exo_simu
                                         vectorN_t       & u)
     {
         sensorsGroupMap_t const * sensors = engine.getModel().getSensors();
-        std::map<std::string, matrixN_t> sensorsData = getSensorsData(sensors);
+        std::map<std::string, matrixN_t> sensorsData = getSensorsData(sensors); // <- very time consuming : about 12us/it (vs <100us/it for the whole iter)
         commandFct_(t, q, v, sensorsData.at("IMUSensor"), sensorsData.at("ForceSensor"), u);
     }
 

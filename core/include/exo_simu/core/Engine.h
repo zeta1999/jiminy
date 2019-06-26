@@ -34,8 +34,8 @@ namespace exo_simu
             config["frictionViscous"] = 0.8;
             config["frictionDry"] = 1.0;
             config["dryFrictionVelEps"] = 1.0e-2;
-            config["stiffness"] = 5.0e5;
-            config["damping"] = 5.0e3;
+            config["stiffness"] = 1.0e6;
+            config["damping"] = 2.0e3;
             config["transitionEps"] = 1.0e-3;
 
             return config;
@@ -65,9 +65,9 @@ namespace exo_simu
         configHolder_t getDefaultJointOptions()
         {
             configHolder_t config;
-            config["boundStiffness"] = 5.0e5;
-            config["boundDamping"] = 5.0e2;
-            config["boundTransitionEps"] = 2.0e-3;
+            config["boundStiffness"] = 1.0e5;
+            config["boundDamping"] = 1.0e2;
+            config["boundTransitionEps"] = 1.0e-2;
 
             return config;
         };
@@ -182,6 +182,7 @@ namespace exo_simu
         callbackFct_t callbackFct_;
 
     private:
+        float64_t timePrev_;
         uint32_t nq_;
         uint32_t nv_;
         uint32_t nx_;

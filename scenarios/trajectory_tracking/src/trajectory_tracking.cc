@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
     x0(2) = 1.0;
     x0(6) = 1.0;
 
-    float64_t tf = 5.0;
+    float64_t tf = 3.0;
     float64_t dt = 0.001;
 
     // Run simulation

@@ -17,7 +17,7 @@ file(GLOB_RECURSE ${PROJECT_NAME}_PYTHON_SOURCES "src/python/*.py")
 add_library(${PROJECT_NAME} SHARED ${SRC})
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC core eigenpy boost_python)
+target_link_libraries(${PROJECT_NAME} PUBLIC wdc eigenpy boost_python)
 
 # Activate c++14
 set_target_properties(${PROJECT_NAME} PROPERTIES

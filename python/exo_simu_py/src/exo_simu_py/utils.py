@@ -186,27 +186,18 @@ def extract_state_from_neural_network_prediction(urdf_path, pred):
     return trajectory_data
 
 def extract_state_from_simulation_log(urdf_path, log_data):
-    # Extract time, joint positions and velocities evolution from log
+    # Extract time, joint positions and velocities evolution from log.
+    # Note that the quaternion angular velocity vectors are expressed
+    # it body frame rather than world frame.
     t = log_data[:,0]
-    q = log_data[:,8:20].T
-    dq = log_data[:,26:38].T
-    quatVec_freeflyer = log_data[:,np.concatenate([np.arange(5,8), [4]])].T
-    quatVec_freeflyer_norm = np.linalg.norm(quatVec_freeflyer, axis=0, keepdims=True)
-    quatVec_freeflyer /= quatVec_freeflyer_norm
-    position_freeflyer = np.concatenate((log_data[:,1:4].T, quatVec_freeflyer))
-    diff_quatVec_freeflyer = log_data[:,22:25].T
-    diff_quatVec_freeflyer /= quatVec_freeflyer_norm
-    velocity_freeflyer = np.concatenate((log_data[:,19:22].T, diff_quatVec_freeflyer))
+    qe = log_data[:,1:22].T
+    dqe = log_data[:,23:42].T
 
     ## Reorder the joints
-    #TODO: Check the formula for the derivative of the free flyer
-    rbdt = DynamicsTeller.make(urdf_path, rootjoint.FREEFLYER)
-    qe, dqe = _reorderJoint(rbdt, JOINT_ORDER_EXO_SIMU, q, dq)
-    qe[:7] = position_freeflyer
-    dqe[:6] = velocity_freeflyer
+    # rbdt = DynamicsTeller.make(urdf_path, rootjoint.FREEFLYER)
+    # qe, dqe = _reorderJoint(rbdt, JOINT_ORDER_EXO_SIMU, q, dq)
 
     # Post-processing: numerical derivation
-    #TODO: Check the formula for the second derivative of the free flyer
     ddqe = np.gradient(dqe, t, axis=1)
 
     # Create state sequence

@@ -38,5 +38,6 @@ include_directories(SYSTEM /usr/local/lib/python2.7/dist-packages/numpy/core/inc
 
 # Sub-project name(s)
 add_subdirectory(core)
+add_subdirectory(wdc)
 add_subdirectory(python)
 add_subdirectory(scenarios/trajectory_tracking)

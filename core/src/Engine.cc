@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cmath>
 #include <algorithm>
 
 #include "pinocchio/parsers/urdf.hpp"
@@ -6,6 +7,7 @@
 #include "pinocchio/algorithm/frames.hpp"
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/aba.hpp"
+#include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/AbstractController.h"
@@ -22,9 +24,10 @@ namespace exo_simu
     engineOptionsHolder_(),
     callbackFct_([](float64_t const & t, 
                     vectorN_t const & x)->bool{ return true; }),
-    nq_(),
-    nv_(),
-    nx_()
+    timePrev_(0),
+    nq_(0),
+    nv_(0),
+    nx_(0)
     {
         setOptions(getDefaultOptions());
     }
@@ -141,11 +144,13 @@ namespace exo_simu
         auto itBegin = make_adaptive_time_iterator_begin(stepper, rhsBind, x0Vect, 0, tf, dt); // const_step_time, adaptive_time
         auto itEnd = make_adaptive_time_iterator_end(stepper, rhsBind, x0Vect);
 
+        timePrev_ = 0;
         model_->pncData_ = pinocchio::Data(model_->pncModel_); // Initialize the internal state
         for(auto it = itBegin; it != itEnd; it++)
         {
             float64_t const & t = it->second;
             state_t const & xVect = it->first;
+            timePrev_ = t;
 
             state_t log_data(nx_ + 1);
             log_data[0] = t;
@@ -168,123 +173,88 @@ namespace exo_simu
                             state_t   const & xVect,
                             state_t         & xVectDot)
     {
+        // Make sure that the output has the right shape
         xVectDot.resize(nx_);
 
-        Eigen::Map<const vectorN_t> xEig(xVect.data(),nx_);
-        Eigen::Map<vectorN_t> xDotEig(xVectDot.data(),nx_);
-        Eigen::Map<const vectorN_t> q(xVect.data(),nq_);
-        Eigen::Map<const vectorN_t> dq(xVect.data() + nq_,nv_);
-        Eigen::Map<vectorN_t> ddq(xVectDot.data() + nq_,nv_);
+        // Map std::vector input data to Eigen::VectorXd
+        Eigen::Map<vectorN_t const> x(xVect.data(),nx_);
+        Eigen::Map<vectorN_t const> q(xVect.data(),nq_);
+        Eigen::Map<vectorN_t const> v(xVect.data() + nq_, nv_);
+        Eigen::Map<vectorN_t> xDot(xVectDot.data(),nx_);
+        
+        // Compute true quaternion derivative
+        // See: https://arxiv.org/abs/0811.2889 (section 1.5.2)
+        Eigen::Vector3d const omega = v.segment<3>(3);
+        quaternion_t quat(q.segment<4>(3).data()); // Only way to initialize with [x,y,z,w] order
+        quat.normalize();
+        quaternion_t const quatDot = quat * quaternion_t(0, 0.5 * omega(0), 0.5 * omega(1), 0.5 * omega(2));
 
-        // Compute quaternion derivative
-        const Eigen::Vector3d omega = dq.segment<3>(3);
-        Eigen::Vector4d quatVec = q.segment<4>(3);
-        quatVec.normalize();
-        const Eigen::Quaterniond quat(quatVec(0),quatVec(1),quatVec(2),quatVec(3));
-        Eigen::Matrix<float64_t,4,4> quat2quatDot;
-        quat2quatDot << 0        , omega(0), omega(1), omega(2),
-                        -omega(0),        0,-omega(2), omega(1),
-                        -omega(1), omega(2),        0,-omega(0),
-                        -omega(2), -omega(1), omega(0),       0;
-        quat2quatDot *= -0.5;
-        const Eigen::Vector4d quatDot = quat2quatDot*quatVec;
+        /* Compute the linear velocity of the free flyer in body frame
+           instead of world frame since it is required by pinocchio. */
+        vectorN_t vPnc = v;
+        Eigen::Matrix3d const Rbody2world = quat.toRotationMatrix();
+        vPnc.head<3>() = Rbody2world.transpose() * v.head<3>();
 
-        // Put quaternion in [x y z w] order
-        vectorN_t qPinocchio = q;
-        qPinocchio.segment<3>(3) = quatVec.tail<3>();
-        qPinocchio(6) = quatVec(0);
-
-        // Compute body velocity
-        vectorN_t dqPinocchio = dq;
-        const Eigen::Matrix3d Rb2w = quat.toRotationMatrix();
-        dqPinocchio.head<3>() = Rb2w.transpose()*dqPinocchio.head<3>();
+        /* It is not possible to use directly pinocchio::integrate method
+           since it requires dt. One way would be to save the time of the
+           last successful iteration has a private property of the engine.
+           However, this method does not work for dt very close to zero... */
+        // float64_t dt = std::max(1e-5, t - timePrev_);
+        // vectorN_t qNext = vectorN_t::Zero(nq_);
+        // pinocchio::integrate(model_->pncModel_, q, vPnc*dt, qNext); // Quaternion assert error in Debug for some reasons...
+        // vectorN_t qDot = (qNext - q) / dt;
 
         // Compute kinematics information
-        pinocchio::forwardKinematics(model_->pncModel_, model_->pncData_, qPinocchio, dqPinocchio);
+        pinocchio::forwardKinematics(model_->pncModel_, model_->pncData_, q, vPnc);
         pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
 
         // Compute the external forces
-        pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(), pinocchio::Force::Zero());
+        pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(), 
+                                                                    pinocchio::Force::Zero());
         for(int32_t const & contactFrameIdx : model_->getContactFramesIdx())
         {
             pinocchio::Force const fFrame(contactDynamics(contactFrameIdx));
-            int32_t const parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
+            int32_t parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
             fext[parentIdx] += fFrame;
         }
 
         // Compute command and internal dynamics
-        vectorN_t uCommand;
-        controller_->compute_efforts(*this, t, qPinocchio, dqPinocchio, uCommand);
-        vectorN_t uInternal;
-        internalDynamics(t, qPinocchio, dqPinocchio, uInternal);
+        vectorN_t uCommand = vectorN_t::Zero(nv_);
+        controller_->compute_efforts(*this, t, q, vPnc, uCommand);
+        vectorN_t uInternal = vectorN_t::Zero(nv_);
+        internalDynamics(t, q, vPnc, uInternal);
 
         // Compute dynamics
-        ddq = pinocchio::aba(model_->pncModel_, model_->pncData_, qPinocchio, dqPinocchio, uCommand + uInternal, fext);
+        vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, vPnc, uCommand + uInternal, fext);
 
-        // Compute world frame acceleration
-        Eigen::Matrix3d Rw2bDot;
-        Rw2bDot(0,0) = -4*quatVec(2)*quatDot(2) - 4*quatVec(3)*quatDot(3);
-        Rw2bDot(0,1) =  2*quatDot(1)*quatVec(2) + 2*quatVec(1)*quatDot(2) + 2*quatDot(0)*quatVec(3) + 2*quatVec(0)*quatDot(3);
-        Rw2bDot(0,2) = -2*quatDot(0)*quatVec(2) - 2*quatVec(0)*quatDot(2) + 2*quatDot(1)*quatVec(3) + 2*quatVec(1)*quatDot(3);
-        Rw2bDot(1,0) =  2*quatDot(1)*quatVec(2) + 2*quatVec(1)*quatDot(2) - 2*quatDot(0)*quatVec(3) - 2*quatVec(0)*quatDot(3);
-        Rw2bDot(1,1) = -4*quatVec(1)*quatDot(1) - 4*quatVec(3)*quatDot(3);
-        Rw2bDot(1,2) =  2*quatDot(0)*quatVec(1) + 2*quatVec(0)*quatDot(1) + 2*quatDot(2)*quatVec(3) + 2*quatVec(2)*quatDot(3);
-        Rw2bDot(2,0) =  2*quatDot(0)*quatVec(2) + 2*quatVec(0)*quatDot(2) + 2*quatDot(1)*quatVec(3) + 2*quatVec(1)*quatDot(3);
-        Rw2bDot(2,1) = -2*quatDot(0)*quatVec(1) - 2*quatVec(0)*quatDot(1) + 2*quatDot(2)*quatVec(3) + 2*quatVec(2)*quatDot(3);
-        Rw2bDot(2,2) = -4*quatVec(1)*quatDot(1) - 4*quatVec(2)*quatDot(2);
-        ddq.head<3>() = Rb2w*(ddq.head<3>() - Rw2bDot*dq.head<3>());
+        /* Compute the linear acceleration of the free flyer in world frame
+           instead of body frame since the ode stepper requires to use a
+           consistent frame between the position, velocity and acceleration. */
+        Eigen::Matrix3d Rworld2bodyDot;
+        Rworld2bodyDot(0,0) = -4 * quat.y() * quatDot.y() - 4 * quat.z() * quatDot.z();
+        Rworld2bodyDot(0,1) =  2 * quat.y() * quatDot.x() + 2 * quat.x() * quatDot.y() + 2 * quat.z() * quatDot.w() + 2 * quat.w() * quatDot.z();
+        Rworld2bodyDot(0,2) = -2 * quat.y() * quatDot.w() - 2 * quat.w() * quatDot.y() + 2 * quat.z() * quatDot.x() + 2 * quat.x() * quatDot.z();
+        Rworld2bodyDot(1,0) =  2 * quat.y() * quatDot.x() + 2 * quat.x() * quatDot.y() - 2 * quat.z() * quatDot.w() - 2 * quat.w() * quatDot.z();
+        Rworld2bodyDot(1,1) = -4 * quat.x() * quatDot.x() - 4 * quat.z() * quatDot.z();        
+        Rworld2bodyDot(1,2) =  2 * quat.x() * quatDot.w() + 2 * quat.w() * quatDot.x() + 2 * quat.z() * quatDot.y() + 2 * quat.y() * quatDot.z();
+        Rworld2bodyDot(2,0) =  2 * quat.y() * quatDot.w() + 2 * quat.w() * quatDot.y() + 2 * quat.z() * quatDot.x() + 2 * quat.x() * quatDot.z();
+        Rworld2bodyDot(2,1) = -2 * quat.x() * quatDot.w() - 2 * quat.w() * quatDot.x() + 2 * quat.z() * quatDot.y() + 2 * quat.y() * quatDot.z();
+        Rworld2bodyDot(2,2) = -4 * quat.x() * quatDot.x() - 4 * quat.y() * quatDot.y();
+        a.head<3>() = Rbody2world * (a.head<3>() - Rworld2bodyDot * v.head<3>());
 
         // Fill up xDot
-        xDotEig.head<3>() = dq.head<3>();
-        xDotEig.segment<4>(3) = quatDot;
-        xDotEig.segment(7,nq_-7) = dq.tail(nv_-6);
-        xDotEig.segment(nq_,nv_) = ddq;
+        xDot.head<3>() = v.head<3>();
+        xDot.segment<4>(3) = quatDot.coeffs(); // coeffs returns the Eigen vector [x,y,z,w]
+        xDot.segment(7, nq_ - 7) = v.tail(nv_ - 6);
+        // xDot.head(nq_) = qDot;
+        xDot.tail(nv_) = a;
 
-        // // Make sure that the output has the right shape
-        // xVectDot.resize(nx_);
-
-        // // Map std::vector input data to Eigen::VectorXd
-        // Eigen::Map<vectorN_t const> x(xVect.data(),nx_);
-        // Eigen::Map<vectorN_t const> q(x.data(),nq_);
-        // Eigen::Map<vectorN_t const> v(x.data() + nq_, nv_);
-        // Eigen::Map<vectorN_t> xDot(xVectDot.data(),nx_);
-
-        // // Convert the body angular velocity in the right frame
-
-        // // Compute true quaternion derivative
-        // // It is not possible to use directly pinocchio::integrate method since it requires dt
-        // // One way would be to save the time of the last successful iteration has a private property of the engine
-        // Eigen::Vector3d const omega = v.segment<3>(3);
-        // quaternion_t quat(q.segment<4>(3).data()); // Only way to initialize with [x,y,z,w] order
-        // quat.normalize();
-        // quaternion_t quatDot = quat * quaternion_t(0, 0.5 * omega(0), 0.5 * omega(1), 0.5 * omega(2));
-
-        // // Compute kinematics information
-        // pinocchio::forwardKinematics(model_->pncModel_, model_->pncData_, q, v);
-        // pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
-
-        // // Compute the external forces
-        // pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(), 
-        //                                                             pinocchio::Force::Zero());
-        // for(int32_t const & contactFrameIdx : model_->getContactFramesIdx())
-        // {
-        //     pinocchio::Force const fFrame(contactDynamics(contactFrameIdx));
-        //     int32_t const parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
-        //     fext[parentIdx] += fFrame;
-        // }
-
-        // // Compute command and internal dynamics
-        // vectorN_t u = vectorN_t::Zero(nv_);
-        // controller_->compute_efforts(*this, t, q, v, u);
-
-        // // Compute dynamics
-        // vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, v, u, fext);
-
-        // // Fill up xDot
-        // xDot.head<3>() = v.head<3>();
-        // xDot.segment<4>(3) = quatDot.coeffs(); // coeffs returns a vector [x,y,z,w]
-        // xDot.segment(7, nq_ - 7) = v.tail(nv_ - 6);
-        // xDot.segment(nq_, nv_) = a;
+        // matrixN_t tmp = matrixN_t::Zero(nq_,2);
+        // tmp.col(0) = xDot.head(nq_);
+        // tmp.col(1) = qDot;
+        // // std::cout << xDot.head(nq_) - qDot << std::endl;
+        // std::cout << tmp << std::endl;
+        // std::cout << "=====" << std::endl;
     }
  
     vectorN_t Engine::contactDynamics(int32_t const & frameId) const
@@ -317,7 +287,7 @@ namespace exo_simu
             }
             fextInWorld(2) = -contactOptions_->stiffness * posFrame(2) + damping;
 
-            // Compute friction force
+            // Compute friction forces
             Eigen::Vector2d const vxy = vFrameInWorld.head<2>();
             float64_t const vNorm = vxy.norm();
             float64_t frictionCoeff;
@@ -340,7 +310,7 @@ namespace exo_simu
             }
             fextInWorld.head<2>() = -vxy * frictionCoeff * fextInWorld(2);
 
-            // Express forces at parent joint frame origin
+            // Compute the forces at the origin of the parent joint frame
             fextLocal.head<3>() = tformFrame2Jt.topLeftCorner<3,3>()*tformFrame.topLeftCorner<3,3>().transpose()*fextInWorld;
             fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>()).eval();
 
@@ -391,8 +361,9 @@ namespace exo_simu
                 forceJoint = engineJointOptions_.boundStiffness * qJointError + damping;
             }
 
-            float64_t blendingFactor = std::min(qJointError / engineJointOptions_.boundTransitionEps, 1.0);
-            forceJoint *= blendingFactor;
+            float64_t blendingFactor = qJointError / engineJointOptions_.boundTransitionEps;
+            float64_t blendingLaw = std::tanh(2 * blendingFactor);
+            forceJoint *= blendingLaw;
 
             u(jointsVelocityIdx[i]) += forceJoint;
         }

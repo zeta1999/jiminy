@@ -4,14 +4,9 @@ cmake_minimum_required(VERSION 3.10)
 # Project name
 project(trajectory_tracking)
 
-# Find library and headers
-find_package(urdfdom REQUIRED)
-
 # Add sources
 set(SRC 
     "${CMAKE_CURRENT_SOURCE_DIR}/src/trajectory_tracking.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoModel.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoController.cc"
 )
 
 # Make executables
@@ -24,7 +19,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC core)
+target_link_libraries(${PROJECT_NAME} PUBLIC wdc)
 
 # Activate c++14
 set_target_properties(${PROJECT_NAME} PROPERTIES
