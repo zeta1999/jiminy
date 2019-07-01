@@ -6,7 +6,6 @@ project(engine)
 
 # Find library and headers
 find_package(Boost REQUIRED)
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(urdfdom REQUIRED)
 
 include(GNUInstallDirs)
@@ -31,7 +30,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>)
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC wdc_core Eigen3::Eigen urdfdom_model boost_system)
+target_link_libraries(${PROJECT_NAME} PUBLIC wdc_core urdfdom_model boost_system)
 
 # Activate c++11
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_11)

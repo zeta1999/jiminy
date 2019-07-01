@@ -4,9 +4,6 @@ cmake_minimum_required(VERSION 3.10)
 # Project name
 project(exo_simu_pywrap)
 
-# Find library and headers
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-
 # Set the include directories.
 include_directories("include/")
 
@@ -17,7 +14,7 @@ set(SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/Module.cc")
 add_library(${PROJECT_NAME} SHARED ${SRC})
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC wdc_core engine Eigen3::Eigen eigenpy boost_python wdc_core)
+target_link_libraries(${PROJECT_NAME} PUBLIC wdc_core engine eigenpy boost_python wdc_core)
 
 # Python sources
 file(GLOB_RECURSE ${PROJECT_NAME}_PYTHON_SOURCES "src/python/*.py")
