@@ -35,7 +35,7 @@ namespace exo_simu
         ~ImuSensor(void);
         AbstractSensor* clone(void) override;
 
-        void initialize(int32_t const & framesIdx);
+        void initialize(int32_t const & frameIdx);
 
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
@@ -51,7 +51,7 @@ namespace exo_simu
         std::shared_ptr<imuSensorOptions_t const> imuSensorOptions_;
 
     private:
-        int32_t framesIdx_;
+        int32_t frameIdx_;
     };
 
     class ForceSensor : public virtual AbstractSensor, public SensorDataHolder<ForceSensor>
@@ -79,7 +79,7 @@ namespace exo_simu
         ~ForceSensor(void);
         AbstractSensor* clone(void);
 
-        void initialize(int32_t const & framesIdx);
+        void initialize(int32_t const & frameIdx);
 
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
@@ -95,7 +95,54 @@ namespace exo_simu
         std::shared_ptr<forceSensorOptions_t const> forceSensorOptions_;
 
     private:
-        int32_t framesIdx_;
+        int32_t frameIdx_;
+    };
+
+    class EncoderSensor : public virtual AbstractSensor, public SensorDataHolder<EncoderSensor>
+    {
+    public:
+        configHolder_t getDefaultOptions(void) override
+        {
+            configHolder_t config = AbstractSensor::getDefaultOptions();
+            // No extra configuration parameter
+
+            return config;
+        };
+        
+        struct encoderSensorOptions_t : public abstractSensorOptions_t
+        {
+            encoderSensorOptions_t(configHolder_t const & options):
+            abstractSensorOptions_t(options)
+            {
+                // Empty.
+            }
+        };
+
+    public:
+        EncoderSensor(std::string const & name);
+        ~EncoderSensor(void);
+        AbstractSensor* clone(void);
+
+        void initialize(int32_t const & jointPositionIdx,
+                        int32_t const & jointVelocityIdx);
+
+        void setOptions(configHolder_t const & sensorOptions);
+        int32_t getJointPositionIdx(void) const;
+        int32_t getJointVelocityIdx(void) const;
+        
+        result_t set(Model     const & model,
+                     float64_t const & t,
+                     vectorN_t const & q,
+                     vectorN_t const & v,
+                     vectorN_t const & a,
+                     vectorN_t const & u);
+
+    public:
+        std::shared_ptr<encoderSensorOptions_t const> encoderSensorOptions_;
+
+    private:
+        int32_t jointPositionIdx_;
+        int32_t jointVelocityIdx_;
     };
 }
 

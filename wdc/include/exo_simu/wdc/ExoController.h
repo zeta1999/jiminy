@@ -13,8 +13,9 @@ namespace exo_simu
         typedef std::function<void(float64_t const &/*t*/,
                                    vectorN_t const &/*q*/,
                                    vectorN_t const &/*v*/,
-                                   matrixN_t const &/*optoforces*/,
-                                   matrixN_t const &/*IMUs*/,
+                                   matrixN_t const &/*forceSensorsData*/,
+                                   matrixN_t const &/*imuSensorsData*/,
+                                   matrixN_t const &/*encoderSensorsData*/,
                                    vectorN_t       &/*u*/)> commandFct_t;
 
     public:

@@ -30,12 +30,12 @@ vectorN_t Kd = (vectorN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0,
 void compute_command(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
-                     matrixN_t const & optoforces,
-                     matrixN_t const & IMUs,
+                     matrixN_t const & forceSensorsData,
+                     matrixN_t const & imuSensorsData,
+                     matrixN_t const & encoderSensorsData,
                      vectorN_t       & u)
 {
-    u.head<6>() = -(Kp.head<6>().array() * q.segment<6>(7).array() + Kd.head<6>().array() * v.segment<6>(6).array());
-    u.tail<6>() = -(Kp.tail<6>().array() * q.segment<6>(14).array() + Kd.tail<6>().array() * v.segment<6>(13).array());
+    u = -(Kp.array() * encoderSensorsData.col(0).array() + Kd.array() * encoderSensorsData.col(1).array());
 }
 
 bool callback(float64_t const & t, 

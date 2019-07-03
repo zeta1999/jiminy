@@ -10,8 +10,9 @@ namespace exo_simu
     commandFct_([](float64_t const & t,
                    vectorN_t const & q,
                    vectorN_t const & v,
-                   matrixN_t const & optoforces,
-                   matrixN_t const & IMUs,
+                   matrixN_t const & forceSensorsData,
+                   matrixN_t const & imuSensorsData,
+                   matrixN_t const & encoderSensorsData,
                    vectorN_t       & u) -> void
                 {
                    u = vectorN_t::Zero(12);
@@ -49,9 +50,10 @@ namespace exo_simu
                                         vectorN_t const & v,
                                         vectorN_t       & u)
     {
-        matrixN_t const & forceSensorData = model.getSensorsData("ForceSensor");
-        matrixN_t const & imuSensorData = model.getSensorsData("IMUSensor");
-        commandFct_(t, q, v, forceSensorData, imuSensorData, u);
+        matrixN_t const & forceSensorsData = model.getSensorsData("ForceSensor");
+        matrixN_t const & imuSensorsData = model.getSensorsData("IMUSensor");
+        matrixN_t const & encoderSensorsData = model.getSensorsData("EncoderSensor");
+        commandFct_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData, u);
     }
 
     void ExoController::internalDynamics(Model     const & model,
