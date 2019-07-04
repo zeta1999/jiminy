@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     Engine simulator;
     simulator.initialize(model, controller, callback);
     configHolder_t simuOptions = simulator.getDefaultOptions();
-    boost::get<vectorN_t>(simuOptions.at("gravity"))(2) = -9.81;
+    boost::get<vectorN_t>(boost::get<configHolder_t>(simuOptions.at("world")).at("gravity"))(2) = -9.81;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 1.0e-3;

@@ -113,7 +113,7 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Engine::simulate(vectorN_t         x_init,
+    result_t Engine::simulate(vectorN_t const & x_init,
                               float64_t const & end_time)
     {
         result_t returnCode = result_t::SUCCESS;
@@ -492,11 +492,11 @@ namespace exo_simu
     void Engine::setOptions(configHolder_t const & engineOptions)
     {
         engineOptionsHolder_ = engineOptions;
+        engineOptions_ = std::make_shared<engineOptions_t const>(engineOptionsHolder_);
         if (isInitialized_)
         {
-            model_->pncModel_.gravity = boost::get<vectorN_t>(engineOptions.at("gravity")); // It is reversed (Third Newton law)
+            model_->pncModel_.gravity = engineOptions_->world.gravity; // It is reversed (Third Newton law)
         }
-        engineOptions_ = std::make_shared<engineOptions_t const>(engineOptionsHolder_);
     }
 
     bool Engine::getIsInitialized(void) const

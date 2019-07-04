@@ -87,6 +87,25 @@ namespace exo_simu
             }
         };
 
+        configHolder_t getDefaultWorldOptions()
+        {
+            configHolder_t config;
+            config["gravity"] = (vectorN_t(6) << 0.0,0.0,-9.81,0.0,0.0,0.0).finished();
+
+            return config;
+        };
+
+        struct worldOptions_t
+        {
+            vectorN_t const gravity;
+
+            worldOptions_t(configHolder_t const & options) :
+            gravity(boost::get<vectorN_t>(options.at("gravity")))
+            {
+                // Empty.
+            }
+        };
+
         configHolder_t getDefaultStepperOptions()
         {
             configHolder_t config;
@@ -119,9 +138,9 @@ namespace exo_simu
         {
             configHolder_t config;
             config["stepper"] = getDefaultStepperOptions();
+            config["world"] = getDefaultWorldOptions();
             config["joints"] = getDefaultJointOptions();
             config["contacts"] = getDefaultContactOptions();
-            config["gravity"] = (vectorN_t(6) << 0.0,0.0,-9.81,0.0,0.0,0.0).finished();
 
             return config;
         };
@@ -129,15 +148,15 @@ namespace exo_simu
         struct engineOptions_t
         {
             stepperOptions_t const stepper;
+            worldOptions_t   const world;
             jointOptions_t   const joints;
             contactOptions_t const contacts;
-            vectorN_t        const gravity;
 
-            engineOptions_t(configHolder_t const & options):
+            engineOptions_t(configHolder_t const & options) :
             stepper(boost::get<configHolder_t>(options.at("stepper"))),
+            world(boost::get<configHolder_t>(options.at("world"))),
             joints(boost::get<configHolder_t>(options.at("joints"))),
-            contacts(boost::get<configHolder_t>(options.at("contacts"))),
-            gravity(boost::get<vectorN_t>(options.at("gravity")))
+            contacts(boost::get<configHolder_t>(options.at("contacts")))
             {
                 // Empty.
             }
@@ -257,7 +276,7 @@ namespace exo_simu
                             AbstractController & controller,
                             callbackFct_t        callbackFct);
 
-        result_t simulate(vectorN_t         x_init, /* Make a copy */
+        result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
 
         configHolder_t getOptions(void) const;

@@ -11,7 +11,10 @@
 #include <boost/python/def.hpp>
 #include <boost/python/dict.hpp>
 
+#include "exo_simu/core/Types.h"
 #include "exo_simu/core/Engine.h"
+#include "exo_simu/wdc/ExoModel.h"
+#include "exo_simu/wdc/ExoController.h"
 #include "exo_simu/python/Utilities.h"
 
 namespace exo_simu
@@ -20,16 +23,90 @@ namespace python
 {
     namespace bp = boost::python;
 
+    typedef std::function<void(float64_t const &/*t*/,
+                                vectorN_t const &/*q*/,
+                                vectorN_t const &/*v*/,
+                                matrixN_t const &/*forceSensorsData*/,
+                                matrixN_t const &/*imuSensorsData*/,
+                                matrixN_t const &/*encoderSensorsData*/,
+                                vectorN_t       &/*u*/)> commandFct_t;
+
+    typedef std::function<bool(float64_t const &/*t*/,
+                                vectorN_t const &/*x*/)> callbackFct_t;
+
+    class PyEngine // Composition over inheritance
+    {
+    public:
+        PyEngine(void) :
+        urdfPath_(),
+        model_(),
+        controller_(),
+        simulator_()
+        {
+            // Empty.
+        }
+
+        ~PyEngine(void)
+        {
+            // Empty.
+        }
+
+        result_t initialize(std::string urdfPath)
+        {
+            result_t returnCode = result_t::SUCCESS;
+
+            urdfPath_ = urdfPath;
+            returnCode = model_.initialize(urdfPath_);
+
+            return returnCode;
+        }
+
+        result_t simulate(vectorN_t     const & x_init,
+                          float64_t     const & end_time, 
+                          commandFct_t          commandFct,
+                          callbackFct_t         callbackFct)
+        {
+            result_t returnCode = result_t::SUCCESS;
+
+            returnCode = controller_.initialize(commandFct);
+
+            if (returnCode == result_t::SUCCESS)
+            {
+                returnCode = simulator_.initialize(model_, controller_, callbackFct);
+            }
+
+            if (returnCode == result_t::SUCCESS)
+            {
+                returnCode = simulator_.simulate(x_init, end_time);
+            }
+
+            return returnCode;
+        }
+
+        std::string const & getUrdfPath(void) const
+        {
+            return urdfPath_;
+        }
+
+    public:
+        std::string urdfPath_;
+        ExoModel model_;
+        ExoController controller_;
+        Engine simulator_;
+    };
+
     struct controllerPyWrapper {
     public:
         controllerPyWrapper(bp::object const& objPy) : funcPyPtr_(objPy) {}
-        void operator() (const float64_t & t,
-                           const vectorN_t & x,
-                           const matrixN_t & optoforces,
-                           const matrixN_t & IMUs,
-                                 vectorN_t & u)
+        void operator() (float64_t const & t,
+                         vectorN_t const & q,
+                         vectorN_t const & v,
+                         matrixN_t const & forceSensorsData,
+                         matrixN_t const & imuSensorsData,
+                         matrixN_t const & encoderSensorsData,
+                         vectorN_t       & u)
         {
-            u = bp::extract<vectorN_t>(funcPyPtr_(t, x, optoforces, IMUs));
+            u = bp::extract<vectorN_t>(funcPyPtr_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData));
         }
     private:
         bp::object funcPyPtr_;
@@ -60,16 +137,18 @@ namespace python
                 .def("init", &ExoSimulatorVisitor::init, 
                              (bp::arg("self"), "urdf_path"))
                 .def("simulate", &ExoSimulatorVisitor::simulate, 
-                                 (bp::arg("self"), "x0", "t0", "tf", "dt", "controller"))
+                                 (bp::arg("self"), "x_init", "end_time", "controller_handle"))
                 .def("simulate", &ExoSimulatorVisitor::simulate_with_callback, 
-                                 (bp::arg("self"), "x0", "t0", "tf", "dt", "controller", "callback"))
+                                 (bp::arg("self"), "x_init", "end_time", "controller_handle", "callback_handle"))
                 .def("get_log", &ExoSimulatorVisitor::getLog)
-                .def("get_urdf_path", &Engine::getUrdfPath, 
+                .def("get_urdf_path", &PyEngine::getUrdfPath, 
                                       bp::return_value_policy<bp::return_by_value>())
-                .def("set_urdf_path", &Engine::setUrdfPath)
                 .def("get_model_options", &ExoSimulatorVisitor::getModelOptions, 
                                           bp::return_value_policy<bp::return_by_value>())
                 .def("set_model_options", &ExoSimulatorVisitor::setModelOptions)
+                .def("get_controller_options", &ExoSimulatorVisitor::getControllerOptions, 
+                                               bp::return_value_policy<bp::return_by_value>())
+                .def("set_controller_options", &ExoSimulatorVisitor::setControllerOptions)
                 .def("get_simulation_options", &ExoSimulatorVisitor::getSimulationOptions, 
                                                bp::return_value_policy<bp::return_by_value>())
                 .def("set_simulation_options", &ExoSimulatorVisitor::setSimulationOptions)
@@ -77,76 +156,94 @@ namespace python
         }
 
         ///////////////////////////////////////////////////////////////////////////////
-        /// \brief      Run the simulation
+        /// \brief      Initialize the model
         ///////////////////////////////////////////////////////////////////////////////
-        static void init(Engine& self,
-                         std::string const& urdf_path)
+        static void init(PyEngine          & self,
+                         std::string const & urdf_path)
         {
-            self.init(urdf_path);
+            self.initialize(urdf_path);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief      Run the simulation
         ///////////////////////////////////////////////////////////////////////////////
-        static void simulate(Engine& self,
-                             vectorN_t const& x0,
-                             float64_t const& t0,
-                             float64_t const& tf,
-                             float64_t const& dt,
-                             bp::object const& controllerPy)
+        static void simulate(PyEngine         & self,
+                             vectorN_t  const & x_init,
+                             float64_t  const & end_time,
+                             bp::object const & controllerPy)
         {
-            controllerPyWrapper controller = controllerPyWrapper(controllerPy);
-            self.simulate(x0, t0, tf, dt, controller);
+            controllerPyWrapper controllerFct = controllerPyWrapper(controllerPy);
+            callbackFct_t callbackFct = [](float64_t const & t, 
+                                           vectorN_t const & x) -> bool
+            {
+                return true;
+            };
+            self.simulate(x_init, end_time, controllerFct, callbackFct);
         }
 
-        static void simulate_with_callback(Engine& self,
-                                           vectorN_t const& x0,
-                                           float64_t const& t0,
-                                           float64_t const& tf,
-                                           float64_t const& dt,
-                                           bp::object const& controllerPy,
-                                           bp::object const& callbackPy)
+        static void simulate_with_callback(PyEngine         & self,
+                                           vectorN_t  const & x_init,
+                                           float64_t  const & end_time,
+                                           bp::object const & controllerPy,
+                                           bp::object const & callbackPy)
         {
-            controllerPyWrapper controller = controllerPyWrapper(controllerPy);
-            callbackPyWrapper callback = callbackPyWrapper(callbackPy);
-            self.simulate(x0, t0, tf, dt, controller, callback);
+            controllerPyWrapper controllerFct = controllerPyWrapper(controllerPy);
+            callbackPyWrapper callbackFct = callbackPyWrapper(callbackPy);
+            self.simulate(x_init, end_time, controllerFct, callbackFct);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief      Getters and Setters
         ///////////////////////////////////////////////////////////////////////////////
 
-        static std::vector<std::vector<float64_t> > getLog(Engine& self)
+        static matrixN_t getLog(PyEngine & self)
         {
-            return self.log;
+            return self.simulator_.log;
         }
 
-        static bp::dict getModelOptions(Engine& self)
+        static bp::dict getModelOptions(PyEngine & self)
         {
             bp::dict configPy;
-            convertConfigHolderPy(self.getModelOptions(), configPy);
+            convertConfigHolderPy(self.model_.getOptions(), configPy);
             return configPy;
         }
 
-        static void setModelOptions(Engine& self, bp::dict const& configPy)
+        static void setModelOptions(PyEngine       & self, 
+                                    bp::dict const & configPy)
         {
-            configHolder_t config = self.getDefaultModelOptions();
+            configHolder_t config = self.model_.getDefaultOptions();
             loadConfigHolder(configPy, config);
-            self.setModelOptions(config);
+            self.model_.setOptions(config);
         }
 
-        static bp::dict getSimulationOptions(Engine& self)
+        static bp::dict getControllerOptions(PyEngine & self)
         {
             bp::dict configPy;
-            convertConfigHolderPy(self.getSimulationOptions(), configPy);
+            convertConfigHolderPy(self.controller_.getOptions(), configPy);
             return configPy;
         }
 
-        static void setSimulationOptions(Engine& self, bp::dict const& configPy)
+        static void setControllerOptions(PyEngine       & self, 
+                                         bp::dict const & configPy)
         {
-            configHolder_t config = self.getDefaultSimulationOptions();
+            configHolder_t config = self.controller_.getDefaultOptions();
             loadConfigHolder(configPy, config);
-            self.setSimulationOptions(config);
+            self.controller_.setOptions(config);
+        }
+
+        static bp::dict getSimulationOptions(PyEngine & self)
+        {
+            bp::dict configPy;
+            convertConfigHolderPy(self.simulator_.getOptions(), configPy);
+            return configPy;
+        }
+
+        static void setSimulationOptions(PyEngine       & self, 
+                                         bp::dict const & configPy)
+        {
+            configHolder_t config = self.simulator_.getDefaultOptions();
+            loadConfigHolder(configPy, config);
+            self.simulator_.setOptions(config);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -158,7 +255,7 @@ namespace python
             bp::to_python_converter<std::vector<vectorN_t>, VecToList<vectorN_t> >();
             bp::to_python_converter<std::vector<matrixN_t>, VecToList<matrixN_t> >();
             bp::to_python_converter<std::vector<std::vector<float64_t> >, VecToList<std::vector<float64_t> > >();
-            bp::class_<Engine>("Engine", "Engine class").def(ExoSimulatorVisitor());
+            bp::class_<PyEngine>("simulator", "PyEngine class").def(ExoSimulatorVisitor());
         }
     };
 }  // End of namespace python.

@@ -52,7 +52,7 @@ def _linear_interp(ratio, value_min, value_max):
     return np.atleast_2d((1 - ratio) * value_min + ratio * value_max).T
 
 @nb.jit(nopython=True, nogil=True)
-def _compute_command(Kp, Kd, traj_ref, t_rel, x, optoforces, IMUs):
+def _compute_command(Kp, Kd, traj_ref, t_rel, qe, v, forceSensorsData, imuSensorsData, encoderSensorsData):
     # Determine the relative time in the current state
     t_ind_inf = bisect_left(traj_ref.t, t_rel)
     t_ind_sup = t_ind_inf + 1
@@ -65,7 +65,9 @@ def _compute_command(Kp, Kd, traj_ref, t_rel, x, optoforces, IMUs):
     u_ref = _linear_interp(ratio, traj_ref.u[:,t_ind_inf], traj_ref.u[:,t_ind_sup])
 
     # Compute PID torques
-    u_pid = - (Kp * (np.asarray(x)[7:19] - q_ref) + Kd * (np.asarray(x)[25:37] - dq_ref))
+    q = np.expand_dims(encoderSensorsData[:,0], axis=1)
+    dq = np.expand_dims(encoderSensorsData[:,1], axis=1)
+    u_pid = - (Kp * (q - q_ref) + Kd * (dq - dq_ref))
 
     return u_ref + u_pid
         
@@ -86,13 +88,13 @@ class pid_feedforward:
         state_ref = self.state_machine[support_foot_ref] = dict()
         state_ref['t'] = np.array([s.t for s in evolution_robot])
         state_ref['q'] = np.asarray(np.concatenate(
-            [s.q[THOT_TO_SIMU_JOINT_MASK_POSITION] for s in evolution_robot], axis=1))
+            [s.q[JOINT_MASK_POSITION] for s in evolution_robot], axis=1))
         state_ref['dq'] = np.asarray(np.concatenate(
-            [s.v[THOT_TO_SIMU_JOINT_MASK_VELOCITY] for s in evolution_robot], axis=1))
+            [s.v[JOINT_MASK_VELOCITY] for s in evolution_robot], axis=1))
         state_ref['ddq'] = np.asarray(np.concatenate(
-            [s.a[THOT_TO_SIMU_JOINT_MASK_VELOCITY] for s in evolution_robot], axis=1))
+            [s.a[JOINT_MASK_VELOCITY] for s in evolution_robot], axis=1))
         state_ref['u'] = np.asarray( np.concatenate(
-            [s.tau.items()[0][1][THOT_TO_SIMU_JOINT_MASK_VELOCITY] for s in evolution_robot], axis=1))
+            [s.tau.items()[0][1][JOINT_MASK_VELOCITY] for s in evolution_robot], axis=1))
         support_foot_next = [elem for elem in SUPPORT_FOOT_ENUM if support_foot_ref not in elem][0]
         state_next = self.state_machine[support_foot_next] = dict()
         state_next['t'] = state_ref['t']
@@ -133,7 +135,7 @@ class pid_feedforward:
         self.time_offset -= self.traj_ref.t[-1]
         # print("switching to previous state: %s" % self.current_state)
 
-    def compute_command(self, t_cur, x, optoforces, IMUs):
+    def compute_command(self, t_cur, qe, v, forceSensorsData, imuSensorsData, encoderSensorsData):
         # Change of state if necessary, and get information about the current state
         t_rel = t_cur - self.time_offset
         if t_rel > self.traj_ref.t[-1]:
@@ -143,4 +145,4 @@ class pid_feedforward:
             self.state_machine_switch_prev()
             t_rel = t_cur - self.time_offset
         
-        return  _compute_command(self.Kp, self.Kd, self.traj_ref, t_rel, x, optoforces, IMUs)
+        return  _compute_command(self.Kp, self.Kd, self.traj_ref, t_rel, qe, v, forceSensorsData, imuSensorsData, encoderSensorsData)

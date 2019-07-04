@@ -21,8 +21,8 @@ from exo_simu_py import *
 urdf_path = "/home/builder/.simulation/atalante_with_patient/atalante_with_patient.urdf"
 urdf_mesh_path = "/home/builder/.simulation"
 neural_network_path = "/home/builder/wdc_workspace/src/wandercode/test_data/data/trajectories/generic_walk_network_v5-4.json"
-traj_features = {"steplength": 16, 
-                 "duration": 0.95,
+traj_features = {"steplength":  16, 
+                 "duration":    0.95,
                  "stairheight": 0.0}
 
 ############# Compute the reference trajectory using the neural network #################
@@ -40,26 +40,25 @@ trajectory_data = extract_state_from_neural_network_prediction(urdf_path, pred)
   
 ################################ Simulate the system ####################################
 
-simulator = exo_simu.Engine()
+simulator = exo_simu.simulator()
 model_options = simulator.get_model_options()
 simu_options = simulator.get_simulation_options()
 
-# model_options["gravity"][2] = 0
+# simu_options["world"]["gravity"][2] = 0
 
-simu_options["tolRel"] = 1.0e-5
-simu_options["tolAbs"] = 1.0e-4
-simu_options["logController"] = False
-simu_options["logOptoforces"] = False
-simu_options["logIMUs"] = False
+simu_options["stepper"]["tolRel"] = 1.0e-5
+simu_options["stepper"]["tolAbs"] = 1.0e-4
+simu_options["stepper"]["sensorsUpdatePeriod"] = 0.0
+simu_options["stepper"]["controllerUpdatePeriod"] = 0.0
 
-model_options['contacts']['stiffness'] = 1.0e6
-model_options['contacts']['damping'] = 2000.0
-model_options['contacts']['dryFrictionVelEps'] = 0.01
-model_options['contacts']['frictionDry'] = 5.0
-model_options['contacts']['frictionViscous'] = 5.0
-model_options['contacts']['transitionEps'] = 0.001
+simu_options['contacts']['stiffness'] = 1.0e6
+simu_options['contacts']['damping'] = 2000.0
+simu_options['contacts']['dryFrictionVelEps'] = 0.01
+simu_options['contacts']['frictionDry'] = 5.0
+simu_options['contacts']['frictionViscous'] = 5.0
+simu_options['contacts']['transitionEps'] = 0.001
 
-simulator.set_urdf_path(urdf_path)
+simulator.init(urdf_path)
 simulator.set_model_options(model_options)
 simulator.set_simulation_options(simu_options)
 
@@ -67,34 +66,32 @@ def callback(t, x):
     return bool(x[2] > 0) 
 
 x0 = get_initial_state_simulation(trajectory_data)
-t0 = 0.0
 tf = 3.0
-dt = 1e-3
 
 Kp = np.array([[20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
                 20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0]]).T
 Kd = np.array([[250.0, 150.0, 100.0, 100.0, 150.0, 100.0, 
                 250.0, 150.0, 100.0, 100.0, 150.0, 100.0]]).T
-controller = pid_feedforward(trajectory_data,Kp,Kd)
-simulator.simulate(x0,t0,0.1,dt,controller.compute_command,callback) # Force compile Python controller for a fair benchmark
+controller = pid_feedforward(trajectory_data, Kp, Kd)
+simulator.simulate(x0, 5e-2, controller.compute_command, callback) # Force compile Python controller for a fair benchmark
 controller.reset()
 start = time.time()
-simulator.simulate(x0,t0,tf,dt,controller.compute_command,callback)
+simulator.simulate(x0, tf, controller.compute_command, callback)
 end = time.time()
 print("Simulation time: %03.0fms" %((end - start)*1.0e3))
 
 ################################## Display the results ##################################
 
-log = np.array(simulator.get_log())
+log = np.asarray(simulator.get_log())
 print('%i log points' % log.shape[0])
 trajectory_data_log = extract_state_from_simulation_log(urdf_path, log)
 
-# Display the simulation trajectory
+nb_steps = int(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evolution_robot'][-1].t)
+trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
+
+# Display the simulation trajectory and the reference
 # display_robot(trajectory_data_log, speed_ratio=0.5)
+play_trajectories([trajectory_data_ref, trajectory_data_log], xyz_offset=[None, None], urdf_rgba=[(1.0,0.0,0.0,0.5), None], speed_ratio=0.5)
+# delete_scenes_viewer("world")
 
-# Display the reference trajectory
-# display_robot(trajectory_data, speed_ratio=0.5, scene_name="ref")
-# delete_scenes_viewer("ref")
-
-# plot_kinematics(trajectory_data_log, get_n_steps(trajectory_data, 
-#     int(np.ceil(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evolution_robot'][-1].t))))
+plot_kinematics(trajectory_data_log, trajectory_data_ref)

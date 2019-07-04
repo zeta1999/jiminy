@@ -131,7 +131,7 @@ namespace python
             options.push_back(it.first);
         }
 
-        for (int32_t i = 0; i < options.size(); i++)
+        for (uint32_t i = 0; i < options.size(); i++)
         {
             std::string const name = options[i];
             const std::type_info & optionType = config.at(name).type();
@@ -157,9 +157,9 @@ namespace python
                 vectorN_t const v = boost::get<vectorN_t>(config.at(name));
                 bp::list l;
 
-                for (int32_t i = 0; i < v.rows(); i++)
+                for (int32_t j = 0; j < v.rows(); j++)
                 {
-                    l.append(v(i));
+                    l.append(v(j));
                 }
                 configPy[name] = l;
             }
@@ -168,12 +168,12 @@ namespace python
                 matrixN_t const M = boost::get<matrixN_t>(config.at(name));
                 bp::list l;
 
-                for (int32_t i = 0; i < M.rows(); i++)
+                for (int32_t j = 0; j < M.rows(); j++)
                 {
                     bp::list row;
-                    for (int32_t j = 0; j < M.cols(); j++)
+                    for (int32_t k = 0; k < M.cols(); k++)
                     {
-                        row.append(M(i, j));
+                        row.append(M(j, k));
                     }
                     l.append(row);
                 }
@@ -203,7 +203,7 @@ namespace python
             options.push_back(it.first);
         }
         
-        for (int32_t i = 0; i < options.size(); i++)
+        for (uint32_t i = 0; i < options.size(); i++)
         {
             std::string const name = options[i];
             const std::type_info & optionType = config[name].type();
