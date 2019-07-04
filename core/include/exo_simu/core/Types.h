@@ -1,54 +1,55 @@
 ///////////////////////////////////////////////////////////////////////////////
+/// \brief    Contains types used in the optimal module.
 ///
-/// \file              Types.h
-/// \brief             Define types.
-/// \details           Define main types for use in wandercraft code.
-///
-/// \copyright         Wandercraft
-///
-////////////////////////////////////////////////////////////////////////////////
+/// \copyright Wandercraft
+///////////////////////////////////////////////////////////////////////////////
 
-#ifndef WDC_DEFINITION_TYPES_H
-#define WDC_DEFINITION_TYPES_H
+#ifndef WDC_OPTIMAL_TYPES_H
+#define WDC_OPTIMAL_TYPES_H
 
-#include <cstdint>  // C99 fixed size types.
-#include <cstddef>   // Various standard specific types (size_t, NULL, nullptr, etc).
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
+#include <boost/variant.hpp>
 
 namespace exo_simu
 {
-    //////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \typedef Define main types for use in wandercraft code.
-    ///
-    //////////////////////////////////////////////////////////////////////////////
-    typedef bool            bool_t;
-    typedef char            char_t;
-    typedef float           float32_t;
-    typedef double          float64_t;
+    class AbstractSensor;
+    
+    // wdc types
+    typedef bool   bool_t;
+    typedef char   char_t;
+    typedef float  float32_t;
+    typedef double float64_t;
 
-    //////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \brief Type definition for hresult_t.
-    ///
-    /// \details When viewed as a hexadecimal number, hresult_t is
-    ///          divided into three parts: The most significant nibble
-    ///          is set to 0 in case of success or 8 in case of error,
-    ///          the three following nibbles identify the facility,
-    ///          and the last four nibbles identify specific error for
-    ///          the facility. The facility codes are unique and
-    ///          listed in Facilities.h. The error codes for a given
-    ///          facility are listed in each module or class file.
-    ///
-    //////////////////////////////////////////////////////////////////////////////
-    typedef uint32_t hresult_t;
+    // other "standard" types
+    typedef char_t const* const const_cstr_t;
 
-    //////////////////////////////////////////////////////////////////////////////
-    /// \brief Disable the copy of the class
-    /// \param[in] className  Name of the class on which to disable copy.
-    //////////////////////////////////////////////////////////////////////////////
-    #define DISABLE_COPY(className) \
-        className(className const&) = delete; \
-        className& operator=(className const&) = delete
+    // import types.
+    typedef float64_t real_t;
+    typedef float64_t scalar_t;
+
+    // math types.
+    typedef Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic> matrixN_t;
+    typedef Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>              vectorN_t;
+
+    typedef Eigen::Matrix<float64_t, Eigen::Dynamic, Eigen::Dynamic> matrixN_double_t;
+    typedef Eigen::Matrix<float64_t, Eigen::Dynamic, 1>              vectorN_double_t;
+
+    typedef Eigen::Quaternion<real_t> quaternion_t;
+
+    // exo_simu specific type
+    enum class result_t : int32_t
+    {
+        SUCCESS = 1,
+        ERROR_GENERIC = -1,
+        ERROR_BAD_INPUT = -2,
+        ERROR_INIT_FAILED = -3
+    };
+    typedef boost::make_recursive_variant<bool_t, int32_t, real_t, std::string, vectorN_t, matrixN_t, 
+                                          std::map<std::string, boost::recursive_variant_> >::type configField_t;
+    typedef std::map<std::string, configField_t> configHolder_t;
+    typedef std::map<std::string, std::shared_ptr<AbstractSensor>> sensorsHolder_t;
+    typedef std::map<std::string, sensorsHolder_t> sensorsGroupHolder_t;
 }
 
-#endif  // WDC_DEFINITION_TYPES_H
+#endif  // WDC_OPTIMAL_TYPES_H

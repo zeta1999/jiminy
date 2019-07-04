@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
 import os
+import re
+import shutil
 import time
 from copy import copy
+from threading import Thread, Lock
 import json
 from collections import OrderedDict
 import xmltodict
+from bisect import bisect_right
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
@@ -18,7 +22,6 @@ from wdc_dynamicsteller import DynamicsTeller, rootjoint
 from wdc.effort_assessment.state_extracting import State, retrieve_freeflyer
 from wdc.effort_assessment.compute_efforts import compute_efforts_with_rnea
 from wdc.log_analysis_py import WDC_MESH_PATH, WDC_URDF_PATH
-
 
 EXO_THIGH_RPY = [-7/180*np.pi, 0, 0]
 EXO_DEFAULT_THIGH_SETTINGS_MM = 420
@@ -49,8 +52,8 @@ JOINT_ORDER_NN = ["RightFrontalHipJoint",
 SUPPORT_FOOT_NN = 'RightSole'
 SUPPORT_FOOT_ENUM = ['RightSole', 'LeftSole']
 INPUT_ORDER_NN = {"steplength": 1, "duration": 2, "stairheight": 3}
-THOT_TO_SIMU_JOINT_MASK_POSITION = np.concatenate((np.arange(7,13),np.arange(14,20)))
-THOT_TO_SIMU_JOINT_MASK_VELOCITY = np.concatenate((np.arange(6,12),np.arange(13,19)))
+JOINT_MASK_POSITION = np.concatenate((np.arange(7,13),np.arange(14,20)))
+JOINT_MASK_VELOCITY = np.concatenate((np.arange(6,12),np.arange(13,19)))
 RELABELING_JOINT_MATRIX = np.zeros((12,12))
 RELABELING_JOINT_MATRIX[6:,:6] = RELABELING_JOINT_MATRIX[:6,6:] = np.diag([-1,-1,1,1,1,-1])
 
@@ -188,27 +191,14 @@ def extract_state_from_neural_network_prediction(urdf_path, pred):
     return trajectory_data
 
 def extract_state_from_simulation_log(urdf_path, log_data):
-    # Extract time, joint positions and velocities evolution from log
+    # Extract time, joint positions and velocities evolution from log.
+    # Note that the quaternion angular velocity vectors are expressed
+    # it body frame rather than world frame.
     t = log_data[:,0]
-    q = log_data[:,8:20].T
-    dq = log_data[:,26:38].T
-    quatVec_freeflyer = log_data[:,np.concatenate([np.arange(5,8), [4]])].T
-    quatVec_freeflyer_norm = np.linalg.norm(quatVec_freeflyer, axis=0, keepdims=True)
-    quatVec_freeflyer /= quatVec_freeflyer_norm
-    position_freeflyer = np.concatenate((log_data[:,1:4].T, quatVec_freeflyer))
-    diff_quatVec_freeflyer = log_data[:,22:25].T
-    diff_quatVec_freeflyer /= quatVec_freeflyer_norm
-    velocity_freeflyer = np.concatenate((log_data[:,19:22].T, diff_quatVec_freeflyer))
-
-    ## Reorder the joints
-    #TODO: Check the formula for the derivative of the free flyer
-    rbdt = DynamicsTeller.make(urdf_path, rootjoint.FREEFLYER)
-    qe, dqe = _reorderJoint(rbdt, JOINT_ORDER_EXO_SIMU, q, dq)
-    qe[:7] = position_freeflyer
-    dqe[:6] = velocity_freeflyer
+    qe = log_data[:,1:22].T
+    dqe = log_data[:,22:42].T
 
     # Post-processing: numerical derivation
-    #TODO: Check the formula for the second derivative of the free flyer
     ddqe = np.gradient(dqe, t, axis=1)
 
     # Create state sequence
@@ -226,9 +216,8 @@ def get_initial_state_simulation(trajectory_data):
     qe = evolution_robot[0].q
     dqe = evolution_robot[0].v
 
-    x0 = np.concatenate((qe[0:3],np.array([[1]]),qe[3:6]/qe[6],qe[THOT_TO_SIMU_JOINT_MASK_POSITION],
-                         dqe[0:6],dqe[THOT_TO_SIMU_JOINT_MASK_VELOCITY]))
-    x0[2] -= 0.02 # Compensate optoforce wrong frame
+    x0 = np.concatenate((qe, dqe))
+    x0[2] -= 0.02 # Compensate the vertical offset of the foot contact frames
 
     return x0
 
@@ -240,14 +229,17 @@ def get_n_steps(trajectory_data, n):
     state_dict_sym = dict()
     support_foot = [elem for elem in SUPPORT_FOOT_ENUM if state_dict['support_foot'][0] not in elem][0]
     state_dict_sym['q'] = copy(state_dict['q'])
-    state_dict_sym['q'][THOT_TO_SIMU_JOINT_MASK_POSITION] = \
-        RELABELING_JOINT_MATRIX.dot(state_dict_sym['q'][THOT_TO_SIMU_JOINT_MASK_POSITION])
+    state_dict_sym['q'][[1, 3]] = -state_dict_sym['q'][[1, 3]]
+    state_dict_sym['q'][JOINT_MASK_POSITION] = \
+        RELABELING_JOINT_MATRIX.dot(state_dict_sym['q'][JOINT_MASK_POSITION])
     state_dict_sym['v'] = copy(state_dict['v'])
-    state_dict_sym['v'][THOT_TO_SIMU_JOINT_MASK_VELOCITY] = \
-        RELABELING_JOINT_MATRIX.dot(state_dict_sym['v'][THOT_TO_SIMU_JOINT_MASK_VELOCITY])
+    state_dict_sym['v'][[1, 3]] = - state_dict_sym['v'][[1, 3]]
+    state_dict_sym['v'][JOINT_MASK_VELOCITY] = \
+        RELABELING_JOINT_MATRIX.dot(state_dict_sym['v'][JOINT_MASK_VELOCITY])
     state_dict_sym['a'] = copy(state_dict['a'])
-    state_dict_sym['a'][THOT_TO_SIMU_JOINT_MASK_VELOCITY] = \
-        RELABELING_JOINT_MATRIX.dot(state_dict_sym['a'][THOT_TO_SIMU_JOINT_MASK_VELOCITY])
+    state_dict_sym['a'][[1, 3]] = - state_dict_sym['a'][[1, 3]]
+    state_dict_sym['a'][JOINT_MASK_VELOCITY] = \
+        RELABELING_JOINT_MATRIX.dot(state_dict_sym['a'][JOINT_MASK_VELOCITY])
     state_dict_sym['t'] = copy(state_dict['t'])
     state_dict_sym['hzd_state'] = [None for i in range(len(state_dict['hzd_state']))]
     state_dict_sym['support_foot'] = [support_foot for i in range(len(state_dict['support_foot']))]
@@ -255,8 +247,8 @@ def get_n_steps(trajectory_data, n):
     state_dict_sym['tau'] = copy(state_dict['tau'])
     for key in state_dict['tau'][0].keys():
         for i in range(state_dict['q'].shape[1]):
-            state_dict_sym['tau'][i][key][THOT_TO_SIMU_JOINT_MASK_VELOCITY] = \
-                RELABELING_JOINT_MATRIX.dot(state_dict_sym['tau'][i][key][THOT_TO_SIMU_JOINT_MASK_VELOCITY])
+            state_dict_sym['tau'][i][key][JOINT_MASK_VELOCITY] = \
+                RELABELING_JOINT_MATRIX.dot(state_dict_sym['tau'][i][key][JOINT_MASK_VELOCITY])
     state_dict_sym['f_ext'] = [None for i in range(len(state_dict['f_ext']))]
 
     state_dict_gbl = dict(state_dict) # Copy
@@ -266,7 +258,7 @@ def get_n_steps(trajectory_data, n):
         else:
             state_dict_tmp = dict(state_dict) # Copy
         state_dict_tmp['t'] += state_dict_gbl['t'][-1] - state_dict_tmp['t'][0]
-        state_dict_tmp['q'][0] += state_dict_gbl['q'][0,-1] - state_dict_tmp['q'][0,0]
+        state_dict_tmp['q'][:2] += state_dict_gbl['q'][:2, -1] - state_dict_tmp['q'][:2, 0]
 
         for key in state_dict_gbl.keys():
             if isinstance(state_dict_tmp[key], list):
@@ -281,3 +273,89 @@ def delete_scenes_viewer(*scene_names):
     for scene_name in scene_names:
         if scene_name in client.gui.getNodeList():
             client.gui.deleteNode(scene_name, True)
+
+## @brief   Display robot evolution in Gepetto viewer.
+lo = Lock()
+def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None, speed_ratio=1.0, window_name='python-pinocchio', scene_name='world'):
+    # Load robots in gepetto viewer
+    robots = []
+    for i in range(len(trajectory_data)):
+        rb = RobotWrapper()
+        urdf_path = trajectory_data[i]["urdf"]
+        if (urdf_rgba is not None and urdf_rgba[i] is not None):
+            urdf_path = get_colorized_urdf(urdf_path, urdf_rgba[i])
+        rb.initFromURDF(urdf_path, [""], root_joint=pnc.JointModelFreeFlyer())
+        client = Client()
+        if not scene_name in client.gui.getSceneList():
+            client.gui.createSceneWithFloor(scene_name)
+        if not window_name in client.gui.getWindowList():
+            window_id = client.gui.createWindow(window_name)
+            client.gui.addSceneToWindow(scene_name, window_id)
+            client.gui.createGroup(scene_name + '/' + scene_name)
+            client.gui.addLandmark(scene_name + '/' + scene_name, 0.1)
+        rb.initDisplay(window_name, scene_name, loadModel=False)
+        rb.loadDisplayModel("wdc_exo_" + str(i))
+        if (xyz_offset is not None and xyz_offset[i] is not None):
+            q = trajectory_data[i]["evolution_robot"][0].q.copy() # Make sure to use a copy to avoid altering the original data
+            q[:3] += xyz_offset[i]
+        else:
+            q = trajectory_data[i]["evolution_robot"][0].q
+        rb.display(q)
+        robots.append(rb)
+
+    if (xyz_offset is None):
+        xyz_offset = [np.zeros((3,1)) for i in range(len(trajectory_data))]
+
+    # Animate the robot
+    def display_robot(rb, evolution_robot, speed_ratio, xyz_offset=None):
+        global lo # Share the same lock on each thread (python 2 does not support `nonlocal` keyword)
+
+        t = [s.t for s in evolution_robot]
+        i = 0
+        init_time = time.time()
+        while i < len(evolution_robot):
+            s = evolution_robot[i]
+            if (xyz_offset is not None):
+                q = s.q.copy() # Make sure to use a copy to avoid altering the original data
+                q[:3] += xyz_offset
+            else:
+                q = s.q
+            with lo: # It is necessary to use lock since corbaserver does not support multiple connection simultaneously.
+                rb.display(q)
+            t_simu = (time.time() - init_time) * speed_ratio
+            i = bisect_right(t, t_simu)
+            if t_simu < s.t:
+                time.sleep(s.t - t_simu)
+
+    threads = []
+    for i in range(len(trajectory_data)):
+        threads.append(Thread(target=display_robot, args=(robots[i], trajectory_data[i]["evolution_robot"], speed_ratio, xyz_offset[i])))
+    for i in range(len(trajectory_data)):
+        threads[i].start()
+    for i in range(len(trajectory_data)):
+        threads[i].join()
+
+def get_colorized_urdf(urdf_path, rgba):
+    color_string = "%.3f_%.3f_%.3f_%.3f" % rgba
+    color_tag = "<color rgba=\"%.3f %.3f %.3f %.3f\"" % rgba # don't close tag with '>', in order to handle <color/> and <color></color>
+    colorized_tmp_path = os.path.join("/tmp", "colorized_urdf_rgba_" + color_string)
+    colorized_urdf_path = os.path.join(colorized_tmp_path, os.path.basename(urdf_path))
+    if not os.path.exists(colorized_tmp_path):
+        os.makedirs(colorized_tmp_path)
+
+    with open(urdf_path, "r") as urdf_file:
+        colorized_contents = urdf_file.read()
+        
+    for mesh_fullpath in re.findall('<mesh filename="(.*)"', colorized_contents):
+        colorized_mesh_fullpath = os.path.join(colorized_tmp_path, mesh_fullpath[1:])
+        colorized_mesh_path = os.path.dirname(colorized_mesh_fullpath)
+        if not os.access(colorized_mesh_path, os.F_OK):
+            os.makedirs(colorized_mesh_path)
+        shutil.copy2(mesh_fullpath, colorized_mesh_fullpath)
+        colorized_contents = colorized_contents.replace(mesh_fullpath, colorized_mesh_fullpath, 1)
+    colorized_contents = re.sub("<color rgba=\"[\d. ]*\"", color_tag, colorized_contents)
+
+    with open(colorized_urdf_path, "w") as colorized_urdf_file:
+        colorized_urdf_file.write(colorized_contents)
+
+    return colorized_urdf_path

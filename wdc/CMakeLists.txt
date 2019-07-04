@@ -2,24 +2,12 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(core)
-
-# Find library and headers
-find_package(Boost REQUIRED)
-find_package(urdfdom REQUIRED)
-
-# Pinocchio specific stuff
-SET(COMPILE_FLAGS "-D PINOCCHIO_WITH_URDFDOM")
-add_definitions(${COMPILE_FLAGS})
+project(wdc)
 
 # Add sources
 set(SRC 
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Utilities.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractSensor.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractController.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Sensor.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Model.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoModel.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ExoController.cc"
 )
 
 # Make library
@@ -27,12 +15,12 @@ add_library(${PROJECT_NAME} STATIC ${SRC})
 
 # Set include directory
 target_include_directories(${PROJECT_NAME} PUBLIC
-    $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+    "$<INSTALL_INTERFACE:include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
 )
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC urdfdom_model boost_system)
+target_link_libraries(${PROJECT_NAME} PUBLIC core)
 
 # Activate c++14
 set_target_properties(${PROJECT_NAME} PROPERTIES

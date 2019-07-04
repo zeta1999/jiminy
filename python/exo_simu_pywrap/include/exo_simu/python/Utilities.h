@@ -13,8 +13,6 @@
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 
-#include <exo_simu/engine/ConfigHolder.h>
-
 namespace exo_simu
 {
 namespace python
@@ -89,9 +87,9 @@ namespace python
     ///////////////////////////////////////////////////////////////////////
     /// \brief      Convert a 1D python list into an Eigen vector.
     ///////////////////////////////////////////////////////////////////////
-    VectorN listPyToVector(bp::list const& listPy)
+    vectorN_t listPyToVector(bp::list const& listPy)
     {
-        VectorN x(len(listPy));
+        vectorN_t x(len(listPy));
         for (int32_t i = 0; i < len(listPy); i++)
         {
             x(i) = bp::extract<real_t>(listPy[i]);
@@ -103,7 +101,7 @@ namespace python
     ///////////////////////////////////////////////////////////////////////
     /// \brief      Convert a 2D python list into an Eigen matrix.
     ///////////////////////////////////////////////////////////////////////
-    MatrixN listPyToMatrix(bp::list const& listPy)
+    matrixN_t listPyToMatrix(bp::list const& listPy)
     {
         int32_t const nRows = len(listPy);
         assert(nRows > 0 && "empty list");
@@ -111,7 +109,7 @@ namespace python
         int32_t const nCols = len(bp::extract<bp::list>(listPy[0]));
         assert(nCols > 0 && "empty row");
 
-        MatrixN M(nRows, nCols);
+        matrixN_t M(nRows, nCols);
         for (int32_t i = 0; i < nRows; i++)
         {
             bp::list const row = bp::extract<bp::list>(listPy[i]);
@@ -125,76 +123,71 @@ namespace python
     ///////////////////////////////////////////////////////////////////////
     /// \brief      Convert config holder into a python dictionary.
     ///////////////////////////////////////////////////////////////////////
-    void convertConfigHolderPy(ConfigHolder const& config, bp::dict& configPy)
+    void convertConfigHolderPy(configHolder_t const& config, bp::dict& configPy)
     {
-        std::vector<std::string> const options = config.getOptionNames();
-        for (int32_t i = 0; i < options.size(); i++)
+        std::vector<std::string> options;
+        for(auto const& it : config) 
+        {
+            options.push_back(it.first);
+        }
+
+        for (uint32_t i = 0; i < options.size(); i++)
         {
             std::string const name = options[i];
-            switch (config.getType(name))
+            const std::type_info & optionType = config.at(name).type();
+            
+            if (optionType == typeid(bool_t))
             {
-                case configholder::optiontype::BOOLEAN:
-                {
-                    configPy[name] = config.get<bool_t>(name);
-                    break;
-                }
-                case configholder::optiontype::INTEGER:
-                {
-                    configPy[name] = config.get<int32_t>(name);
-                    break;
-                }
-                case configholder::optiontype::REAL:
-                {
-                    configPy[name] = config.get<real_t>(name);
-                    break;
-                }
-                case configholder::optiontype::STRING:
-                {
-                    configPy[name] = config.get<std::string>(name);
-                    break;
-                }
-                case configholder::optiontype::EIGEN_VECTOR:
-                {
-                    VectorN const v = config.get<VectorN>(name);
-                    bp::list l;
+                configPy[name] = boost::get<bool_t>(config.at(name));
+            }
+            else if (optionType == typeid(int32_t))
+            {
+                configPy[name] = boost::get<int32_t>(config.at(name));
+            }
+            else if (optionType == typeid(real_t))
+            {
+                configPy[name] = boost::get<real_t>(config.at(name));
+            }
+            else if (optionType == typeid(std::string))
+            {
+                configPy[name] = boost::get<std::string>(config.at(name));
+            }
+            else if (optionType == typeid(vectorN_t))
+            {
+                vectorN_t const v = boost::get<vectorN_t>(config.at(name));
+                bp::list l;
 
-                    for (int32_t i = 0; i < v.rows(); i++)
-                    {
-                        l.append(v(i));
-                    }
-                    configPy[name] = l;
-                    break;
-                }
-                case configholder::optiontype::EIGEN_MATRIX:
+                for (int32_t j = 0; j < v.rows(); j++)
                 {
-                    MatrixN const M = config.get<MatrixN>(name);
-                    bp::list l;
+                    l.append(v(j));
+                }
+                configPy[name] = l;
+            }
+            else if (optionType == typeid(matrixN_t))
+            {
+                matrixN_t const M = boost::get<matrixN_t>(config.at(name));
+                bp::list l;
 
-                    for (int32_t i = 0; i < M.rows(); i++)
+                for (int32_t j = 0; j < M.rows(); j++)
+                {
+                    bp::list row;
+                    for (int32_t k = 0; k < M.cols(); k++)
                     {
-                        bp::list row;
-                        for (int32_t j = 0; j < M.cols(); j++)
-                        {
-                            row.append(M(i, j));
-                        }
-                        l.append(row);
+                        row.append(M(j, k));
                     }
-                    configPy[name] = l;
-                    break;
+                    l.append(row);
                 }
-                case configholder::optiontype::CONFIG_HOLDER:
-                {
-                    bp::dict configPyTmp;
-                    convertConfigHolderPy(config.get<ConfigHolder>(name), configPyTmp);
-                    configPy[name] = configPyTmp;
-                    break;
-                }
-                case configholder::optiontype::NOT_A_TYPE:
-                default:
-                {
-                    assert(false && "Unsupported type");
-                    break;
-                }
+                configPy[name] = l;
+            }
+            else if (optionType == typeid(configHolder_t))
+            {
+                bp::dict configPyTmp;
+                convertConfigHolderPy(boost::get<configHolder_t>(config.at(name)), configPyTmp);
+                configPy[name] = configPyTmp;
+            }
+            else
+            {
+                assert(false && "Unsupported type");
             }
         }
     }
@@ -202,55 +195,50 @@ namespace python
     ///////////////////////////////////////////////////////////////////////
     /// \brief      Load a config holder from a python dictionary.
     ///////////////////////////////////////////////////////////////////////
-    void loadConfigHolder(bp::dict const& configPy, ConfigHolder& config)
+    void loadConfigHolder(bp::dict const& configPy, configHolder_t& config)
     {
-        std::vector<std::string> const options = config.getOptionNames();
-        for (int32_t i = 0; i < options.size(); i++)
+        std::vector<std::string> options;
+        for(auto const& it : config) 
+        {
+            options.push_back(it.first);
+        }
+        
+        for (uint32_t i = 0; i < options.size(); i++)
         {
             std::string const name = options[i];
-            switch (config.getType(name))
+            const std::type_info & optionType = config[name].type();
+            
+            if (optionType == typeid(bool_t))
             {
-                case configholder::optiontype::BOOLEAN:
-                {
-                    config.get<bool_t>(name) = bp::extract<bool_t>(configPy[name]);
-                    break;
-                }
-                case configholder::optiontype::INTEGER:
-                {
-                    config.get<int32_t>(name) = bp::extract<int32_t>(configPy[name]);
-                    break;
-                }
-                case configholder::optiontype::REAL:
-                {
-                    config.get<real_t>(name) = bp::extract<real_t>(configPy[name]);
-                    break;
-                }
-                case configholder::optiontype::STRING:
-                {
-                    config.get<std::string>(name) = bp::extract<std::string>(configPy[name]);
-                    break;
-                }
-                case configholder::optiontype::EIGEN_VECTOR:
-                {
-                    config.get<VectorN>(name) = listPyToVector(bp::extract<bp::list>(configPy[name]));
-                    break;
-                }
-                case configholder::optiontype::EIGEN_MATRIX:
-                {
-                    config.get<MatrixN>(name) = listPyToMatrix(bp::extract<bp::list>(configPy[name]));
-                    break;
-                }
-                case configholder::optiontype::CONFIG_HOLDER:
-                {
-                    loadConfigHolder(bp::extract<bp::dict>(configPy[name]), config.get<ConfigHolder>(name));
-                    break;
-                }
-                case configholder::optiontype::NOT_A_TYPE:
-                default:
-                {
-                    assert(false && "Unsupported type");
-                    break;
-                }
+                boost::get<bool_t>(config.at(name)) = bp::extract<bool_t>(configPy[name]);
+            }
+            else if (optionType == typeid(int32_t))
+            {
+                boost::get<int32_t>(config.at(name)) = bp::extract<int32_t>(configPy[name]);
+            }
+            else if (optionType == typeid(real_t))
+            {
+                boost::get<real_t>(config.at(name)) = bp::extract<real_t>(configPy[name]);
+            }
+            else if (optionType == typeid(std::string))
+            {
+                 boost::get<std::string>(config.at(name)) = bp::extract<std::string>(configPy[name]);
+            }
+            else if (optionType == typeid(vectorN_t))
+            {
+                boost::get<vectorN_t>(config.at(name)) = listPyToVector(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(matrixN_t))
+            {
+                boost::get<matrixN_t>(config.at(name)) = listPyToMatrix(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(configHolder_t))
+            {
+                loadConfigHolder(bp::extract<bp::dict>(configPy[name]), boost::get<configHolder_t>(config.at(name)));
+            }
+            else
+            {
+                assert(false && "Unsupported type");
             }
         }
     }
