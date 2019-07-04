@@ -115,15 +115,18 @@ int main(int argc, char *argv[])
     Engine simulator;
     simulator.initialize(model, controller, callback);
     configHolder_t simuOptions = simulator.getDefaultOptions();
+    boost::get<vectorN_t>(simuOptions.at("gravity"))(2) = -9.81;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
-    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e3;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 1.0e-3;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 1.0e-3;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("frictionDry")) = 5.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("frictionViscous")) = 5.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("transitionEps")) = 0.001;
-    boost::get<vectorN_t>(simuOptions.at("gravity"))(2) = -9.81;
+
     // boost::get<bool>(simOpts.at("isLogControllerEnable")) = false;
     // boost::get<bool>(simOpts.at("isLogLogForceSensorsEnable")) = false;
     // boost::get<bool>(simOpts.at("isLogLogImuSensorsEnable")) = false;
@@ -140,13 +143,11 @@ int main(int argc, char *argv[])
     Eigen::VectorXd x0 = Eigen::VectorXd::Zero(41);
     x0(2) = 1.0;
     x0(6) = 1.0;
-
     float64_t tf = 3.0;
-    float64_t dt = 0.001;
 
     // Run simulation
     timer.tic();
-    simulator.simulate(x0,tf,dt);
+    simulator.simulate(x0,tf);
     timer.toc();
     std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 

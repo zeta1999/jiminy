@@ -27,91 +27,6 @@ namespace exo_simu
 
         typedef runge_kutta_dopri5<vectorN_t, float64_t, vectorN_t, float64_t, vector_space_algebra> stepper_t;
 
-        struct stepperState_t
-        {
-            // Internal state for the integration loop
-
-        public:
-            stepperState_t(void):
-            iterPrev(),
-            tPrev(),
-            qPrev(),
-            vPrev(),
-            aPrev(),
-            uPrev(),
-            qNext(),
-            fext(),
-            uCommand(),
-            uInternal(),
-            isInitialized()
-            {
-                // Empty.
-            }
-
-            bool getIsInitialized(void) const
-            {
-                return isInitialized;
-            }
-
-            result_t initialize(Model const & model)
-            {
-                result_t returnCode = result_t::SUCCESS;
-
-                if (!model.getIsInitialized())
-                {
-                    std::cout << "Error - stepperState_t::initialize - Something is wrong with the Model." << std::endl;
-                    returnCode = result_t::ERROR_INIT_FAILED;
-                }
-                
-                if (returnCode == result_t::SUCCESS)
-                {
-                    iterPrev = 0;
-                    tPrev = 0;
-                    qPrev = vectorN_t::Zero(model.nq());
-                    vPrev = vectorN_t::Zero(model.nv());
-                    aPrev = vectorN_t::Zero(model.nv());
-                    uPrev = vectorN_t::Zero(model.nv());
-                    qNext = vectorN_t::Zero(model.nq());
-                    fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(), 
-                                                                                  pinocchio::Force::Zero());
-                    uCommand = vectorN_t::Zero(model.getJointsVelocityIdx().size());
-                    uInternal = vectorN_t::Zero(model.nv());
-                    isInitialized = true;
-                }
-
-                return returnCode;
-            }
-
-            void updatePrev(float64_t const & t,
-                            vectorN_t const & q,
-                            vectorN_t const & v,
-                            vectorN_t const & a,
-                            vectorN_t const & u)
-            {
-                tPrev = t;
-                qPrev = q;
-                vPrev = v;
-                aPrev = a;
-                uPrev = u;
-                ++iterPrev;
-            }
-
-        public:
-            uint32_t iterPrev;
-            float64_t tPrev;
-            vectorN_t qPrev;
-            vectorN_t vPrev;
-            vectorN_t aPrev;
-            vectorN_t uPrev;
-            vectorN_t qNext;
-            pinocchio::container::aligned_vector<pinocchio::Force> fext;
-            vectorN_t uCommand;
-            vectorN_t uInternal;
-
-        private:
-            bool isInitialized;
-        };
-        
     public:
         configHolder_t getDefaultContactOptions()
         {
@@ -177,6 +92,8 @@ namespace exo_simu
             configHolder_t config;
             config["tolAbs"] = 1.0e-5;
             config["tolRel"] = 1.0e-4;
+            config["sensorsUpdatePeriod"] = 0.0;
+            config["controllerUpdatePeriod"] = 0.0;
 
             return config;
         };
@@ -185,10 +102,14 @@ namespace exo_simu
         {
             float64_t const tolAbs;
             float64_t const tolRel;
-
+            float64_t const sensorsUpdatePeriod;
+            float64_t const controllerUpdatePeriod;
+            
             stepperOptions_t(configHolder_t const & options):
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
-            tolRel(boost::get<float64_t>(options.at("tolRel")))
+            tolRel(boost::get<float64_t>(options.at("tolRel"))),
+            sensorsUpdatePeriod(boost::get<float64_t>(options.at("sensorsUpdatePeriod"))),
+            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod")))//,
             {
                 // Empty.
             }
@@ -221,6 +142,112 @@ namespace exo_simu
                 // Empty.
             }
         };
+
+    protected:
+        struct stepperState_t
+        {
+        // Internal state for the integration loop
+
+        public:
+            stepperState_t(void):
+            iterLast(),
+            tLast(),
+            qLast(),
+            vLast(),
+            aLast(),
+            uLast(),
+            uCommandLast(),
+            x(),
+            dxdt(),
+            uControl(),
+            fext(),
+            uBounds(),
+            uInternal(),
+            isInitialized()
+            {
+                // Empty.
+            }
+
+            bool getIsInitialized(void) const
+            {
+                return isInitialized;
+            }
+
+            result_t initialize(Model     const & model, 
+                                vectorN_t const & x_init)
+            {
+                result_t returnCode = result_t::SUCCESS;
+
+                if (!model.getIsInitialized())
+                {
+                    std::cout << "Error - stepperState_t::initialize - Something is wrong with the Model." << std::endl;
+                    returnCode = result_t::ERROR_INIT_FAILED;
+                }
+                
+                if (returnCode == result_t::SUCCESS)
+                {
+                    iterLast = 0;
+                    tLast = 0;
+                    qLast = x_init.head(model.nq());
+                    vLast = x_init.tail(model.nv());
+                    aLast = vectorN_t::Zero(model.nv());
+                    uLast = vectorN_t::Zero(model.nv());
+                    uCommandLast = vectorN_t::Zero(model.getJointsVelocityIdx().size());
+
+                    x = x_init;
+                    dxdt = vectorN_t::Zero(model.nx());
+                    uControl = vectorN_t::Zero(model.nv());
+
+                    fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(), 
+                                                                                  pinocchio::Force::Zero());
+                    uBounds = vectorN_t::Zero(model.nv());
+                    uInternal = vectorN_t::Zero(model.nv());
+
+                    isInitialized = true;
+                }
+
+                return returnCode;
+            }
+
+            void updateLast(float64_t const & t,
+                            vectorN_t const & q,
+                            vectorN_t const & v,
+                            vectorN_t const & a,
+                            vectorN_t const & u,
+                            vectorN_t const & uCommand)
+            {
+                tLast = t;
+                qLast = q;
+                vLast = v;
+                aLast = a;
+                uLast = u;
+                uCommandLast = uCommand;
+                ++iterLast;
+            }
+
+        public:
+            // State information about the last iteration
+            uint32_t iterLast;
+            float64_t tLast;
+            vectorN_t qLast;
+            vectorN_t vLast;
+            vectorN_t aLast;
+            vectorN_t uLast;
+            vectorN_t uCommandLast;
+
+            // Internal buffers required for the adaptive step computation and system dynamics
+            vectorN_t x;
+            vectorN_t dxdt;
+            vectorN_t uControl;
+
+            // Internal buffers to speed up the evaluation of the system dynamics
+            pinocchio::container::aligned_vector<pinocchio::Force> fext;
+            vectorN_t uBounds;
+            vectorN_t uInternal;
+
+        private:
+            bool isInitialized;
+        };
         
     public:
         Engine(void);
@@ -230,11 +257,8 @@ namespace exo_simu
                             AbstractController & controller,
                             callbackFct_t        callbackFct);
 
-        vectorN_t contactDynamics(int32_t const & frameId) const;
-
-        result_t simulate(vectorN_t         x0, /* Make a copy */
-                          float64_t const & tf,
-                          float64_t const & dt);
+        result_t simulate(vectorN_t         x_init, /* Make a copy */
+                          float64_t const & end_time);
 
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & engineOptions);
@@ -243,14 +267,15 @@ namespace exo_simu
         std::vector<vectorN_t> const & getContactForces(void) const;
 
     protected:
-        void dynamicsCL(float64_t const & t,
-                        vectorN_t const & xVect,
-                        vectorN_t       & xVectDot);
+        void systemDynamics(float64_t const & t,
+                            vectorN_t const & x,
+                            vectorN_t       & dxdt);
 
-        void internalDynamics(float64_t const & t,
-                              vectorN_t const & q,
-                              vectorN_t const & v,
-                              vectorN_t       & u);
+        void boundsDynamics(vectorN_t const & q,
+                            vectorN_t const & v,
+                            vectorN_t       & u);
+
+        vectorN_t contactDynamics(int32_t const & frameId) const;
 
     public:
         matrixN_t log; // TODO: To be removed

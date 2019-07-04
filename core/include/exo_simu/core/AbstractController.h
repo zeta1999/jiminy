@@ -14,17 +14,14 @@ namespace exo_simu
         virtual configHolder_t getDefaultOptions()
         {
             configHolder_t config;
-            config["updatePeriod"] = 0.0;
+            // No default configuration parameter
 
             return config;
         };
 
         struct controllerOptions_t
         {
-            float64_t const updatePeriod;
-
-            controllerOptions_t(configHolder_t const & options) :
-            updatePeriod(boost::get<float64_t>(options.at("updatePeriod")))
+            controllerOptions_t(configHolder_t const & options)
             {
                 // Empty.
             }
@@ -40,12 +37,6 @@ namespace exo_simu
         bool getIsInitialized(void) const;
 
         // It assumes that the model internal state is consistent with other input arguments
-        result_t compute_efforts(Model     const & model,
-                                 float64_t const & t,
-                                 vectorN_t const & q,
-                                 vectorN_t const & v,
-                                 vectorN_t       & u);
-
         virtual void compute_command(Model     const & model,
                                      float64_t const & t,
                                      vectorN_t const & q,
