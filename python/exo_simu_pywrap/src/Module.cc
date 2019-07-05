@@ -16,5 +16,5 @@ BOOST_PYTHON_MODULE(libexo_simu_pywrap)
 {
     eigenpy::enableEigenPy();
 
-    exo_simu::python::ExoSimulatorVisitor::expose();
+    exo_simu::python::PyEngineVisitor::expose();
 }

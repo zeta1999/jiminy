@@ -268,11 +268,11 @@ def get_n_steps(trajectory_data, n):
 
     return {"evolution_robot": State.fromdict(state_dict_gbl), "urdf": trajectory_data["urdf"]}
 
-def delete_scenes_viewer(*scene_names):
+def delete_nodes_viewer(*nodes_path):
     client = Client()
-    for scene_name in scene_names:
-        if scene_name in client.gui.getNodeList():
-            client.gui.deleteNode(scene_name, True)
+    for node_path in nodes_path:
+        if node_path in client.gui.getNodeList():
+            client.gui.deleteNode(node_path, True)
 
 ## @brief   Display robot evolution in Gepetto viewer.
 lo = Lock()
@@ -281,9 +281,13 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None, speed_ra
     robots = []
     for i in range(len(trajectory_data)):
         rb = RobotWrapper()
+        robot_name = scene_name + '/' + "wdc_exo_" + str(i)
+        delete_nodes_viewer(robot_name)
+        alpha = 1.0
         urdf_path = trajectory_data[i]["urdf"]
         if (urdf_rgba is not None and urdf_rgba[i] is not None):
-            urdf_path = get_colorized_urdf(urdf_path, urdf_rgba[i])
+            alpha = urdf_rgba[i][3]
+            urdf_path = get_colorized_urdf(urdf_path, urdf_rgba[i][:3])
         rb.initFromURDF(urdf_path, [""], root_joint=pnc.JointModelFreeFlyer())
         client = Client()
         if not scene_name in client.gui.getSceneList():
@@ -294,7 +298,8 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None, speed_ra
             client.gui.createGroup(scene_name + '/' + scene_name)
             client.gui.addLandmark(scene_name + '/' + scene_name, 0.1)
         rb.initDisplay(window_name, scene_name, loadModel=False)
-        rb.loadDisplayModel("wdc_exo_" + str(i))
+        rb.loadDisplayModel(robot_name)
+        client.gui.setFloatProperty(scene_name + '/' + robot_name, "Transparency", 1-alpha)
         if (xyz_offset is not None and xyz_offset[i] is not None):
             q = trajectory_data[i]["evolution_robot"][0].q.copy() # Make sure to use a copy to avoid altering the original data
             q[:3] += xyz_offset[i]
@@ -335,9 +340,9 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None, speed_ra
     for i in range(len(trajectory_data)):
         threads[i].join()
 
-def get_colorized_urdf(urdf_path, rgba):
-    color_string = "%.3f_%.3f_%.3f_%.3f" % rgba
-    color_tag = "<color rgba=\"%.3f %.3f %.3f %.3f\"" % rgba # don't close tag with '>', in order to handle <color/> and <color></color>
+def get_colorized_urdf(urdf_path, rgb):
+    color_string = "%.3f_%.3f_%.3f_1.0" % rgb
+    color_tag = "<color rgba=\"%.3f %.3f %.3f 1.0\"" % rgb # don't close tag with '>', in order to handle <color/> and <color></color>
     colorized_tmp_path = os.path.join("/tmp", "colorized_urdf_rgba_" + color_string)
     colorized_urdf_path = os.path.join(colorized_tmp_path, os.path.basename(urdf_path))
     if not os.path.exists(colorized_tmp_path):

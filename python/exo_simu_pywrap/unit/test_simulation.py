@@ -90,8 +90,6 @@ nb_steps = int(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evo
 trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 
 # Display the simulation trajectory and the reference
-# display_robot(trajectory_data_log, speed_ratio=0.5)
-play_trajectories([trajectory_data_ref, trajectory_data_log], xyz_offset=[None, None], urdf_rgba=[(1.0,0.0,0.0,0.5), None], speed_ratio=0.5)
-# delete_scenes_viewer("world")
+# play_trajectories([trajectory_data_ref, trajectory_data_log], xyz_offset=[None, None], urdf_rgba=[(1.0,0.0,0.0,0.5), None], speed_ratio=0.5)
 
-plot_kinematics(trajectory_data_log, trajectory_data_ref)
+# plot_kinematics(trajectory_data_log, trajectory_data_ref)

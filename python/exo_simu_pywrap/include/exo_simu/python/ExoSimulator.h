@@ -7,6 +7,7 @@
 #ifndef WDC_EXO_SIMULATOR_PYTHON_H
 #define WDC_EXO_SIMULATOR_PYTHON_H
 
+#include <boost/weak_ptr.hpp>
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/dict.hpp>
@@ -88,12 +89,31 @@ namespace python
             return urdfPath_;
         }
 
+        static boost::shared_ptr<PyEngine> pyEngineFactory(void)
+        {
+            if (pyEnginePtr_.use_count())
+            {
+                return pyEnginePtr_.lock(); 
+            } 
+            else 
+            {
+                boost::shared_ptr<PyEngine> strong = boost::shared_ptr<PyEngine>(new PyEngine());
+                pyEnginePtr_ = strong;
+                return strong;
+            }
+        }
+
     public:
         std::string urdfPath_;
         ExoModel model_;
         ExoController controller_;
         Engine simulator_;
+
+    private:
+        static boost::weak_ptr<PyEngine> pyEnginePtr_;
     };
+
+    boost::weak_ptr<PyEngine> PyEngine::pyEnginePtr_ = boost::weak_ptr<PyEngine>();
 
     struct controllerPyWrapper {
     public:
@@ -123,8 +143,8 @@ namespace python
         bp::object funcPyPtr_;
     };
 
-    struct ExoSimulatorVisitor
-        : public bp::def_visitor<ExoSimulatorVisitor>
+    struct PyEngineVisitor
+        : public bp::def_visitor<PyEngineVisitor>
     {
     public:
         ///////////////////////////////////////////////////////////////////////////////
@@ -134,24 +154,25 @@ namespace python
         void visit(PyClass& cl) const
         {
             cl
-                .def("init", &ExoSimulatorVisitor::init, 
+                .def("__init__", bp::make_constructor(&PyEngine::pyEngineFactory))
+                .def("init", &PyEngineVisitor::init, 
                              (bp::arg("self"), "urdf_path"))
-                .def("simulate", &ExoSimulatorVisitor::simulate, 
+                .def("simulate", &PyEngineVisitor::simulate, 
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle"))
-                .def("simulate", &ExoSimulatorVisitor::simulate_with_callback, 
+                .def("simulate", &PyEngineVisitor::simulate_with_callback, 
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle", "callback_handle"))
-                .def("get_log", &ExoSimulatorVisitor::getLog)
+                .def("get_log", &PyEngineVisitor::getLog)
                 .def("get_urdf_path", &PyEngine::getUrdfPath, 
                                       bp::return_value_policy<bp::return_by_value>())
-                .def("get_model_options", &ExoSimulatorVisitor::getModelOptions, 
+                .def("get_model_options", &PyEngineVisitor::getModelOptions, 
                                           bp::return_value_policy<bp::return_by_value>())
-                .def("set_model_options", &ExoSimulatorVisitor::setModelOptions)
-                .def("get_controller_options", &ExoSimulatorVisitor::getControllerOptions, 
+                .def("set_model_options", &PyEngineVisitor::setModelOptions)
+                .def("get_controller_options", &PyEngineVisitor::getControllerOptions, 
                                                bp::return_value_policy<bp::return_by_value>())
-                .def("set_controller_options", &ExoSimulatorVisitor::setControllerOptions)
-                .def("get_simulation_options", &ExoSimulatorVisitor::getSimulationOptions, 
+                .def("set_controller_options", &PyEngineVisitor::setControllerOptions)
+                .def("get_simulation_options", &PyEngineVisitor::getSimulationOptions, 
                                                bp::return_value_policy<bp::return_by_value>())
-                .def("set_simulation_options", &ExoSimulatorVisitor::setSimulationOptions)
+                .def("set_simulation_options", &PyEngineVisitor::setSimulationOptions)
                 ;
         }
 
@@ -255,8 +276,9 @@ namespace python
             bp::to_python_converter<std::vector<vectorN_t>, VecToList<vectorN_t> >();
             bp::to_python_converter<std::vector<matrixN_t>, VecToList<matrixN_t> >();
             bp::to_python_converter<std::vector<std::vector<float64_t> >, VecToList<std::vector<float64_t> > >();
-            bp::class_<PyEngine>("simulator", "PyEngine class").def(ExoSimulatorVisitor());
+            bp::class_<PyEngine, boost::shared_ptr<PyEngine>, boost::noncopyable>("simulator").def(PyEngineVisitor());
         }
+        
     };
 }  // End of namespace python.
 }  // End of namespace exo_simu.
