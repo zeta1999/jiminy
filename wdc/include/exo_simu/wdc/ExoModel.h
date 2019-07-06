@@ -3,10 +3,7 @@
 
 #include <cmath>
 
-#include "exo_simu/core/Types.h"
 #include "exo_simu/core/Model.h"
-#include "exo_simu/core/Sensor.h"
-#include "exo_simu/core/Utilities.h"
 
 
 namespace exo_simu

@@ -6,8 +6,8 @@
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
-#include "exo_simu/core/AbstractSensor.h"
 #include "exo_simu/core/Model.h"
+
 
 namespace exo_simu
 {
@@ -19,12 +19,13 @@ namespace exo_simu
     isInitialized_(false),
     urdfPath_(),
     mdlOptionsHolder_(),
-    sensorsGroupHolder_(),
     contactFramesNames_(),
     jointsNames_(),
     contactFramesIdx_(),
     jointsPositionIdx_(),
     jointsVelocityIdx_(),
+    sensorsGroupHolder_(),
+    sensorsDataHolder_(),
     nq_(0),
     nv_(0),
     nx_(0)
@@ -79,51 +80,36 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Model::addSensor(std::string    const & sensorType, 
-                              AbstractSensor       * sensor)
-    {
-        // The sensor name must be unique, even if there types are different
-        result_t returnCode = result_t::SUCCESS;
-
-        std::string sensorName = sensor->getName();
-
-        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
-        {
-            sensorsHolder_t::const_iterator it = sensorGroup.second.find(sensorName);
-            if (it != sensorGroup.second.end())
-            {
-                std::cout << "Error - Model::addSensor - Sensor with the same name already exists." << std::endl;
-                returnCode = result_t::ERROR_BAD_INPUT;
-            }
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
-            sensorsGroupHolder_[sensorType][sensorName] = std::shared_ptr<AbstractSensor>(sensor->clone());
-        }
-
-        return returnCode;
-    }
-
-    result_t Model::removeSensor(std::string const & sensorName)
+    result_t Model::removeSensor(std::string const & name)
     {
         // Can be used to remove either a sensor or a sensor type
+
         result_t returnCode = result_t::SUCCESS;
 
-        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorName);
+        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(name);
         if (sensorGroupIt != sensorsGroupHolder_.end())
         {
             sensorsGroupHolder_.erase(sensorGroupIt);
+            sensorsDataHolder_.erase(name);
         }
         else
         {
             bool isSensorDeleted = false;
             for (sensorsGroupHolder_t::value_type & sensorGroup : sensorsGroupHolder_)
             {
-                sensorsHolder_t::iterator sensorIt = sensorGroup.second.find(sensorName);
+                sensorsHolder_t::iterator sensorIt = sensorGroup.second.find(name);
                 if (sensorIt != sensorGroup.second.end())
                 {
+                    // Remove the sensor from its group
                     sensorGroup.second.erase(sensorIt);
+                    
+                    // Remove the sensor group if there is no more sensors left.
+                    if (sensorGroup.second.empty())
+                    {
+                        sensorsGroupHolder_.erase(sensorGroup.first);
+                        sensorsDataHolder_.erase(sensorGroup.first);
+                    }
+                    
                     isSensorDeleted = true;
                     break;
                 }
@@ -142,6 +128,7 @@ namespace exo_simu
     void Model::removeSensors(void)
     {
         sensorsGroupHolder_.clear();
+        sensorsDataHolder_.clear();
     }
 
     configHolder_t Model::getOptions(void) const
@@ -231,8 +218,13 @@ namespace exo_simu
 
     matrixN_t const & Model::getSensorsData(std::string const & sensorType) const
     {
-        sensorsHolder_t const & sensorGroup = sensorsGroupHolder_.at(sensorType);
-        return sensorGroup.begin()->second->getAll();
+        return sensorsGroupHolder_.at(sensorType).begin()->second->getAll();
+    }
+
+    matrixN_t::ConstRowXpr Model::getSensorData(std::string const & sensorType,
+                                                std::string const & sensorName) const
+    {
+        return sensorsGroupHolder_.at(sensorType).at(sensorName)->get();
     }
 
     void Model::setSensorsData(float64_t const & t,
@@ -245,7 +237,7 @@ namespace exo_simu
         {
             if (!sensorGroup.second.empty())
             {
-                sensorGroup.second.begin()->second->setAll(*this, t, q, v, a, u); // Access static member of the sensor Group through the first instance
+                sensorGroup.second.begin()->second->setAll(t, q, v, a, u); // Access static member of the sensor Group through the first instance
             }
         }
     }

@@ -1,7 +1,9 @@
 #include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/Sensor.h"
 #include "exo_simu/core/Model.h"
 #include "exo_simu/wdc/ExoModel.h"
 #include "exo_simu/wdc/ExoController.h"
+
 
 namespace exo_simu
 {
@@ -50,9 +52,9 @@ namespace exo_simu
                                         vectorN_t const & v,
                                         vectorN_t       & u)
     {
-        matrixN_t const & forceSensorsData = model.getSensorsData("ForceSensor");
-        matrixN_t const & imuSensorsData = model.getSensorsData("IMUSensor");
-        matrixN_t const & encoderSensorsData = model.getSensorsData("EncoderSensor");
+        matrixN_t const & forceSensorsData = model.getSensorsData(ForceSensor::type_);
+        matrixN_t const & imuSensorsData = model.getSensorsData(ImuSensor::type_);
+        matrixN_t const & encoderSensorsData = model.getSensorsData(EncoderSensor::type_);
         commandFct_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData, u);
     }
 

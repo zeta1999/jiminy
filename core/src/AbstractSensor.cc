@@ -1,13 +1,18 @@
+#include "exo_simu/core/Model.h"
 #include "exo_simu/core/AbstractSensor.h"
+
 
 namespace exo_simu
 {
-    AbstractSensor::AbstractSensor(std::string const & name) :
+    AbstractSensor::AbstractSensor(Model       const & model,
+                                   std::string const & name) :
     sensorOptions_(nullptr),
     name_(name),
     isInitialized_(false),
+    model_(),                 
     sensorOptionsHolder_()
     {
+        model_ = std::make_shared<Model>(model);
         AbstractSensor::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
     }
 

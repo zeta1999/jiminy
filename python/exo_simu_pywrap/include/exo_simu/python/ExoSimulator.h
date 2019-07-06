@@ -18,22 +18,23 @@
 #include "exo_simu/wdc/ExoController.h"
 #include "exo_simu/python/Utilities.h"
 
+
 namespace exo_simu
 {
 namespace python
 {
     namespace bp = boost::python;
 
-    typedef std::function<void(float64_t const &/*t*/,
-                                vectorN_t const &/*q*/,
-                                vectorN_t const &/*v*/,
-                                matrixN_t const &/*forceSensorsData*/,
-                                matrixN_t const &/*imuSensorsData*/,
-                                matrixN_t const &/*encoderSensorsData*/,
-                                vectorN_t       &/*u*/)> commandFct_t;
+    typedef std::function<void(float64_t const & /*t*/,
+                               vectorN_t const & /*q*/,
+                               vectorN_t const & /*v*/,
+                               matrixN_t const & /*forceSensorsData*/,
+                               matrixN_t const & /*imuSensorsData*/,
+                               matrixN_t const & /*encoderSensorsData*/,
+                               vectorN_t       & /*u*/)> commandFct_t;
 
-    typedef std::function<bool(float64_t const &/*t*/,
-                                vectorN_t const &/*x*/)> callbackFct_t;
+    typedef std::function<bool(float64_t const & /*t*/,
+                               vectorN_t const & /*x*/)> callbackFct_t;
 
     class PyEngine // Composition over inheritance
     {

@@ -22,8 +22,8 @@ namespace exo_simu
     class Engine
     {
     protected:
-        typedef std::function<bool(float64_t const &/*t*/,
-                                   vectorN_t const &/*x*/)> callbackFct_t;
+        typedef std::function<bool(float64_t const & /*t*/,
+                                   vectorN_t const & /*x*/)> callbackFct_t;
 
         typedef runge_kutta_dopri5<vectorN_t, float64_t, vectorN_t, float64_t, vector_space_algebra> stepper_t;
 

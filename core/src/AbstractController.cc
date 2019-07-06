@@ -3,6 +3,7 @@
 #include "exo_simu/core/Model.h"
 #include "exo_simu/core/AbstractController.h"
 
+
 namespace exo_simu
 {
     AbstractController::AbstractController(void) :

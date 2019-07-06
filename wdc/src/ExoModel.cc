@@ -1,6 +1,7 @@
 #include "exo_simu/core/Sensor.h"
 #include "exo_simu/wdc/ExoModel.h"
 
+
 namespace exo_simu
 {
     ExoModel::ExoModel(void) :
@@ -81,62 +82,65 @@ namespace exo_simu
         }
 
         // ********** Add the IMU sensors **********
-        std::string imuBaseName = "IMUSensor";
         for(uint32_t i = 0; i < imuFramesNames.size(); i++)
         {
+            std::shared_ptr<ImuSensor> imuSensor;
+            std::string imuName = ImuSensor::type_ + "_" + imuFramesNames[i];
+
             if (returnCode == result_t::SUCCESS)
             {
                 // Create a new IMU sensor
-                std::string imuName = imuBaseName + "_" + imuFramesNames[i];
-                ImuSensor imu(imuName);
-
-                // Config the IMU
-                configHolder_t imuOptions = imu.getOptions();
-                imu.setOptions(imuOptions);
-                imu.initialize(imuFramesIdx[i]);
-
-                // Add the IMU to the model
-                returnCode = addSensor(imuBaseName, &imu);
+                returnCode = addSensor(imuName, imuSensor);
+            }
+            
+            if (returnCode == result_t::SUCCESS)
+            {
+                // Configure the sensor
+                configHolder_t imuOptions = imuSensor->getOptions();
+                imuSensor->setOptions(imuOptions);
+                imuSensor->initialize(imuFramesIdx[i]);
             }
         }
         
         // ********** Add the force sensors **********
-        std::string forceBaseName = "ForceSensor";
         for (uint32_t i = 0; i<contactFramesNames_.size(); i++)
         {
+            std::shared_ptr<ForceSensor> forceSensor;
+            std::string forceName = ForceSensor::type_ + "_" + contactFramesNames_[i];
+
             if (returnCode == result_t::SUCCESS)
             {
                 // Create a new force sensor
-                std::string forceName = forceBaseName + "_" + contactFramesNames_[i];
-                ForceSensor forceSensor(forceName);
+                returnCode = addSensor(forceName, forceSensor);
+            }
 
-                // Config the force
-                configHolder_t forceOptions = forceSensor.getOptions();
-                forceSensor.setOptions(forceOptions);
-                forceSensor.initialize(contactFramesIdx_[i]);
-
-                // Add the force to the model
-                returnCode = addSensor(forceBaseName, &forceSensor);
+            if (returnCode == result_t::SUCCESS)
+            {
+                // Configure the sensor
+                configHolder_t forceOptions = forceSensor->getOptions();
+                forceSensor->setOptions(forceOptions);
+                forceSensor->initialize(contactFramesIdx_[i]);
             }
         }
 
         // ********** Add the encoder sensors **********
-        std::string encoderBaseName = "EncoderSensor";
         for (uint32_t i = 0; i<jointsNames_.size(); i++)
         {
+            std::shared_ptr<EncoderSensor> encoderSensor;
+            std::string encoderName = EncoderSensor::type_ + "_" + jointsNames_[i];
+
             if (returnCode == result_t::SUCCESS)
             {
-                // Create a new encoder sensor
-                std::string encoderName = encoderBaseName + "_" + jointsNames_[i];
-                EncoderSensor encoderSensor(encoderName);
-
-                // Config the encoder
-                configHolder_t encoderOptions = encoderSensor.getOptions();
-                encoderSensor.setOptions(encoderOptions);
-                encoderSensor.initialize(jointsPositionIdx_[i], jointsVelocityIdx_[i]);
-
-                // Add the encoder to the model
-                returnCode = addSensor(encoderBaseName, &encoderSensor);
+                // Create a new IMU sensor
+                returnCode = addSensor(encoderName, encoderSensor);
+            }
+            
+            if (returnCode == result_t::SUCCESS)
+            {
+                // Configure the sensor
+                configHolder_t encoderOptions = encoderSensor->getOptions();
+                encoderSensor->setOptions(encoderOptions);
+                encoderSensor->initialize(jointsPositionIdx_[i], jointsVelocityIdx_[i]);
             }
         }
         

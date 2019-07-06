@@ -2,11 +2,13 @@
 #define SIMU_ABSTRACT_SENSOR_H
 
 #include "exo_simu/core/Types.h"
+#include "exo_simu/core/Model.h"
+
 
 namespace exo_simu
-{
+{    
     class Model;
-
+    
     class AbstractSensor
     {
     public:
@@ -27,26 +29,25 @@ namespace exo_simu
         };
 
     public:
-        AbstractSensor(std::string const & name);
+        AbstractSensor(Model       const & model,
+                       std::string const & name);
         virtual ~AbstractSensor(void);
         virtual AbstractSensor* clone(void) = 0;
 
         configHolder_t getOptions(void) const;
-        void setOptions(configHolder_t const & sensorOptions);
+        virtual void setOptions(configHolder_t const & sensorOptions);
         bool getIsInitialized(void) const;
         std::string getName(void) const;
-        virtual matrixN_t::ConstRowXpr const get(void) const = 0;
-        virtual matrixN_t const & getAll(void) = 0;
+        virtual matrixN_t::ConstRowXpr get(void) const = 0;
+        virtual matrixN_t const & getAll(void) const = 0;
 
         // It assumes that the model internal state is consistent with other input arguments
-        virtual result_t set(Model     const & model,
-                             float64_t const & t,
+        virtual result_t set(float64_t const & t,
                              vectorN_t const & q,
                              vectorN_t const & v,
                              vectorN_t const & a,
                              vectorN_t const & u) = 0;
-        virtual result_t setAll(Model     const & model,
-                                float64_t const & t,
+        virtual result_t setAll(float64_t const & t,
                                 vectorN_t const & q,
                                 vectorN_t const & v,
                                 vectorN_t const & a,
@@ -60,95 +61,101 @@ namespace exo_simu
 
     protected:
         bool isInitialized_;
+        std::shared_ptr<Model const> model_;
         configHolder_t sensorOptionsHolder_;
     };
 
     template<class T>
-    class SensorDataHolder : public virtual AbstractSensor
+    class AbstractSensorTpl : public AbstractSensor
     {
     public:
-        SensorDataHolder(std::string const & name):
-        AbstractSensor(name),
-        sensorId_(sensorNb_)
+        AbstractSensorTpl(Model                               const & model,
+                          std::shared_ptr<SensorDataHolder_t> const & dataHolder,
+                          std::string                         const & name):
+        AbstractSensor(model, name),
+        dataHolder_(dataHolder),
+        sensorId_(dataHolder_->num_)
         {
-            ++sensorNb_;
-            dataHolder_.conservativeResize(sensorNb_, sizeOf_);
+            ++dataHolder_->num_;
+            dataHolder_->data_.conservativeResize(dataHolder_->num_, sizeOf_);
             data() = vectorN_t::Zero(sizeOf_);
-            sensorsHolder_.push_back(this);
-            sensorsCopyCounter_.push_back(1);
+            dataHolder_->sensors_.push_back(this);
+            dataHolder_->counters_.push_back(1);
         }
 
-        SensorDataHolder(SensorDataHolder const & sensorDataHolder):
-        AbstractSensor(sensorDataHolder),
-        sensorId_(sensorDataHolder.sensorId_)
+        AbstractSensorTpl(AbstractSensorTpl const & abstractSensor):
+        AbstractSensor(abstractSensor),
+        dataHolder_(abstractSensor.dataHolder_),
+        sensorId_(abstractSensor.sensorId_)
         {
             /* Do NOT create a new sensor and making a copy
                BUT update the pointer in the global container
                in case the original object would be destroyed. */
-
-            sensorsHolder_[sensorId_] = this;
-            ++sensorsCopyCounter_[sensorId_];
+            dataHolder_->sensors_[sensorId_] = this;
+            ++dataHolder_->counters_[sensorId_];
         }
 
-        ~SensorDataHolder(void)
+        virtual ~AbstractSensorTpl(void)
         {
-            --sensorsCopyCounter_[sensorId_];
-            if (!sensorsCopyCounter_[sensorId_])
+            --dataHolder_->counters_[sensorId_];
+            if (!dataHolder_->counters_[sensorId_])
             {
                 // Remove associated row in the global data buffer
-                if(sensorId_ < sensorNb_ - 1)
+                if(sensorId_ < dataHolder_->num_ - 1)
                 {
-                    dataHolder_.block(sensorId_, 0, sensorNb_ - sensorId_ - 1, sizeOf_) = dataHolder_.bottomRows(sensorNb_ - sensorId_ - 1).eval(); // eval to avoid aliasing
+                    dataHolder_->data_.block(sensorId_, 0, dataHolder_->num_ - sensorId_ - 1, sizeOf_) = 
+                        dataHolder_->data_.block(sensorId_ + 1, 0, dataHolder_->num_ - sensorId_ - 1, sizeOf_).eval(); // eval to avoid aliasing
                 }
-                dataHolder_.conservativeResize(sensorNb_ - 1, sizeOf_);
+                dataHolder_->data_.conservativeResize(dataHolder_->num_ - 1, sizeOf_);
 
                 // Shift the sensor ids
-                for (uint32_t i=sensorId_ + 1; i < sensorNb_; i++)
+                for (uint32_t i=sensorId_ + 1; i < dataHolder_->num_; i++)
                 {
-                    --sensorsHolder_[i]->sensorId_;
+                    AbstractSensorTpl<T> * sensor = static_cast<AbstractSensorTpl<T> *>(dataHolder_->sensors_[i]);
+                    --sensor->sensorId_;
                 }
 
                 // Remove the deprecated elements of the global containers
-                sensorsHolder_.erase(sensorsHolder_.begin() + sensorId_);
-                sensorsCopyCounter_.erase(sensorsCopyCounter_.begin() + sensorId_);
+                dataHolder_->sensors_.erase(dataHolder_->sensors_.begin() + sensorId_);
+                dataHolder_->counters_.erase(dataHolder_->counters_.begin() + sensorId_);
 
                 // Update the total number of sensors left
-                --sensorNb_;
+                --dataHolder_->num_;
             }
         };
 
-        SensorDataHolder & operator = (SensorDataHolder const & other) 
+        AbstractSensorTpl & operator = (AbstractSensorTpl const & other) 
         {
             if (this != &other) {
                 /* Make the overriden sensor floating by deleting the
                    data in the global containers. Note that it does
                    NOT actually destroy the object. */
-                ~SensorDataHolder();
+                ~AbstractSensorTpl();
 
                 /* Assign the same sensor id to the floating sensor
                    than the other one, so that they share the same
                    data in the global container. */
                 AbstractSensor::operator=(other);
+                dataHolder_ = std::shared_ptr<SensorDataHolder_t>(other.dataHolder_);
                 sensorId_ = other.sensorId;
-                sensorsHolder_[sensorId_] = this;
-                ++sensorsCopyCounter_[sensorId_];
+                dataHolder_->sensors_[sensorId_] = this;
+                ++dataHolder_->counters_[sensorId_];
             }
             
             return *this;
         } 
 
-        matrixN_t::ConstRowXpr const get(void) const override
+        matrixN_t::ConstRowXpr get(void) const override
         {
-            return Eigen::Block<matrixN_t const, 1, Eigen::Dynamic>(dataHolder_.derived(), sensorId_, 0, 1, sizeOf_); // Const version of matrixN_t::row method
+            return matrixN_t::ConstRowXpr(dataHolder_->data_.derived(), sensorId_, 0, 1, sizeOf_);
         };
 
-        matrixN_t const & getAll(void)
+        matrixN_t const & getAll(void) const override
         {
-            return dataHolder_;
+            return dataHolder_->data_;
         };
 
-        result_t setAll(Model     const & model,
-                        float64_t const & t,
+        result_t setAll(float64_t const & t,
                         vectorN_t const & q,
                         vectorN_t const & v,
                         vectorN_t const & a,
@@ -156,11 +163,11 @@ namespace exo_simu
         {
             result_t returnCode = result_t::SUCCESS; 
 
-            for (SensorDataHolder<T> * sensor : sensorsHolder_)
+            for (AbstractSensor * sensor : dataHolder_->sensors_)
             {
                 if (returnCode == result_t::SUCCESS)
                 {
-                    returnCode = sensor->set(model, t, q, v, a, u);
+                    returnCode = sensor->set(t, q, v, a, u);
                 }
             }
 
@@ -170,15 +177,15 @@ namespace exo_simu
     protected:
         matrixN_t::RowXpr data(void)
         {
-            return dataHolder_.row(sensorId_);
+            return matrixN_t::RowXpr(dataHolder_->data_.derived(), sensorId_, 0, 1, sizeOf_);
         };
 
-    private:
-        static std::vector<uint32_t> sensorsCopyCounter_;
-        static std::vector<SensorDataHolder<T> *> sensorsHolder_;
-        static matrixN_t dataHolder_;
+    public:
+        static std::string const type_;
         static uint32_t const sizeOf_;
-        static uint32_t sensorNb_;
+
+    private:
+        std::shared_ptr<SensorDataHolder_t> dataHolder_;
         uint32_t sensorId_;
     };
 }

@@ -10,7 +10,7 @@ namespace exo_simu
 {
     class Model;
 
-    class ImuSensor : public virtual AbstractSensor, public SensorDataHolder<ImuSensor>
+    class ImuSensor : public AbstractSensorTpl<ImuSensor>
     {
     public:
         configHolder_t getDefaultOptions(void) override
@@ -31,7 +31,9 @@ namespace exo_simu
         };
 
     public:
-        ImuSensor(std::string const & name);
+        ImuSensor(Model                               const & model,
+                  std::shared_ptr<SensorDataHolder_t> const & dataHolder,
+                  std::string                         const & name);
         ~ImuSensor(void);
         AbstractSensor* clone(void) override;
 
@@ -40,8 +42,7 @@ namespace exo_simu
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
 
-        result_t set(Model     const & model,
-                     float64_t const & t,
+        result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
                      vectorN_t const & a,
@@ -54,7 +55,7 @@ namespace exo_simu
         int32_t frameIdx_;
     };
 
-    class ForceSensor : public virtual AbstractSensor, public SensorDataHolder<ForceSensor>
+    class ForceSensor : public AbstractSensorTpl<ForceSensor>
     {
     public:
         configHolder_t getDefaultOptions(void) override
@@ -75,7 +76,9 @@ namespace exo_simu
         };
 
     public:
-        ForceSensor(std::string const & name);
+        ForceSensor(Model                               const & model,
+                    std::shared_ptr<SensorDataHolder_t> const & dataHolder,
+                    std::string                         const & name);
         ~ForceSensor(void);
         AbstractSensor* clone(void);
 
@@ -84,8 +87,7 @@ namespace exo_simu
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
         
-        result_t set(Model     const & model,
-                     float64_t const & t,
+        result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
                      vectorN_t const & a,
@@ -98,7 +100,7 @@ namespace exo_simu
         int32_t frameIdx_;
     };
 
-    class EncoderSensor : public virtual AbstractSensor, public SensorDataHolder<EncoderSensor>
+    class EncoderSensor : public AbstractSensorTpl<EncoderSensor>
     {
     public:
         configHolder_t getDefaultOptions(void) override
@@ -119,7 +121,9 @@ namespace exo_simu
         };
 
     public:
-        EncoderSensor(std::string const & name);
+        EncoderSensor(Model                               const & model,
+                      std::shared_ptr<SensorDataHolder_t> const & dataHolder,
+                      std::string                         const & name);
         ~EncoderSensor(void);
         AbstractSensor* clone(void);
 
@@ -130,8 +134,7 @@ namespace exo_simu
         int32_t getJointPositionIdx(void) const;
         int32_t getJointVelocityIdx(void) const;
         
-        result_t set(Model     const & model,
-                     float64_t const & t,
+        result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
                      vectorN_t const & a,

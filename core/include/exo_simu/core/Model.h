@@ -17,6 +17,28 @@ namespace exo_simu
 {
     class AbstractSensor;
 
+    struct SensorDataHolder_t
+    {
+        SensorDataHolder_t(void) :
+        data_(),
+        counters_(),
+        sensors_(),
+        num_()
+        {
+            // Empty.
+        };
+
+        ~SensorDataHolder_t(void)
+        {
+            // Empty.
+        }; 
+
+        matrixN_t data_;
+        std::vector<uint32_t> counters_;
+        std::vector<AbstractSensor *> sensors_;
+        uint32_t num_;
+    };
+
     class Model
     {
     public:
@@ -73,8 +95,9 @@ namespace exo_simu
                             std::vector<std::string> const & contactFramesNames, 
                             std::vector<std::string> const & jointsNames);
 
-        result_t addSensor(std::string    const & sensorType, 
-                           AbstractSensor       * sensor);
+        template<typename TSensor>
+        result_t addSensor(std::string              const & sensorName, 
+                           std::shared_ptr<TSensor>       & sensor);
         result_t removeSensor(std::string const & name);
         void removeSensors(void);
 
@@ -83,6 +106,8 @@ namespace exo_simu
         bool getIsInitialized(void) const;
         std::string getUrdfPath(void) const;
         matrixN_t const & getSensorsData(std::string const & sensorType) const;
+        matrixN_t::ConstRowXpr getSensorData(std::string const & sensorType,
+                                             std::string const & sensorName) const;
         void setSensorsData(float64_t const & t,
                             vectorN_t const & q,
                             vectorN_t const & v,
@@ -96,6 +121,10 @@ namespace exo_simu
         uint32_t nx(void) const;
 
     protected:
+        template<typename TSensor>
+        std::shared_ptr<TSensor> getSensor(std::string const & sensorType,
+                                           std::string const & sensorName);
+
         result_t setUrdfPath(std::string const & urdfPath);
         result_t getFrameIdx(std::string const & frameName, 
                              int32_t           & frameIdx) const;
@@ -107,7 +136,7 @@ namespace exo_simu
         result_t getJointsIdx(std::vector<std::string> const & jointsNames, 
                               std::vector<int32_t>           & jointsPositionIdx, 
                               std::vector<int32_t>           & jointsVelocityIdx) const;
-        
+
     public:
         pinocchio::Model pncModel_;
         pinocchio::Data pncData_;
@@ -118,7 +147,6 @@ namespace exo_simu
         bool isInitialized_;
         std::string urdfPath_;
         configHolder_t mdlOptionsHolder_;
-        sensorsGroupHolder_t sensorsGroupHolder_;
 
         std::vector<std::string> contactFramesNames_;
         std::vector<std::string> jointsNames_;
@@ -127,10 +155,14 @@ namespace exo_simu
         std::vector<int32_t> jointsVelocityIdx_; // Indices of the actuated joints in the velocity vector representation
 
     private:
+        sensorsGroupHolder_t sensorsGroupHolder_;
+        std::map<std::string, std::shared_ptr<SensorDataHolder_t> > sensorsDataHolder_;
         uint32_t nq_;
         uint32_t nv_;
         uint32_t nx_;
     };
 }
+
+#include "exo_simu/core/Model.tcc"
 
 #endif //end of SIMU_MODEL_H
