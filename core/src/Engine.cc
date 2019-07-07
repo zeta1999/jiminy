@@ -379,21 +379,24 @@ namespace exo_simu
 
         contactOptions_t const * const contactOptions_ = &engineOptions_->contacts;
         
-        Eigen::Matrix4d tformFrame = model_->pncData_.oMf[frameId].toHomogeneousMatrix();
-        Eigen::Vector3d posFrame = tformFrame.topRightCorner<3,1>();
+        Eigen::Matrix3d const & tformFrameRot = model_->pncData_.oMf[frameId].rotation();
+        Eigen::Vector3d const & posFrame = model_->pncData_.oMf[frameId].translation();
 
         vectorN_t fextLocal = vectorN_t::Zero(6);
 
         if(posFrame(2) < 0.0)
         {
+            // Initialize the contact force
+            Eigen::Vector3d fextInWorld(0.0, 0.0, 0.0);
+
             // Get various transformations
-            Eigen::Matrix4d const tformFrame2Jt = model_->pncModel_.frames[frameId].placement.toHomogeneousMatrix();
-            Eigen::Vector3d fextInWorld(0.0,0.0,0.0);
-            Eigen::Vector3d const posFrameJoint = tformFrame2Jt.topRightCorner<3,1>();
-            pinocchio::Motion const motionFrame = pinocchio::getFrameVelocity(model_->pncModel_, 
-                                                                              model_->pncData_,
-                                                                              frameId);
-            Eigen::Vector3d const vFrameInWorld = tformFrame.topLeftCorner<3,3>() * motionFrame.linear();
+            Eigen::Matrix3d const & tformFrameJointRot = model_->pncModel_.frames[frameId].placement.rotation();
+            Eigen::Vector3d const & posFrameJoint = model_->pncModel_.frames[frameId].placement.translation();
+
+            Eigen::Vector3d motionFrame = pinocchio::getFrameVelocity(model_->pncModel_, 
+                                                                      model_->pncData_,
+                                                                      frameId).linear();
+            Eigen::Vector3d vFrameInWorld = tformFrameRot * motionFrame;
 
             // Compute normal force
             float64_t damping = 0;
@@ -404,8 +407,8 @@ namespace exo_simu
             fextInWorld(2) = -contactOptions_->stiffness * posFrame(2) + damping;
 
             // Compute friction forces
-            Eigen::Vector2d const vxy = vFrameInWorld.head<2>();
-            float64_t const vNorm = vxy.norm();
+            Eigen::Vector2d const & vxy = vFrameInWorld.head<2>();
+            float64_t vNorm = vxy.norm();
             float64_t frictionCoeff;
             if(vNorm > contactOptions_->dryFrictionVelEps)
             {
@@ -427,8 +430,8 @@ namespace exo_simu
             fextInWorld.head<2>() = -vxy * frictionCoeff * fextInWorld(2);
 
             // Compute the forces at the origin of the parent joint frame
-            fextLocal.head<3>() = tformFrame2Jt.topLeftCorner<3,3>()*tformFrame.topLeftCorner<3,3>().transpose()*fextInWorld;
-            fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>()).eval();
+            fextLocal.head<3>() = tformFrameJointRot * tformFrameRot.transpose() * fextInWorld;
+            fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>());
 
             // Add blending factor
             float64_t blendingFactor = -posFrame(2) / contactOptions_->transitionEps;
