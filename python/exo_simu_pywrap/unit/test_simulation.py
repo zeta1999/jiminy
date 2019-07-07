@@ -82,7 +82,7 @@ print("Simulation time: %03.0fms" %((end - start)*1.0e3))
 
 ################################## Display the results ##################################
 
-log = np.asarray(simulator.get_log())
+log = np.asarray(simulator.get_log()[1])
 print('%i log points' % log.shape[0])
 trajectory_data_log = extract_state_from_simulation_log(urdf_path, log)
 

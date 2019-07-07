@@ -15,7 +15,9 @@
 
 namespace exo_simu
 {
+    class Engine;
     class AbstractSensor;
+    class TelemetryData;
 
     struct SensorDataHolder_t
     {
@@ -41,6 +43,8 @@ namespace exo_simu
 
     class Model
     {
+        friend Engine;
+
     public:
         virtual configHolder_t getDefaultJointOptions()
         {
@@ -104,6 +108,7 @@ namespace exo_simu
         configHolder_t getOptions(void) const;
         result_t setOptions(configHolder_t const & mdlOptions);
         bool getIsInitialized(void) const;
+        bool getIsTelemetryConfigured(void) const;
         std::string getUrdfPath(void) const;
         matrixN_t const & getSensorsData(std::string const & sensorType) const;
         matrixN_t::ConstRowXpr getSensorData(std::string const & sensorType,
@@ -113,6 +118,7 @@ namespace exo_simu
                             vectorN_t const & v,
                             vectorN_t const & a,
                             vectorN_t const & u);
+        void updateSensorsTelemetry(void);
         std::vector<int32_t> const & getContactFramesIdx(void) const;
         std::vector<int32_t> const & getJointsPositionIdx(void) const;
         std::vector<int32_t> const & getJointsVelocityIdx(void) const;
@@ -121,6 +127,8 @@ namespace exo_simu
         uint32_t nx(void) const;
 
     protected:
+        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+        
         template<typename TSensor>
         std::shared_ptr<TSensor> getSensor(std::string const & sensorType,
                                            std::string const & sensorName);
@@ -145,8 +153,12 @@ namespace exo_simu
 
     protected:
         bool isInitialized_;
+        bool isTelemetryConfigured_;
         std::string urdfPath_;
         configHolder_t mdlOptionsHolder_;
+
+        std::shared_ptr<TelemetryData> telemetryData_;
+        sensorsGroupHolder_t sensorsGroupHolder_;
 
         std::vector<std::string> contactFramesNames_;
         std::vector<std::string> jointsNames_;
@@ -155,7 +167,6 @@ namespace exo_simu
         std::vector<int32_t> jointsVelocityIdx_; // Indices of the actuated joints in the velocity vector representation
 
     private:
-        sensorsGroupHolder_t sensorsGroupHolder_;
         std::map<std::string, std::shared_ptr<SensorDataHolder_t> > sensorsDataHolder_;
         uint32_t nq_;
         uint32_t nv_;

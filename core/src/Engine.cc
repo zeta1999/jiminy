@@ -14,15 +14,17 @@
 #include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/TelemetryData.h"
+#include "exo_simu/core/TelemetryRecorder.h"
 #include "exo_simu/core/AbstractController.h"
 #include "exo_simu/core/AbstractSensor.h"
+#include "exo_simu/core/Model.h"
 #include "exo_simu/core/Engine.h"
 
 
 namespace exo_simu
 {
     Engine::Engine(void):
-    log(),
     engineOptions_(nullptr),
     isInitialized_(false),
     model_(nullptr),
@@ -33,8 +35,16 @@ namespace exo_simu
                  {
                      return true;
                  }),
+    telemetrySender_(),
+    telemetryData_(nullptr),
+    telemetryRecorder_(nullptr),
     stepperState_()
     {
+        telemetryData_ = std::make_shared<TelemetryData>();
+        telemetrySender_.configureObject(telemetryData_, OBJECT_NAME);
+
+        telemetryRecorder_ = std::make_shared<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
+
         setOptions(getDefaultOptions());
     }
 
@@ -111,6 +121,17 @@ namespace exo_simu
             setOptions(engineOptionsHolder_); // Make sure the gravity is properly set at model level
         }
 
+        // Initialize the logger
+        stepperState_.initialize(*model_);
+        telemetryData_->reset();
+        telemetrySender_.configureObject(telemetryData_, OBJECT_NAME);
+        (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+        (void) registerNewVectorEntry(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+        (void) registerNewVectorEntry(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+        (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+        model_->configureTelemetry(telemetryData_);
+        telemetryRecorder_->initialize();
+
         return returnCode;
     }
 
@@ -150,8 +171,7 @@ namespace exo_simu
         model_->pncData_ = pinocchio::Data(model_->pncModel_);
         stepperState_.initialize(*model_, x_init);
         systemDynamics(0, stepperState_.x, stepperState_.dxdt);
-        log.resize(0, 1 + model_->nq() + model_->nv() + model_->nv() + model_->getJointsVelocityIdx().size()); // Log [t, q, v, a, uCommand]
-        log.conservativeResize(1000, Eigen::NoChange);
+        telemetryRecorder_->initialize();
 
         // Compute the breakpoints' period (for command or observation) during the integration loop
         float64_t updatePeriod = 0.0;
@@ -186,17 +206,13 @@ namespace exo_simu
         failed_step_checker fail_checker; // to throw a runtime_error if step size adjustment fail
         while (true)
         {
-            /* Reserve a new chunk of rows to the log buffer and save the
-               current state and time. */
-            if (stepperState_.iterLast >= log.rows())
-            {
-                log.conservativeResize(log.rows() + 1000, Eigen::NoChange);
-            }
-            log.row(stepperState_.iterLast) = (vectorN_t(log.cols()) << stepperState_.tLast, 
-                                                                        stepperState_.qLast, 
-                                                                        stepperState_.vLast, 
-                                                                        stepperState_.aLast, 
-                                                                        stepperState_.uCommandLast).finished();
+            // Log the current time, state, command, and sensors
+            updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+            updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+            updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+            updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+            model_->updateSensorsTelemetry();
+            telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
             /* Stop the simulation if the end time has been reached, if
                the callback returns false, or if the number of integration
@@ -296,9 +312,6 @@ namespace exo_simu
             stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a);
             stepperState_.updateLast(current_time, q, v, a, stepperState_.uLast, stepperState_.uCommandLast); // uLast and uCommandLast are already up-to-date
         }
-
-        // Cleanup any extra rows of the log buffer
-        log.conservativeResize(stepperState_.iterLast, Eigen::NoChange);
         
         return returnCode;
     }
@@ -435,11 +448,9 @@ namespace exo_simu
 
             // Add blending factor
             float64_t blendingFactor = -posFrame(2) / contactOptions_->transitionEps;
-            if(blendingFactor > 1.0)
-            {
-                blendingFactor = 1.0;
-            }
-            fextLocal *= blendingFactor;
+            // float64_t blendingLaw = std::tanh(2 * blendingFactor);
+            float64_t blendingLaw = std::min(blendingFactor, 1.0);
+            fextLocal *= blendingLaw;
         }
 
         return fextLocal;
@@ -511,5 +522,28 @@ namespace exo_simu
     Model const & Engine::getModel(void) const
     {
         return *model_.get();
+    }
+
+    void Engine::getLog(std::vector<std::string> & header, 
+                        matrixN_t                & log)
+    {
+        std::vector<float64_t> timestamps;
+        std::vector<std::vector<int32_t> > intData;
+        std::vector<std::vector<float32_t> > floatData;
+        telemetryRecorder_->getData(header, timestamps, intData, floatData);
+
+        // Never empty since it contains at least the initial state
+        log.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
+        log.col(0) = vectorN_t::Map(timestamps.data(), timestamps.size());
+        for (uint32_t i=0; i<intData.size(); i++)
+        {
+            log.block(i, 1, 1, intData[i].size()) = 
+                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(intData[i].data(), intData[i].size()).cast<float64_t>();
+        }
+        for (uint32_t i=0; i<floatData.size(); i++)
+        {
+            log.block(i, 1 + intData[0].size(), 1, floatData[i].size()) = 
+                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(), floatData[i].size()).cast<float64_t>();
+        }
     }
 }

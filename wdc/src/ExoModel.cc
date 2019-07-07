@@ -85,7 +85,7 @@ namespace exo_simu
         for(uint32_t i = 0; i < imuFramesNames.size(); i++)
         {
             std::shared_ptr<ImuSensor> imuSensor;
-            std::string imuName = ImuSensor::type_ + "_" + imuFramesNames[i];
+            std::string imuName = ImuSensor::type_ + "." + imuFramesNames[i];
 
             if (returnCode == result_t::SUCCESS)
             {
@@ -106,7 +106,7 @@ namespace exo_simu
         for (uint32_t i = 0; i<contactFramesNames_.size(); i++)
         {
             std::shared_ptr<ForceSensor> forceSensor;
-            std::string forceName = ForceSensor::type_ + "_" + contactFramesNames_[i];
+            std::string forceName = ForceSensor::type_ + "." + contactFramesNames_[i];
 
             if (returnCode == result_t::SUCCESS)
             {
@@ -127,7 +127,7 @@ namespace exo_simu
         for (uint32_t i = 0; i<jointsNames_.size(); i++)
         {
             std::shared_ptr<EncoderSensor> encoderSensor;
-            std::string encoderName = EncoderSensor::type_ + "_" + jointsNames_[i];
+            std::string encoderName = EncoderSensor::type_ + "." + jointsNames_[i];
 
             if (returnCode == result_t::SUCCESS)
             {
@@ -149,6 +149,41 @@ namespace exo_simu
         {
             isInitialized_ = true;
             returnCode = setOptions(mdlOptionsHolder_);
+        }
+
+        return returnCode;
+    }
+
+    result_t ExoModel::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        returnCode = Model::configureTelemetry(telemetryData);
+
+        std::vector<std::string> imuFieldNames =  {"Quat_x", "Quat_y", "Quat_z", "Quat_w", "W_x", "W_y", "W_z"};
+        std::vector<std::string> forceFieldNames =  {"F_x", "F_y", "F_z"};
+        std::vector<std::string> encoderFieldNames =  {"q", "dq"};
+
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        {
+            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+            {
+                if (returnCode == result_t::SUCCESS)
+                {
+                    if (sensorGroup.first == ImuSensor::type_)
+                    {
+                        returnCode = sensor.second->configureTelemetry(imuFieldNames, telemetryData_);
+                    }
+                    else if (sensorGroup.first == ForceSensor::type_)
+                    {
+                        returnCode = sensor.second->configureTelemetry(forceFieldNames, telemetryData_);
+                    }
+                    else
+                    {
+                        returnCode = sensor.second->configureTelemetry(encoderFieldNames, telemetryData_);
+                    }
+                }
+            }
         }
 
         return returnCode;

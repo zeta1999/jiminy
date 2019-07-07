@@ -2,15 +2,20 @@
 #define SIMU_ABSTRACT_SENSOR_H
 
 #include "exo_simu/core/Types.h"
+#include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/TelemetrySender.h"
 #include "exo_simu/core/Model.h"
 
 
 namespace exo_simu
 {    
-    class Model;
-    
+    class TelemetryData;
+    template<typename> class AbstractSensorTpl;
+
     class AbstractSensor
     {
+        template<typename> friend class AbstractSensorTpl;
+
     public:
         virtual configHolder_t getDefaultOptions(void)
         {
@@ -34,24 +39,32 @@ namespace exo_simu
         virtual ~AbstractSensor(void);
         virtual AbstractSensor* clone(void) = 0;
 
+        virtual result_t configureTelemetry(std::vector<std::string>       const & fieldNames,
+                                            std::shared_ptr<TelemetryData> const & telemetryData);
+
         configHolder_t getOptions(void) const;
         virtual void setOptions(configHolder_t const & sensorOptions);
         bool getIsInitialized(void) const;
+        bool getIsTelemetryConfigured(void) const;
         std::string getName(void) const;
         virtual matrixN_t::ConstRowXpr get(void) const = 0;
         virtual matrixN_t const & getAll(void) const = 0;
 
         // It assumes that the model internal state is consistent with other input arguments
-        virtual result_t set(float64_t const & t,
-                             vectorN_t const & q,
-                             vectorN_t const & v,
-                             vectorN_t const & a,
-                             vectorN_t const & u) = 0;
         virtual result_t setAll(float64_t const & t,
                                 vectorN_t const & q,
                                 vectorN_t const & v,
                                 vectorN_t const & a,
                                 vectorN_t const & u) = 0;
+        void updateTelemetry(void);
+        virtual void updateTelemetryAll(void) = 0;
+
+    protected:
+        virtual result_t set(float64_t const & t,
+                             vectorN_t const & q,
+                             vectorN_t const & v,
+                             vectorN_t const & a,
+                             vectorN_t const & u) = 0;
 
     public:
         std::shared_ptr<abstractSensorOptions_t const> sensorOptions_;
@@ -60,7 +73,10 @@ namespace exo_simu
         std::string name_;
 
     protected:
+        std::vector<std::string> fieldNames_;
+        TelemetrySender telemetrySender_;
         bool isInitialized_;
+        bool isTelemetryConfigured_;
         std::shared_ptr<Model const> model_;
         configHolder_t sensorOptionsHolder_;
     };
@@ -143,7 +159,7 @@ namespace exo_simu
             }
             
             return *this;
-        } 
+        }
 
         matrixN_t::ConstRowXpr get(void) const override
         {
@@ -172,6 +188,14 @@ namespace exo_simu
             }
 
             return returnCode;
+        };
+
+        void updateTelemetryAll(void) override
+        {
+            for (AbstractSensor * sensor : dataHolder_->sensors_)
+            {
+                sensor->updateTelemetry();
+            }
         };
 
     protected:

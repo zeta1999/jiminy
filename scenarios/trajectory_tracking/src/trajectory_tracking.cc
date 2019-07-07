@@ -151,13 +151,17 @@ int main(int argc, char *argv[])
     timer.toc();
     std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
-    // TODO: Write the log file
-    std::cout << simulator.log.rows() << " log points" << std::endl;
-
+    // Write the log file
+    std::vector<std::string> header;
+    matrixN_t log;
+    simulator.getLog(header, log);
+    std::cout << log.rows() << " log points" << std::endl;
     std::ofstream myfile;
     Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
     myfile.open(outputDirPath + std::string("/log.csv"), std::ofstream::out | std::ofstream::trunc);
-    myfile << simulator.log.format(CSVFormat);
+    std::copy(header.begin(), header.end()-1, std::ostream_iterator<std::string>(myfile, ", "));
+    std::copy(header.end()-1, header.end(), std::ostream_iterator<std::string>(myfile, "\n"));
+    myfile << log.format(CSVFormat);
     myfile.close();
 
     return 0;

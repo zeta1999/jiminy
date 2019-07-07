@@ -7,8 +7,10 @@
 #ifndef WDC_OPTIMAL_TYPES_H
 #define WDC_OPTIMAL_TYPES_H
 
+#include <map>
+
 #include <Eigen/Core>
-#include <Eigen/SparseCore>
+#include <Eigen/Dense>
 #include <boost/variant.hpp>
 
 namespace exo_simu

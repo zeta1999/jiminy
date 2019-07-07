@@ -61,21 +61,16 @@ namespace exo_simu
         ~ExoModel(void);
         Model* clone(void) override;
 
+        result_t initialize(std::string          const & urdfPath, 
+                            std::vector<int32_t> const & contactFramesIdx) = delete;
         result_t initialize(std::string const & urdfPath);
 
         result_t setOptions(configHolder_t const & mdlOptions);
 
     protected:
-        result_t setUrdfPath(std::string const & urdfPath);
+        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData) override;
         
-    private:
-        // Discourage usage of the base initializer
-        result_t initialize(std::string          const & urdfPath, 
-                            std::vector<int32_t> const & contactFramesIdx)
-        {
-            std::cout << "Error - ExoModel::initialize - Base method not available from derived class." << std::endl;
-            return result_t::ERROR_GENERIC;
-        }
+        result_t setUrdfPath(std::string const & urdfPath);
 
     public:
         std::shared_ptr<exoModelOptions_t const> exoMdlOptions_;

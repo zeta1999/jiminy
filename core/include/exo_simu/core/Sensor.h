@@ -42,6 +42,7 @@ namespace exo_simu
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
 
+    protected:
         result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
@@ -87,6 +88,7 @@ namespace exo_simu
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
         
+    protected:
         result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
@@ -134,6 +136,7 @@ namespace exo_simu
         int32_t getJointPositionIdx(void) const;
         int32_t getJointVelocityIdx(void) const;
         
+    protected:
         result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,

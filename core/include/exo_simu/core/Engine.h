@@ -11,13 +11,18 @@
 
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Model.h"
+#include "exo_simu/core/TelemetrySender.h"
 
 
 namespace exo_simu
 {
-    using namespace boost::numeric::odeint;
+    std::string const OBJECT_NAME("Engine");
 
+    using namespace boost::numeric::odeint;
+    
     class AbstractController;
+    class TelemetryData;
+    class TelemetryRecorder;
         
     class Engine
     {
@@ -176,6 +181,10 @@ namespace exo_simu
             aLast(),
             uLast(),
             uCommandLast(),
+            qNames(),
+            vNames(),
+            aNames(),
+            uCommandNames(),
             x(),
             dxdt(),
             uControl(),
@@ -190,6 +199,13 @@ namespace exo_simu
             bool getIsInitialized(void) const
             {
                 return isInitialized;
+            }
+
+
+            result_t initialize(Model const & model)
+            {
+                vectorN_t x_init = vectorN_t::Zero(model.nx());
+                return initialize(model, x_init);
             }
 
             result_t initialize(Model     const & model, 
@@ -212,6 +228,11 @@ namespace exo_simu
                     aLast = vectorN_t::Zero(model.nv());
                     uLast = vectorN_t::Zero(model.nv());
                     uCommandLast = vectorN_t::Zero(model.getJointsVelocityIdx().size());
+
+                    qNames = defaultVectorFieldnames("q", qLast.size());
+                    vNames = defaultVectorFieldnames("v", vLast.size());
+                    aNames = defaultVectorFieldnames("a", aLast.size());
+                    uCommandNames = defaultVectorFieldnames("uCommand", uCommandLast.size());
 
                     x = x_init;
                     dxdt = vectorN_t::Zero(model.nx());
@@ -254,6 +275,11 @@ namespace exo_simu
             vectorN_t uLast;
             vectorN_t uCommandLast;
 
+            std::vector<std::string> qNames;
+            std::vector<std::string> vNames;
+            std::vector<std::string> aNames;
+            std::vector<std::string> uCommandNames;
+            
             // Internal buffers required for the adaptive step computation and system dynamics
             vectorN_t x;
             vectorN_t dxdt;
@@ -284,20 +310,19 @@ namespace exo_simu
         bool getIsInitialized(void) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
+        void getLog(std::vector<std::string> & header, 
+                    matrixN_t                & log);
 
     protected:
         void systemDynamics(float64_t const & t,
                             vectorN_t const & x,
                             vectorN_t       & dxdt);
-
         void boundsDynamics(vectorN_t const & q,
                             vectorN_t const & v,
                             vectorN_t       & u);
-
         vectorN_t contactDynamics(int32_t const & frameId) const;
 
     public:
-        matrixN_t log; // TODO: To be removed
         std::shared_ptr<engineOptions_t const> engineOptions_;
 
     protected:
@@ -308,6 +333,9 @@ namespace exo_simu
         callbackFct_t callbackFct_;
 
     private:
+        TelemetrySender telemetrySender_;
+        std::shared_ptr<TelemetryData> telemetryData_;
+        std::shared_ptr<TelemetryRecorder> telemetryRecorder_;
         stepperState_t stepperState_; // Internal state for the integration loop
     };
 }

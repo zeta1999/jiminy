@@ -6,6 +6,7 @@
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
+#include "exo_simu/core/TelemetryData.h"
 #include "exo_simu/core/Model.h"
 
 
@@ -17,14 +18,16 @@ namespace exo_simu
     mdlOptions_(nullptr),
     contactForces_(),
     isInitialized_(false),
+    isTelemetryConfigured_(false),
     urdfPath_(),
     mdlOptionsHolder_(),
+    telemetryData_(nullptr),
+    sensorsGroupHolder_(),
     contactFramesNames_(),
     jointsNames_(),
     contactFramesIdx_(),
     jointsPositionIdx_(),
     jointsVelocityIdx_(),
-    sensorsGroupHolder_(),
     sensorsDataHolder_(),
     nq_(0),
     nv_(0),
@@ -78,6 +81,13 @@ namespace exo_simu
         }
 
         return returnCode;
+    }
+
+    result_t Model::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
+    {
+        telemetryData_ = std::shared_ptr<TelemetryData>(telemetryData);
+        
+        return result_t::SUCCESS; 
     }
 
     result_t Model::removeSensor(std::string const & name)
@@ -177,6 +187,11 @@ namespace exo_simu
         return isInitialized_;
     }
 
+    bool Model::getIsTelemetryConfigured(void) const
+    {
+        return isTelemetryConfigured_;
+    }
+
     std::string Model::getUrdfPath(void) const
     {
         return urdfPath_;
@@ -238,6 +253,17 @@ namespace exo_simu
             if (!sensorGroup.second.empty())
             {
                 sensorGroup.second.begin()->second->setAll(t, q, v, a, u); // Access static member of the sensor Group through the first instance
+            }
+        }
+    }
+
+    void Model::updateSensorsTelemetry(void)
+    {
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        {
+            if (!sensorGroup.second.empty())
+            {
+                sensorGroup.second.begin()->second->updateTelemetryAll(); // Access static member of the sensor Group through the first instance
             }
         }
     }

@@ -218,9 +218,12 @@ namespace python
         /// \brief      Getters and Setters
         ///////////////////////////////////////////////////////////////////////////////
 
-        static matrixN_t getLog(PyEngine & self)
+        static bp::tuple getLog(PyEngine & self)
         {
-            return self.simulator_.log;
+            std::vector<std::string> header;
+            matrixN_t log;
+            self.simulator_.getLog(header, log);
+            return bp::make_tuple(header, log);
         }
 
         static bp::dict getModelOptions(PyEngine & self)
