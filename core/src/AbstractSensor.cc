@@ -4,28 +4,58 @@
 
 namespace exo_simu
 {
-    AbstractSensor::AbstractSensor(Model       const & model,
-                                   std::string const & name) :
+    AbstractSensorBase::AbstractSensorBase(Model       const & model,
+                                           std::string const & name) :
     sensorOptions_(nullptr),
     name_(name),
     fieldNames_(),
     telemetrySender_(),
     isInitialized_(false),
     isTelemetryConfigured_(false),
-    model_(),                 
+    model_(&model),                 
     sensorOptionsHolder_()
     {
-        model_ = std::make_shared<Model>(model);
-        AbstractSensor::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
+        AbstractSensorBase::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
     }
 
-    AbstractSensor::~AbstractSensor(void)
+    AbstractSensorBase::AbstractSensorBase(AbstractSensorBase const & abstractSensor) :
+    sensorOptions_(nullptr),
+    name_(abstractSensor.name_),
+    fieldNames_(abstractSensor.fieldNames_),
+    telemetrySender_(abstractSensor.telemetrySender_),
+    isInitialized_(abstractSensor.isInitialized_),
+    isTelemetryConfigured_(abstractSensor.isTelemetryConfigured_),
+    model_(abstractSensor.model_),                 
+    sensorOptionsHolder_(abstractSensor.sensorOptionsHolder_)
+    {
+        AbstractSensorBase::setOptions(abstractSensor.sensorOptionsHolder_);
+    }
+
+    AbstractSensorBase & AbstractSensorBase::operator = (AbstractSensorBase const & other) 
+    {
+        if (this != &other)
+        {
+            AbstractSensorBase * temp(other.clone());
+            std::swap(sensorOptions_, temp->sensorOptions_);
+            std::swap(name_, temp->name_);
+            std::swap(fieldNames_, temp->fieldNames_);
+            std::swap(telemetrySender_, temp->telemetrySender_);
+            std::swap(isInitialized_, temp->isInitialized_),
+            std::swap(isTelemetryConfigured_, temp->isTelemetryConfigured_);
+            std::swap(model_, temp->model_);  
+            std::swap(sensorOptionsHolder_, temp->sensorOptionsHolder_);
+            delete temp;
+        }
+        return *this;
+    }
+
+    AbstractSensorBase::~AbstractSensorBase(void)
     {
         // Empty.
     }
 
-    result_t AbstractSensor::configureTelemetry(std::vector<std::string>       const & fieldNames,
-                                                std::shared_ptr<TelemetryData> const & telemetryData)
+    result_t AbstractSensorBase::configureTelemetry(std::vector<std::string>       const & fieldNames,
+                                                    std::shared_ptr<TelemetryData> const & telemetryData)
     {
         result_t returnCode = result_t::SUCCESS; 
 
@@ -45,33 +75,33 @@ namespace exo_simu
         return returnCode;
     }
 
-    configHolder_t AbstractSensor::getOptions(void) const
+    configHolder_t AbstractSensorBase::getOptions(void) const
     {
         return sensorOptionsHolder_;
     }
 
-    void AbstractSensor::setOptions(configHolder_t const & sensorOptions)
+    void AbstractSensorBase::setOptions(configHolder_t const & sensorOptions)
     {
         sensorOptionsHolder_ = sensorOptions;
         sensorOptions_ = std::make_shared<abstractSensorOptions_t const>(sensorOptionsHolder_);
     }
 
-    bool AbstractSensor::getIsInitialized(void) const
+    bool AbstractSensorBase::getIsInitialized(void) const
     {
         return isInitialized_;
     }
 
-    bool AbstractSensor::getIsTelemetryConfigured(void) const
+    bool AbstractSensorBase::getIsTelemetryConfigured(void) const
     {
         return isTelemetryConfigured_;
     }
 
-    std::string AbstractSensor::getName(void) const
+    std::string AbstractSensorBase::getName(void) const
     {
         return name_;
     }
 
-    void AbstractSensor::updateTelemetry(void)
+    void AbstractSensorBase::updateTelemetry(void)
     {
         if(getIsTelemetryConfigured())
         {

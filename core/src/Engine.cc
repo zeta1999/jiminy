@@ -42,10 +42,43 @@ namespace exo_simu
     {
         telemetryData_ = std::make_shared<TelemetryData>();
         telemetrySender_.configureObject(telemetryData_, OBJECT_NAME);
-
         telemetryRecorder_ = std::make_shared<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
 
         setOptions(getDefaultOptions());
+    }
+
+    Engine::Engine(Engine const & engine) :
+    engineOptions_(nullptr),
+    isInitialized_(engine.isInitialized_),
+    model_(engine.model_),
+    controller_(engine.controller_),
+    engineOptionsHolder_(engine.engineOptionsHolder_),
+    callbackFct_(engine.callbackFct_),
+    telemetrySender_(),
+    telemetryData_(nullptr),
+    telemetryRecorder_(nullptr),
+    stepperState_(engine.stepperState_)
+    {
+        telemetryData_ = std::make_shared<TelemetryData>();
+        telemetrySender_.configureObject(telemetryData_, OBJECT_NAME);
+        telemetryRecorder_ = std::make_shared<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
+
+        setOptions(engine.engineOptionsHolder_);
+    }
+
+    Engine & Engine::operator = (Engine other)
+    {
+        std::swap(engineOptions_,other.engineOptions_);
+        std::swap(isInitialized_,other.isInitialized_);
+        std::swap(model_,other.model_),
+        std::swap(controller_,other.controller_);
+        std::swap(engineOptionsHolder_,other.engineOptionsHolder_);
+        std::swap(callbackFct_,other.callbackFct_);
+        std::swap(telemetrySender_,other.telemetrySender_);
+        std::swap(telemetryData_,other.telemetryData_);
+        std::swap(telemetryRecorder_,other.telemetryRecorder_);
+        std::swap(stepperState_,other.stepperState_);
+        return *this;
     }
 
     Engine::~Engine(void)
@@ -64,7 +97,7 @@ namespace exo_simu
             std::cout << "Error - Engine::initialize - Model not initialized." << std::endl;
             return result_t::ERROR_INIT_FAILED;
         }
-        model_ = std::shared_ptr<Model>(model.clone());
+        model_ = &model;
 
         if (returnCode == result_t::SUCCESS)
         {
@@ -106,7 +139,7 @@ namespace exo_simu
         }
         if (returnCode == result_t::SUCCESS)
         {
-            controller_ = std::shared_ptr<AbstractController>(controller.clone());
+            controller_ = &controller;
         }
 
         if (returnCode == result_t::SUCCESS)
@@ -521,7 +554,7 @@ namespace exo_simu
 
     Model const & Engine::getModel(void) const
     {
-        return *model_.get();
+        return *model_;
     }
 
     void Engine::getLog(std::vector<std::string> & header, 

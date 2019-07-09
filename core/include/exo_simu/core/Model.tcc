@@ -34,9 +34,9 @@ namespace exo_simu
 
             // Create the sensor and add it to its group
             sensorsGroupHolder_[sensorType][sensorName] = 
-                std::shared_ptr<AbstractSensor>(new TSensor(*this, 
-                                                            sensorsDataHolder_.at(sensorType), 
-                                                            sensorName));
+                std::shared_ptr<AbstractSensorBase>(new TSensor(*this, 
+                                                                sensorsDataHolder_.at(sensorType), 
+                                                                sensorName));
 
             // Get a pointer to the sensor
             sensor = getSensor<TSensor>(sensorType, sensorName);

@@ -31,7 +31,7 @@ namespace exo_simu
         // Empty.
     }
 
-    AbstractSensor* ImuSensor::clone(void)
+    AbstractSensorBase* ImuSensor::clone(void) const
     {
         return new ImuSensor(*this);
     }
@@ -103,7 +103,7 @@ namespace exo_simu
         // Empty.
     }
 
-    AbstractSensor* ForceSensor::clone(void)
+    AbstractSensorBase* ForceSensor::clone(void) const
     {
         return new ForceSensor(*this);
     }
@@ -143,7 +143,7 @@ namespace exo_simu
         {
             std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
             std::vector<int32_t>::const_iterator it = std::find(contactFramesIdx.begin(), contactFramesIdx.end(), frameIdx_);
-            data() = model_->contactForces_[*it].linear();
+            data() = model_->contactForces_[std::distance(contactFramesIdx.begin(), it)].linear();
         }
 
         return returnCode;
@@ -172,7 +172,7 @@ namespace exo_simu
         // Empty.
     }
 
-    AbstractSensor* EncoderSensor::clone(void)
+    AbstractSensorBase* EncoderSensor::clone(void) const
     {
         return new EncoderSensor(*this);
     }

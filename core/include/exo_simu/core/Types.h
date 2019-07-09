@@ -15,7 +15,7 @@
 
 namespace exo_simu
 {
-    class AbstractSensor;
+    class AbstractSensorBase;
     
     // wdc types
     typedef bool   bool_t;
@@ -52,7 +52,7 @@ namespace exo_simu
                                           std::map<std::string, boost::recursive_variant_> >::type configField_t;
     typedef std::map<std::string, configField_t> configHolder_t;
 
-    typedef std::map<std::string, std::shared_ptr<AbstractSensor> > sensorsHolder_t;
+    typedef std::map<std::string, std::shared_ptr<AbstractSensorBase> > sensorsHolder_t;
     typedef std::map<std::string, sensorsHolder_t> sensorsGroupHolder_t;
 }
 

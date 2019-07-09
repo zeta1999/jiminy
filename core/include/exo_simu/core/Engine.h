@@ -296,6 +296,8 @@ namespace exo_simu
         
     public:
         Engine(void);
+        Engine(Engine const & engine);
+        Engine & operator = (Engine other);
         ~Engine(void);
 
         result_t initialize(Model              & model,
@@ -327,8 +329,8 @@ namespace exo_simu
 
     protected:
         bool isInitialized_;
-        std::shared_ptr<Model> model_;
-        std::shared_ptr<AbstractController> controller_;
+        Model * model_;
+        AbstractController * controller_;
         configHolder_t engineOptionsHolder_;
         callbackFct_t callbackFct_;
 

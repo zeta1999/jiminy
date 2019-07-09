@@ -16,7 +16,7 @@
 namespace exo_simu
 {
     class Engine;
-    class AbstractSensor;
+    class AbstractSensorBase;
     class TelemetryData;
 
     struct SensorDataHolder_t
@@ -37,7 +37,7 @@ namespace exo_simu
 
         matrixN_t data_;
         std::vector<uint32_t> counters_;
-        std::vector<AbstractSensor *> sensors_;
+        std::vector<AbstractSensorBase *> sensors_;
         uint32_t num_;
     };
 
@@ -127,6 +127,9 @@ namespace exo_simu
         uint32_t nx(void) const;
 
     protected:
+        Model(Model const & model) = default; // TODO: Implement public deep-copy constructor instead
+        Model & operator = (Model const & other) = default; // TODO: Implement public deep-copy constructor instead
+
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
         
         template<typename TSensor>
