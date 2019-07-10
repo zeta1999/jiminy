@@ -51,7 +51,7 @@ namespace exo_simu
         /// \brief Get access to the memory device holding the data
         ////////////////////////////////////////////////////////////////////////
         void getData(std::vector<std::string>             & header, 
-                     std::vector<float64_t>               & timestamps, 
+                     std::vector<float32_t>               & timestamps, 
                      std::vector<std::vector<int32_t> >   & intData, 
                      std::vector<std::vector<float32_t> > & floatData);
     private:
@@ -69,7 +69,6 @@ namespace exo_simu
         /// Private attributes
         ///////////////////////////////////////////////////////////////////////
         std::shared_ptr<TelemetryData const> telemetryData_;
-        float64_t startTime_;               ///< Time at which the log was started.
         std::vector<MemoryDevice> flows_;
 
         int64_t recordedBytesLimits_;

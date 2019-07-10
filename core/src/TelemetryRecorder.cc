@@ -13,7 +13,6 @@ namespace exo_simu
 {
     TelemetryRecorder::TelemetryRecorder(std::shared_ptr<TelemetryData const> const & telemetryDataInstance) :
     telemetryData_(telemetryDataInstance),
-    startTime_(0.0), 
     flows_(),
     recordedBytesLimits_(0),
     recordedBytesDataLine_(0),
@@ -41,7 +40,7 @@ namespace exo_simu
                                 integerSectionSize_, 
                                 floatsAddress_, 
                                 floatSectionSize_);
-        recordedBytesDataLine_ = sizeof(float64_t) + integerSectionSize_ + floatSectionSize_;
+        recordedBytesDataLine_ = sizeof(float32_t) + integerSectionSize_ + floatSectionSize_;
 
         // Get the header
         std::vector<char_t> header;
@@ -108,7 +107,7 @@ namespace exo_simu
         if (returnCode == result_t::SUCCESS)
         {
             // Write time
-            flows_.back().write(timestamp);
+            flows_.back().write(static_cast<float32_t>(timestamp));
 
             // Write data, integers first.
             flows_.back().write(reinterpret_cast<uint8_t const*>(integersAddress_), integerSectionSize_);
@@ -117,7 +116,7 @@ namespace exo_simu
             flows_.back().write(reinterpret_cast<uint8_t const*>(floatsAddress_), floatSectionSize_);
 
             // Update internal counter
-            recordedBytes_ += sizeof(float64_t) + integerSectionSize_ + floatSectionSize_;
+            recordedBytes_ += sizeof(float32_t) + integerSectionSize_ + floatSectionSize_;
         }
 
         return returnCode;
@@ -125,7 +124,7 @@ namespace exo_simu
     }
 
     void TelemetryRecorder::getData(std::vector<std::string>             & header, 
-                                    std::vector<float64_t>               & timestamps, 
+                                    std::vector<float32_t>               & timestamps, 
                                     std::vector<std::vector<int32_t> >   & intData, 
                                     std::vector<std::vector<float32_t> > & floatData)
     {
@@ -134,7 +133,7 @@ namespace exo_simu
         intData.clear();
         floatData.clear();
 
-        float64_t timestamp;
+        float32_t timestamp;
         std::vector<int32_t> intDataLine;
         intDataLine.resize(integerSectionSize_ * sizeof(uint8_t) / sizeof(int32_t));
         std::vector<float32_t> floatDataLine;
@@ -167,7 +166,7 @@ namespace exo_simu
             floatData.reserve(floatData.size() + numberLines);
             for (uint32_t j=0; j < numberLines; j++)
             {
-                flows_[i].readData(reinterpret_cast<uint8_t *>(&timestamp), sizeof(float64_t));
+                flows_[i].readData(reinterpret_cast<uint8_t *>(&timestamp), sizeof(float32_t));
                 flows_[i].readData(reinterpret_cast<uint8_t *>(intDataLine.data()), integerSectionSize_);
                 flows_[i].readData(reinterpret_cast<uint8_t *>(floatDataLine.data()), floatSectionSize_);
                 timestamps.emplace_back(timestamp);

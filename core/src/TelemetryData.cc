@@ -152,6 +152,20 @@ namespace exo_simu
         char_t const * startConstantsHeader = reinterpret_cast<char_t *>(constantsHeader_) + constantsHeader_->startNameSection;
         char_t const * stopConstantsHeader = reinterpret_cast<char_t *>(constantsHeader_) + constantsHeader_->nextFreeNameOffset;
         header.insert(header.end(), startConstantsHeader, stopConstantsHeader);
+        header.push_back('\n');
+
+        // Record entries numbers.
+        std::string entriesNumbers;
+        entriesNumbers += NUM_INTS;
+        entriesNumbers += std::to_string((integersHeader_->nextFreeDataOffset - integersHeader_->startDataSection) /
+                                          static_cast<int64_t>(sizeof(int32_t))); 
+        entriesNumbers += '\0';
+        entriesNumbers += NUM_FLOATS;
+        entriesNumbers += std::to_string((floatsHeader_->nextFreeDataOffset - floatsHeader_->startDataSection) / 
+                                          static_cast<int64_t>(sizeof(float32_t)) + 1); // +1 because we add Global.Time
+        entriesNumbers += '\0';
+        header.insert(header.end(), entriesNumbers.data(), entriesNumbers.data() + entriesNumbers.size());
+        header.push_back('\n');
 
         // Record header - Global.Time - integers, floats.
         header.insert(header.end(), GLOBAL_TIME.data(), GLOBAL_TIME.data() + GLOBAL_TIME.size());

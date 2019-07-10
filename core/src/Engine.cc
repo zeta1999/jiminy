@@ -553,14 +553,14 @@ namespace exo_simu
     void Engine::getLog(std::vector<std::string> & header, 
                         matrixN_t                & log)
     {
-        std::vector<float64_t> timestamps;
+        std::vector<float32_t> timestamps;
         std::vector<std::vector<int32_t> > intData;
         std::vector<std::vector<float32_t> > floatData;
         telemetryRecorder_->getData(header, timestamps, intData, floatData);
 
         // Never empty since it contains at least the initial state
         log.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
-        log.col(0) = vectorN_t::Map(timestamps.data(), timestamps.size());
+        log.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(timestamps.data(), timestamps.size()).cast<float64_t>();
         for (uint32_t i=0; i<intData.size(); i++)
         {
             log.block(i, 1, 1, intData[i].size()) = 
@@ -571,5 +571,40 @@ namespace exo_simu
             log.block(i, 1 + intData[0].size(), 1, floatData[i].size()) = 
                 Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(), floatData[i].size()).cast<float64_t>();
         }
+    }
+
+    void Engine::writeLog(std::string const & filename)
+    {
+        std::vector<std::string> header;
+        matrixN_t log;
+        getLog(header, log);
+        std::ofstream myfile;
+        Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
+        myfile.open(filename, std::ofstream::out | std::ofstream::trunc);
+        bool isConstantSection = true;
+        for (uint32_t i=0; i < header.size(); i++)
+        {
+            myfile << header[i];
+            if (i < header.size() - 1)
+            {
+                if (header[i+1].front() != '\n')
+                {
+                    if (isConstantSection)
+                    {
+                        myfile << "\n";
+                    }
+                    else
+                    {
+                        myfile << ", ";
+                    }
+                }
+                else
+                {
+                    isConstantSection = false;
+                }
+            }
+        }
+        myfile << "\n" << log.format(CSVFormat);
+        myfile.close();
     }
 }

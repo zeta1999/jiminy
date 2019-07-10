@@ -347,6 +347,7 @@ namespace exo_simu
         std::vector<vectorN_t> const & getContactForces(void) const;
         void getLog(std::vector<std::string> & header, 
                     matrixN_t                & log);
+        void writeLog(std::string const & filename);
 
     protected:
         void systemDynamics(float64_t const & t,

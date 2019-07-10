@@ -159,13 +159,7 @@ int main(int argc, char *argv[])
     matrixN_t log;
     engine.getLog(header, log);
     std::cout << log.rows() << " log points" << std::endl;
-    std::ofstream myfile;
-    Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
-    myfile.open(outputDirPath + std::string("/log.csv"), std::ofstream::out | std::ofstream::trunc);
-    std::copy(header.begin(), header.end()-1, std::ostream_iterator<std::string>(myfile, ", "));
-    std::copy(header.end()-1, header.end(), std::ostream_iterator<std::string>(myfile, "\n"));
-    myfile << log.format(CSVFormat);
-    myfile.close();
+    engine.writeLog(outputDirPath + std::string("/log.csv"));
 
     return 0;
 }

@@ -163,6 +163,7 @@ namespace python
                 .def("simulate", &PyEngineVisitor::simulate_with_callback, 
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle", "callback_handle"))
                 .def("get_log", &PyEngineVisitor::getLog)
+                .def("write_log", &PyEngineVisitor::writeLog)
                 .def("get_urdf_path", &PyEngine::getUrdfPath, 
                                       bp::return_value_policy<bp::return_by_value>())
                 .def("get_model_options", &PyEngineVisitor::getModelOptions, 
@@ -212,6 +213,12 @@ namespace python
             controllerPyWrapper controllerFct = controllerPyWrapper(controllerPy);
             callbackPyWrapper callbackFct = callbackPyWrapper(callbackPy);
             self.simulate(x_init, end_time, controllerFct, callbackFct);
+        }
+
+        static void writeLog(PyEngine          & self, 
+                             std::string const & filename)
+        {
+            self.simulator_.writeLog(filename);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
