@@ -21,7 +21,6 @@ namespace exo_simu
     public:
         ExoController(void);
         ~ExoController(void);
-        AbstractController* clone(void) override;
 
         result_t initialize(commandFct_t commandFct);
 

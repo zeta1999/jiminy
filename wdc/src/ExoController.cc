@@ -28,11 +28,6 @@ namespace exo_simu
         // Empty.
     }
 
-    AbstractController* ExoController::clone(void)
-    {
-        return new ExoController(*this);
-    }
-
     result_t ExoController::initialize(commandFct_t commandFct)
     {
         result_t returnCode = result_t::SUCCESS;

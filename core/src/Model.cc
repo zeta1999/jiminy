@@ -40,12 +40,7 @@ namespace exo_simu
     {
         // Empty.
     }
-
-    Model* Model::clone(void)
-    {
-        return new Model(*this);
-    }
-
+    
     result_t Model::initialize(std::string              const & urdfPath, 
                                std::vector<std::string> const & contactFramesNames, 
                                std::vector<std::string> const & jointsNames)

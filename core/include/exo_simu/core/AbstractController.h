@@ -11,6 +11,11 @@ namespace exo_simu
     class AbstractController
     {
     public:
+        // Disable the copy of the class
+        AbstractController(AbstractController const & controller) = delete;
+        AbstractController & operator = (AbstractController const & controller) = delete;
+
+    public:
         virtual configHolder_t getDefaultOptions()
         {
             configHolder_t config;
@@ -30,7 +35,6 @@ namespace exo_simu
     public:
         AbstractController(void);
         virtual ~AbstractController(void);
-        virtual AbstractController* clone(void) = 0;
 
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & ctrlOptions);

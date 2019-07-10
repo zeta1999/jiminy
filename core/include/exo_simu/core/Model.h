@@ -46,6 +46,11 @@ namespace exo_simu
         friend Engine;
 
     public:
+        // Disable the copy of the class
+        Model(Model const & model) = delete;
+        Model & operator = (Model const & other) = delete;
+
+    public:
         virtual configHolder_t getDefaultJointOptions()
         {
             configHolder_t config;
@@ -93,7 +98,6 @@ namespace exo_simu
     public:
         Model(void);
         virtual ~Model(void);
-        virtual Model* clone(void);
 
         result_t initialize(std::string              const & urdfPath, 
                             std::vector<std::string> const & contactFramesNames, 
@@ -127,9 +131,6 @@ namespace exo_simu
         uint32_t nx(void) const;
 
     protected:
-        Model(Model const & model) = default; // TODO: Implement public deep-copy constructor instead
-        Model & operator = (Model const & other) = default; // TODO: Implement public deep-copy constructor instead
-
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
         
         template<typename TSensor>

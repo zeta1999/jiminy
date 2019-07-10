@@ -18,37 +18,6 @@ namespace exo_simu
         AbstractSensorBase::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
     }
 
-    AbstractSensorBase::AbstractSensorBase(AbstractSensorBase const & abstractSensor) :
-    sensorOptions_(nullptr),
-    name_(abstractSensor.name_),
-    fieldNames_(abstractSensor.fieldNames_),
-    telemetrySender_(abstractSensor.telemetrySender_),
-    isInitialized_(abstractSensor.isInitialized_),
-    isTelemetryConfigured_(abstractSensor.isTelemetryConfigured_),
-    model_(abstractSensor.model_),                 
-    sensorOptionsHolder_(abstractSensor.sensorOptionsHolder_)
-    {
-        AbstractSensorBase::setOptions(abstractSensor.sensorOptionsHolder_);
-    }
-
-    AbstractSensorBase & AbstractSensorBase::operator = (AbstractSensorBase const & other) 
-    {
-        if (this != &other)
-        {
-            AbstractSensorBase * temp(other.clone());
-            std::swap(sensorOptions_, temp->sensorOptions_);
-            std::swap(name_, temp->name_);
-            std::swap(fieldNames_, temp->fieldNames_);
-            std::swap(telemetrySender_, temp->telemetrySender_);
-            std::swap(isInitialized_, temp->isInitialized_),
-            std::swap(isTelemetryConfigured_, temp->isTelemetryConfigured_);
-            std::swap(model_, temp->model_);  
-            std::swap(sensorOptionsHolder_, temp->sensorOptionsHolder_);
-            delete temp;
-        }
-        return *this;
-    }
-
     AbstractSensorBase::~AbstractSensorBase(void)
     {
         // Empty.

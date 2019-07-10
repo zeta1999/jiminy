@@ -33,6 +33,11 @@ namespace exo_simu
         typedef runge_kutta_dopri5<vectorN_t, float64_t, vectorN_t, float64_t, vector_space_algebra> stepper_t;
 
     public:
+        // Disable the copy of the class
+        Engine(Engine const & engine) = delete;
+        Engine & operator = (Engine const & other) = delete;
+
+    public:
         configHolder_t getDefaultContactOptions()
         {
             configHolder_t config;
@@ -296,8 +301,6 @@ namespace exo_simu
         
     public:
         Engine(void);
-        Engine(Engine const & engine);
-        Engine & operator = (Engine other);
         ~Engine(void);
 
         result_t initialize(Model              & model,

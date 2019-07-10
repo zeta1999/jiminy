@@ -18,11 +18,6 @@ namespace exo_simu
         // Empty.
     }
 
-    Model* ExoModel::clone(void)
-    {
-        return new ExoModel(*this);
-    }
-
     result_t ExoModel::initialize(std::string const & urdfPath)
     {
         result_t returnCode = result_t::SUCCESS;

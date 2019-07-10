@@ -15,7 +15,11 @@ namespace exo_simu
     class AbstractSensorBase
     {
         template<typename> friend class AbstractSensorTpl;
-        friend class Model;
+
+    public:
+        // Disable the copy of the class
+        AbstractSensorBase(AbstractSensorBase const & abstractSensor) = delete;
+        AbstractSensorBase & operator = (AbstractSensorBase const & other) = delete;
 
     public:
         virtual configHolder_t getDefaultOptions(void)
@@ -37,10 +41,7 @@ namespace exo_simu
     public:
         AbstractSensorBase(Model       const & model,
                            std::string const & name);
-        AbstractSensorBase(AbstractSensorBase const & abstractSensor);
-        AbstractSensorBase & operator = (AbstractSensorBase const & other);
         virtual ~AbstractSensorBase(void);
-        virtual AbstractSensorBase* clone(void) const = 0;
         friend void swap(AbstractSensorBase & first, 
                          AbstractSensorBase & second);
 
@@ -90,6 +91,11 @@ namespace exo_simu
     class AbstractSensorTpl : public AbstractSensorBase
     {
     public:
+        // Disable the copy of the class
+        AbstractSensorTpl(AbstractSensorTpl const & abstractSensor) = delete;
+        AbstractSensorTpl & operator = (AbstractSensorTpl const & other)  = delete;
+
+    public:
         AbstractSensorTpl(Model                               const & model,
                           std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                           std::string                         const & name):
@@ -102,39 +108,6 @@ namespace exo_simu
             data() = vectorN_t::Zero(sizeOf_);
             dataHolder_->sensors_.push_back(this);
             dataHolder_->counters_.push_back(1);
-        };
-
-        AbstractSensorTpl(AbstractSensorTpl const & abstractSensor):
-        AbstractSensorBase(abstractSensor),
-        dataHolder_(abstractSensor.dataHolder_),
-        sensorId_(abstractSensor.sensorId_)
-        {
-            /* Do NOT create a new sensor and making a copy
-               BUT update the pointer in the global container
-               in case the original object would be destroyed. */
-            dataHolder_->sensors_[sensorId_] = this;
-            ++dataHolder_->counters_[sensorId_];
-        };
-
-        AbstractSensorTpl & operator = (AbstractSensorTpl const & other) 
-        {
-            if (this != &other) {
-                /* Make the overriden sensor floating by deleting the
-                   data in the global containers. Note that it does
-                   NOT actually destroy the object. */
-                ~AbstractSensorTpl();
-
-                /* Assign the same sensor id to the floating sensor
-                   than the other one, so that they share the same
-                   data in the global container. */
-                AbstractSensorBase::operator=(other);
-                dataHolder_ = std::shared_ptr<SensorDataHolder_t>(other.dataHolder_);
-                sensorId_ = other.sensorId;
-                dataHolder_->sensors_[sensorId_] = this;
-                ++dataHolder_->counters_[sensorId_];
-            }
-            
-            return *this;
         };
 
         virtual ~AbstractSensorTpl(void)

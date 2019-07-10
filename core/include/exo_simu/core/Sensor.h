@@ -35,7 +35,6 @@ namespace exo_simu
                   std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                   std::string                         const & name);
         ~ImuSensor(void);
-        AbstractSensorBase* clone(void) const override;
 
         void initialize(int32_t const & frameIdx);
 
@@ -81,7 +80,6 @@ namespace exo_simu
                     std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                     std::string                         const & name);
         ~ForceSensor(void);
-        AbstractSensorBase* clone(void) const override;
 
         void initialize(int32_t const & frameIdx);
 
@@ -127,7 +125,6 @@ namespace exo_simu
                       std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                       std::string                         const & name);
         ~EncoderSensor(void);
-        AbstractSensorBase* clone(void) const override;
 
         void initialize(int32_t const & jointPositionIdx,
                         int32_t const & jointVelocityIdx);

@@ -31,11 +31,6 @@ namespace exo_simu
         // Empty.
     }
 
-    AbstractSensorBase* ImuSensor::clone(void) const
-    {
-        return new ImuSensor(*this);
-    }
-
     void ImuSensor::initialize(int32_t const & frameIdx)
     {
         frameIdx_ = frameIdx;
@@ -103,11 +98,6 @@ namespace exo_simu
         // Empty.
     }
 
-    AbstractSensorBase* ForceSensor::clone(void) const
-    {
-        return new ForceSensor(*this);
-    }
-
     void ForceSensor::initialize(int32_t const & frameIdx)
     {
         frameIdx_ = frameIdx;
@@ -170,11 +160,6 @@ namespace exo_simu
     EncoderSensor::~EncoderSensor(void)
     {
         // Empty.
-    }
-
-    AbstractSensorBase* EncoderSensor::clone(void) const
-    {
-        return new EncoderSensor(*this);
     }
 
     void EncoderSensor::initialize(int32_t const & jointPositionIdx,

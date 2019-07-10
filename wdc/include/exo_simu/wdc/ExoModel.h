@@ -59,7 +59,6 @@ namespace exo_simu
     public:
         ExoModel(void);
         ~ExoModel(void);
-        Model* clone(void) override;
 
         result_t initialize(std::string          const & urdfPath, 
                             std::vector<int32_t> const & contactFramesIdx) = delete;
