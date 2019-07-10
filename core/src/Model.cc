@@ -40,7 +40,7 @@ namespace exo_simu
     {
         // Empty.
     }
-    
+
     result_t Model::initialize(std::string              const & urdfPath, 
                                std::vector<std::string> const & contactFramesNames, 
                                std::vector<std::string> const & jointsNames)
@@ -172,7 +172,7 @@ namespace exo_simu
             }
         }
 
-        mdlOptions_ = std::make_shared<modelOptions_t const>(mdlOptionsHolder_);
+        mdlOptions_ = std::make_unique<modelOptions_t const>(mdlOptionsHolder_);
 
         return returnCode;
     }

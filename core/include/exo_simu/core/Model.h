@@ -152,7 +152,7 @@ namespace exo_simu
     public:
         pinocchio::Model pncModel_;
         pinocchio::Data pncData_;
-        std::shared_ptr<modelOptions_t const> mdlOptions_;
+        std::unique_ptr<modelOptions_t const> mdlOptions_;
         pinocchio::container::aligned_vector<pinocchio::Force> contactForces_; // Buffer to store the contact forces
 
     protected:

@@ -73,7 +73,7 @@ namespace exo_simu
                              vectorN_t const & u) = 0;
 
     public:
-        std::shared_ptr<abstractSensorOptions_t const> sensorOptions_;
+        std::unique_ptr<abstractSensorOptions_t const> sensorOptions_;
 
     private:
         std::string name_;

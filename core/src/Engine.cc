@@ -41,8 +41,7 @@ namespace exo_simu
     stepperState_()
     {
         telemetryData_ = std::make_shared<TelemetryData>();
-        telemetrySender_.configureObject(telemetryData_, OBJECT_NAME);
-        telemetryRecorder_ = std::make_shared<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
+        telemetryRecorder_ = std::make_unique<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
 
         setOptions(getDefaultOptions());
     }
@@ -123,11 +122,23 @@ namespace exo_simu
         // Initialize the logger
         stepperState_.initialize(*model_);
         telemetryData_->reset();
-        telemetrySender_.configureObject(telemetryData_, OBJECT_NAME);
-        (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
-        (void) registerNewVectorEntry(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
-        (void) registerNewVectorEntry(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
-        (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+        telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
+        if (engineOptions_->telemetry.logConfiguration)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+        }
+        if (engineOptions_->telemetry.logVelocity)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+        }
+        if (engineOptions_->telemetry.logAcceleration)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+        }
+        if (engineOptions_->telemetry.logCommand)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+        }
         model_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
@@ -206,10 +217,22 @@ namespace exo_simu
         while (true)
         {
             // Log the current time, state, command, and sensors
-            updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
-            updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
-            updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
-            updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+            if (engineOptions_->telemetry.logConfiguration)
+            {
+                updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+            }
+            if (engineOptions_->telemetry.logVelocity)
+            {
+                updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+            }
+            if (engineOptions_->telemetry.logAcceleration)
+            {
+                updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+            }
+            if (engineOptions_->telemetry.logCommand)
+            {
+                updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+            }
             model_->updateSensorsTelemetry();
             telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
@@ -506,7 +529,7 @@ namespace exo_simu
     void Engine::setOptions(configHolder_t const & engineOptions)
     {
         engineOptionsHolder_ = engineOptions;
-        engineOptions_ = std::make_shared<engineOptions_t const>(engineOptionsHolder_);
+        engineOptions_ = std::make_unique<engineOptions_t const>(engineOptionsHolder_);
         if (isInitialized_)
         {
             model_->pncModel_.gravity = engineOptions_->world.gravity; // It is reversed (Third Newton law)

@@ -40,7 +40,7 @@ namespace exo_simu
     void ImuSensor::setOptions(configHolder_t const & sensorOptions)
     {
         sensorOptionsHolder_ = sensorOptions;
-        imuSensorOptions_ = std::make_shared<imuSensorOptions_t const>(sensorOptionsHolder_);
+        imuSensorOptions_ = std::make_unique<imuSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     int32_t ImuSensor::getFrameIdx(void) const
@@ -107,7 +107,7 @@ namespace exo_simu
     void ForceSensor::setOptions(configHolder_t const & sensorOptions)
     {
         sensorOptionsHolder_ = sensorOptions;
-        forceSensorOptions_ = std::make_shared<forceSensorOptions_t const>(sensorOptionsHolder_);
+        forceSensorOptions_ = std::make_unique<forceSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     int32_t ForceSensor::getFrameIdx(void) const
@@ -173,7 +173,7 @@ namespace exo_simu
     void EncoderSensor::setOptions(configHolder_t const & sensorOptions)
     {
         sensorOptionsHolder_ = sensorOptions;
-        encoderSensorOptions_ = std::make_shared<encoderSensorOptions_t const>(sensorOptionsHolder_);
+        encoderSensorOptions_ = std::make_unique<encoderSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     int32_t EncoderSensor::getJointPositionIdx(void) const

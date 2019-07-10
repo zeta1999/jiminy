@@ -52,7 +52,7 @@ namespace exo_simu
     void AbstractSensorBase::setOptions(configHolder_t const & sensorOptions)
     {
         sensorOptionsHolder_ = sensorOptions;
-        sensorOptions_ = std::make_shared<abstractSensorOptions_t const>(sensorOptionsHolder_);
+        sensorOptions_ = std::make_unique<abstractSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     bool AbstractSensorBase::getIsInitialized(void) const

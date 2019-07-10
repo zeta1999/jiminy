@@ -23,6 +23,9 @@ namespace exo_simu
         ~ExoController(void);
 
         result_t initialize(commandFct_t commandFct);
+        result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+
+        virtual void updateTelemetry(void) override;
 
         void compute_command(Model     const & model,
                              float64_t const & t,

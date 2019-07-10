@@ -16,7 +16,7 @@
 
 namespace exo_simu
 {
-    std::string const OBJECT_NAME("Engine");
+    std::string const ENGINE_OBJECT_NAME("Engine");
 
     using namespace boost::numeric::odeint;
     
@@ -138,7 +138,34 @@ namespace exo_simu
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
             tolRel(boost::get<float64_t>(options.at("tolRel"))),
             sensorsUpdatePeriod(boost::get<float64_t>(options.at("sensorsUpdatePeriod"))),
-            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod")))//,
+            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod")))
+            {
+                // Empty.
+            }
+        };
+
+        configHolder_t getDefaultTelemetryOptions()
+        {
+            configHolder_t config;
+            config["logConfiguration"] = true;
+            config["logVelocity"] = true;
+            config["logAcceleration"] = true;
+            config["logCommand"] = true;
+            return config;
+        };
+
+        struct telemetryOptions_t
+        {
+            bool const logConfiguration;
+            bool const logVelocity;
+            bool const logAcceleration;
+            bool const logCommand;
+
+            telemetryOptions_t(configHolder_t const & options):
+            logConfiguration(boost::get<bool>(options.at("logConfiguration"))),
+            logVelocity(boost::get<bool>(options.at("logVelocity"))),
+            logAcceleration(boost::get<bool>(options.at("logAcceleration"))),
+            logCommand(boost::get<bool>(options.at("logCommand")))
             {
                 // Empty.
             }
@@ -147,6 +174,7 @@ namespace exo_simu
         configHolder_t getDefaultOptions()
         {
             configHolder_t config;
+            config["telemetry"] = getDefaultTelemetryOptions();
             config["stepper"] = getDefaultStepperOptions();
             config["world"] = getDefaultWorldOptions();
             config["joints"] = getDefaultJointOptions();
@@ -157,12 +185,14 @@ namespace exo_simu
 
         struct engineOptions_t
         {
+            telemetryOptions_t const telemetry;
             stepperOptions_t const stepper;
             worldOptions_t   const world;
             jointOptions_t   const joints;
             contactOptions_t const contacts;
 
             engineOptions_t(configHolder_t const & options) :
+            telemetry(boost::get<configHolder_t>(options.at("telemetry"))),
             stepper(boost::get<configHolder_t>(options.at("stepper"))),
             world(boost::get<configHolder_t>(options.at("world"))),
             joints(boost::get<configHolder_t>(options.at("joints"))),
@@ -328,7 +358,7 @@ namespace exo_simu
         vectorN_t contactDynamics(int32_t const & frameId) const;
 
     public:
-        std::shared_ptr<engineOptions_t const> engineOptions_;
+        std::unique_ptr<engineOptions_t const> engineOptions_;
 
     protected:
         bool isInitialized_;
@@ -340,7 +370,7 @@ namespace exo_simu
     private:
         TelemetrySender telemetrySender_;
         std::shared_ptr<TelemetryData> telemetryData_;
-        std::shared_ptr<TelemetryRecorder> telemetryRecorder_;
+        std::unique_ptr<TelemetryRecorder> telemetryRecorder_;
         stepperState_t stepperState_; // Internal state for the integration loop
     };
 }

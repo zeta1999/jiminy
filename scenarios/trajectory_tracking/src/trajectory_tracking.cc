@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
     std::cout << "Log directory: "<< outputDirPath << std::endl;
 
     // =====================================================================
-    // ============= Instantiate and configure the simulator ===============
+    // ============ Instantiate and configure the simulation ===============
     // =====================================================================
 
     // Instantiate timer
@@ -101,42 +101,45 @@ int main(int argc, char *argv[])
 
     // Instantiate and configuration the exoskeleton model
     ExoModel model;
-    model.initialize(urdfPath);
     configHolder_t mdlOptions = model.getOptions();
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logForceSensors")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = false;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logEncoderSensors")) = false;
     model.setOptions(mdlOptions);
+    model.initialize(urdfPath);
 
     // Instantiate and configuration the exoskeleton controller
     ExoController controller;
-    controller.initialize(compute_command);
     configHolder_t ctrlOptions = controller.getOptions();
+    boost::get<bool>(boost::get<configHolder_t>(ctrlOptions.at("telemetry")).at("logController")) = false;
     controller.setOptions(ctrlOptions);
+    controller.initialize(compute_command);
 
-    // Instantiate and configuration the simulator
-    Engine simulator;
-    simulator.initialize(model, controller, callback);
-    configHolder_t simuOptions = simulator.getDefaultOptions();
+    // Instantiate and configuration the engine
+    Engine engine;
+    configHolder_t simuOptions = engine.getDefaultOptions();
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logConfiguration")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logVelocity")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logAcceleration")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logCommand")) = true;
     boost::get<vectorN_t>(boost::get<configHolder_t>(simuOptions.at("world")).at("gravity"))(2) = -9.81;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
-    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 1.0e-3;
-    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 1.0e-3;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 0.0; //1.0e-3;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 0.0; //1.0e-3;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("frictionDry")) = 5.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("frictionViscous")) = 5.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("transitionEps")) = 0.001;
-
-    // boost::get<bool>(simOpts.at("isLogControllerEnable")) = false;
-    // boost::get<bool>(simOpts.at("isLogLogForceSensorsEnable")) = false;
-    // boost::get<bool>(simOpts.at("isLogLogImuSensorsEnable")) = false;
-    simulator.setOptions(simuOptions);
+    engine.setOptions(simuOptions);
+    engine.initialize(model, controller, callback);
 
     timer.toc();
-    std::cout << "Instantiation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // =====================================================================
-    // ======================== Run the simulator ==========================
+    // ======================= Run the simulation ==========================
     // =====================================================================
 
     // Prepare options
@@ -147,14 +150,14 @@ int main(int argc, char *argv[])
 
     // Run simulation
     timer.tic();
-    simulator.simulate(x0,tf);
+    engine.simulate(x0,tf);
     timer.toc();
     std::cout << "Simulation time: " << timer.dt*1.0e3 << "ms" << std::endl;
 
     // Write the log file
     std::vector<std::string> header;
     matrixN_t log;
-    simulator.getLog(header, log);
+    engine.getLog(header, log);
     std::cout << log.rows() << " log points" << std::endl;
     std::ofstream myfile;
     Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");

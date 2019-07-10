@@ -43,6 +43,16 @@ trajectory_data = extract_state_from_neural_network_prediction(urdf_path, pred)
 simulator = exo_simu.simulator()
 model_options = simulator.get_model_options()
 simu_options = simulator.get_simulation_options()
+ctrl_options = simulator.get_controller_options()
+
+ctrl_options["telemetry"]["logController"] = False
+model_options["telemetry"]["logForceSensors"] = True
+model_options["telemetry"]["logImuSensors"] = False
+model_options["telemetry"]["logEncoderSensors"] = False
+simu_options["telemetry"]["logConfiguration"] = True
+simu_options["telemetry"]["logVelocity"] = True
+simu_options["telemetry"]["logAcceleration"] = True
+simu_options["telemetry"]["logCommand"] = True
 
 # simu_options["world"]["gravity"][2] = 0
 
@@ -61,6 +71,7 @@ simu_options['contacts']['transitionEps'] = 0.001
 simulator.init(urdf_path)
 simulator.set_model_options(model_options)
 simulator.set_simulation_options(simu_options)
+simulator.set_controller_options(ctrl_options)
 
 def callback(t, x):
     return bool(x[2] > 0) 

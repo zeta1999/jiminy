@@ -150,15 +150,14 @@ namespace exo_simu
                 std::vector<char_t> headerCharBuffer;
                 headerCharBuffer.resize(headerSize_ * sizeof(uint8_t) / sizeof(char_t));
                 flows_[i].readData(reinterpret_cast<uint8_t *>(headerCharBuffer.data()), headerSize_);
-                char_t const * startHeader = &headerCharBuffer[0];
-                char_t const * stopHeader = &headerCharBuffer.back();
-                char_t const * pHeader = startHeader;
+                char_t const * pHeader = &headerCharBuffer[0];
+                uint32_t posHeader = 0;
                 std::string fieldHeader(pHeader);
-                while (pHeader != stopHeader && fieldHeader.size())
+                while (posHeader < headerCharBuffer.size() && fieldHeader.size())
                 {
                     header.emplace_back(std::move(fieldHeader));
-                    pHeader += header.back().size() + 1;
-                    fieldHeader = std::string(pHeader);
+                    posHeader += header.back().size() + 1;
+                    fieldHeader = std::string(pHeader + posHeader);
                 }
             }
 

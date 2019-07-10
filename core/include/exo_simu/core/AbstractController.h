@@ -6,6 +6,8 @@
 
 namespace exo_simu
 {
+    std::string const CONTROLLER_OBJECT_NAME("Controller");
+
     class Model;
 
     class AbstractController
@@ -16,17 +18,38 @@ namespace exo_simu
         AbstractController & operator = (AbstractController const & controller) = delete;
 
     public:
+        virtual configHolder_t getDefaultTelemetryOptions()
+        {
+            configHolder_t config;
+            config["logController"] = true;
+            return config;
+        };
+
+        struct telemetryOptions_t
+        {
+            bool const logController;
+
+            telemetryOptions_t(configHolder_t const & options):
+            logController(boost::get<bool>(options.at("logController")))
+            {
+                // Empty.
+            }
+        };
+
         virtual configHolder_t getDefaultOptions()
         {
             configHolder_t config;
-            // No default configuration parameter
+            config["telemetry"] = getDefaultTelemetryOptions();
 
             return config;
         };
 
         struct controllerOptions_t
         {
-            controllerOptions_t(configHolder_t const & options)
+            telemetryOptions_t const telemetry;
+
+            controllerOptions_t(configHolder_t const & options):
+            telemetry(boost::get<configHolder_t>(options.at("telemetry")))
             {
                 // Empty.
             }
@@ -36,9 +59,14 @@ namespace exo_simu
         AbstractController(void);
         virtual ~AbstractController(void);
 
+        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+
+        virtual void updateTelemetry(void) = 0;
+
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & ctrlOptions);
         bool getIsInitialized(void) const;
+        bool getIsTelemetryConfigured(void) const;
 
         // It assumes that the model internal state is consistent with other input arguments
         virtual void compute_command(Model     const & model,
@@ -54,11 +82,13 @@ namespace exo_simu
                                       vectorN_t       & u) = 0;
 
     public:
-        std::shared_ptr<controllerOptions_t const> ctrlOptions_;
+        std::unique_ptr<controllerOptions_t const> ctrlOptions_;
 
     protected:
         bool isInitialized_;
+        bool isTelemetryConfigured_;
         configHolder_t ctrlOptionsHolder_;
+        TelemetrySender telemetrySender_;
     };
 }
 

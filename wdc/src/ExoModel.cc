@@ -167,15 +167,24 @@ namespace exo_simu
                 {
                     if (sensorGroup.first == ImuSensor::type_)
                     {
-                        returnCode = sensor.second->configureTelemetry(imuFieldNames, telemetryData_);
+                        if (exoMdlOptions_->telemetry.logImuSensors)
+                        {
+                            returnCode = sensor.second->configureTelemetry(imuFieldNames, telemetryData_);
+                        }
                     }
                     else if (sensorGroup.first == ForceSensor::type_)
                     {
-                        returnCode = sensor.second->configureTelemetry(forceFieldNames, telemetryData_);
+                        if (exoMdlOptions_->telemetry.logForceSensors)
+                        {
+                            returnCode = sensor.second->configureTelemetry(forceFieldNames, telemetryData_);
+                        }
                     }
                     else
                     {
-                        returnCode = sensor.second->configureTelemetry(encoderFieldNames, telemetryData_);
+                        if (exoMdlOptions_->telemetry.logEncoderSensors)
+                        {
+                            returnCode = sensor.second->configureTelemetry(encoderFieldNames, telemetryData_);
+                        }
                     }
                 }
             }
@@ -191,7 +200,7 @@ namespace exo_simu
         returnCode = Model::setOptions(mdlOptions);
         if (returnCode == result_t::SUCCESS)
         {
-            exoMdlOptions_ = std::make_shared<exoModelOptions_t const>(mdlOptionsHolder_);
+            exoMdlOptions_ = std::make_unique<exoModelOptions_t const>(mdlOptionsHolder_);
         }
 
         return returnCode;

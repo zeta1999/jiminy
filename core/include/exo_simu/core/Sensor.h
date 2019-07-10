@@ -49,7 +49,7 @@ namespace exo_simu
                      vectorN_t const & u) override;
 
     public:
-        std::shared_ptr<imuSensorOptions_t const> imuSensorOptions_;
+        std::unique_ptr<imuSensorOptions_t const> imuSensorOptions_;
 
     private:
         int32_t frameIdx_;
@@ -94,7 +94,7 @@ namespace exo_simu
                      vectorN_t const & u);
 
     public:
-        std::shared_ptr<forceSensorOptions_t const> forceSensorOptions_;
+        std::unique_ptr<forceSensorOptions_t const> forceSensorOptions_;
 
     private:
         int32_t frameIdx_;
@@ -141,7 +141,7 @@ namespace exo_simu
                      vectorN_t const & u);
 
     public:
-        std::shared_ptr<encoderSensorOptions_t const> encoderSensorOptions_;
+        std::unique_ptr<encoderSensorOptions_t const> encoderSensorOptions_;
 
     private:
         int32_t jointPositionIdx_;

@@ -41,6 +41,28 @@ namespace exo_simu
         return returnCode;
     }
 
+    result_t ExoController::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
+    {
+        result_t returnCode = result_t::SUCCESS; 
+
+        returnCode = AbstractController::configureTelemetry(telemetryData);
+
+        if (getIsTelemetryConfigured())
+        {
+            // (void) registerNewVectorEntry(telemetrySender_, fieldNames_, get());
+        }
+
+        return returnCode;
+    }
+
+    void ExoController::updateTelemetry(void)
+    {
+        if(getIsTelemetryConfigured())
+        {
+            // updateVectorValue(telemetrySender_, fieldNames_, get());
+        }
+    }
+
     void ExoController::compute_command(Model     const & model,
                                         float64_t const & t,
                                         vectorN_t const & q,
