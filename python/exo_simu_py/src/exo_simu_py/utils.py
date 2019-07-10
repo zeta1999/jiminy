@@ -190,13 +190,13 @@ def extract_state_from_neural_network_prediction(urdf_path, pred):
 
     return trajectory_data
 
-def extract_state_from_simulation_log(urdf_path, log_data):
+def extract_state_from_simulation_log(urdf_path, log_header, log_data):
     # Extract time, joint positions and velocities evolution from log.
     # Note that the quaternion angular velocity vectors are expressed
     # it body frame rather than world frame.
-    t = log_data[:,0]
-    qe = log_data[:,1:22].T
-    dqe = log_data[:,22:42].T
+    t = log_data[:,log_header.index('Global.Time')]
+    qe = log_data[:,np.array(['q_' in field for field in log_header])].T
+    dqe = log_data[:,np.array(['v_' in field for field in log_header])].T
 
     # Post-processing: numerical derivation
     ddqe = np.gradient(dqe, t, axis=1)

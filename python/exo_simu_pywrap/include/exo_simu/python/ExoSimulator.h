@@ -163,7 +163,8 @@ namespace python
                 .def("simulate", &PyEngineVisitor::simulate_with_callback, 
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle", "callback_handle"))
                 .def("get_log", &PyEngineVisitor::getLog)
-                .def("write_log", &PyEngineVisitor::writeLog)
+                .def("write_log", &PyEngineVisitor::writeLog, 
+                                 (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
                 .def("get_urdf_path", &PyEngine::getUrdfPath, 
                                       bp::return_value_policy<bp::return_by_value>())
                 .def("get_model_options", &PyEngineVisitor::getModelOptions, 
@@ -216,9 +217,17 @@ namespace python
         }
 
         static void writeLog(PyEngine          & self, 
-                             std::string const & filename)
+                             std::string const & filename,
+                             bool        const & isModeBinary)
         {
-            self.simulator_.writeLog(filename);
+            if (isModeBinary)
+            {
+                self.simulator_.writeLogBinary(filename);
+            }
+            else
+            {
+                self.simulator_.writeLogTxt(filename);
+            }
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -229,7 +238,7 @@ namespace python
         {
             std::vector<std::string> header;
             matrixN_t log;
-            self.simulator_.getLog(header, log);
+            self.simulator_.getLogData(header, log);
             return bp::make_tuple(header, log);
         }
 

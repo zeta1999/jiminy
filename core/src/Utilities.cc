@@ -75,7 +75,7 @@ namespace exo_simu
         fieldnames.reserve(size);
         for (uint32_t i=0; i<size; i++)
         {
-            fieldnames.emplace_back(baseName + "." + std::to_string(i));
+            fieldnames.emplace_back(baseName + "_" + std::to_string(i)); // TODO: MR going to support "." delimiter
         }
         return fieldnames;
     }

@@ -550,8 +550,8 @@ namespace exo_simu
         return *model_;
     }
 
-    void Engine::getLog(std::vector<std::string> & header, 
-                        matrixN_t                & log)
+    void Engine::getLogData(std::vector<std::string> & header, 
+                            matrixN_t                & logData)
     {
         std::vector<float32_t> timestamps;
         std::vector<std::vector<int32_t> > intData;
@@ -559,52 +559,47 @@ namespace exo_simu
         telemetryRecorder_->getData(header, timestamps, intData, floatData);
 
         // Never empty since it contains at least the initial state
-        log.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
-        log.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(timestamps.data(), timestamps.size()).cast<float64_t>();
+        logData.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
+        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(timestamps.data(), 
+                                                                          timestamps.size()).cast<float64_t>();
         for (uint32_t i=0; i<intData.size(); i++)
         {
-            log.block(i, 1, 1, intData[i].size()) = 
-                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(intData[i].data(), intData[i].size()).cast<float64_t>();
+            logData.block(i, 1, 1, intData[i].size()) = 
+                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(intData[i].data(), 
+                                                               intData[i].size()).cast<float64_t>();
         }
         for (uint32_t i=0; i<floatData.size(); i++)
         {
-            log.block(i, 1 + intData[0].size(), 1, floatData[i].size()) = 
-                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(), floatData[i].size()).cast<float64_t>();
+            logData.block(i, 1 + intData[0].size(), 1, floatData[i].size()) = 
+                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(), 
+                                                                 floatData[i].size()).cast<float64_t>();
         }
     }
 
-    void Engine::writeLog(std::string const & filename)
+    void Engine::writeLogTxt(std::string const & filename)
     {
         std::vector<std::string> header;
         matrixN_t log;
-        getLog(header, log);
-        std::ofstream myfile;
+        getLogData(header, log);
+
+        std::ofstream myfile = std::ofstream(filename, 
+                                             std::ios::out | 
+                                             std::ofstream::trunc);
+
+        auto indexConstantEnd = std::find(header.begin(), header.end(), START_COLUMNS);
+        std::copy(header.begin()+1, indexConstantEnd-1, std::ostream_iterator<std::string>(myfile, ", ")); // Discard the first one (start constant flag)
+        std::copy(indexConstantEnd-1, indexConstantEnd, std::ostream_iterator<std::string>(myfile, "\n"));
+        std::copy(indexConstantEnd+1, header.end()-2, std::ostream_iterator<std::string>(myfile, ", "));
+        std::copy(header.end()-2, header.end()-1, std::ostream_iterator<std::string>(myfile, "\n")); // Discard the last one (start data flag)
+        
         Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
-        myfile.open(filename, std::ofstream::out | std::ofstream::trunc);
-        bool isConstantSection = true;
-        for (uint32_t i=0; i < header.size(); i++)
-        {
-            myfile << header[i];
-            if (i < header.size() - 1)
-            {
-                if (header[i+1].front() != '\n')
-                {
-                    if (isConstantSection)
-                    {
-                        myfile << "\n";
-                    }
-                    else
-                    {
-                        myfile << ", ";
-                    }
-                }
-                else
-                {
-                    isConstantSection = false;
-                }
-            }
-        }
-        myfile << "\n" << log.format(CSVFormat);
+        myfile << log.format(CSVFormat);
+
         myfile.close();
+    }
+
+    void Engine::writeLogBinary(std::string const & filename)
+    {
+        telemetryRecorder_->writeDataBinary(filename);
     }
 }

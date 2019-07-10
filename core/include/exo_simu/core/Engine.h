@@ -345,9 +345,10 @@ namespace exo_simu
         bool getIsInitialized(void) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
-        void getLog(std::vector<std::string> & header, 
-                    matrixN_t                & log);
-        void writeLog(std::string const & filename);
+        void getLogData(std::vector<std::string> & header, 
+                        matrixN_t                & logData);
+        void writeLogTxt(std::string const & filename);
+        void writeLogBinary(std::string const & filename);
 
     protected:
         void systemDynamics(float64_t const & t,

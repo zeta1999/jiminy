@@ -62,7 +62,6 @@ namespace exo_simu
         floatsHeader_->isRegisteringAvailable = true;
     }
 
-
     template<>
     result_t TelemetryData::registerVariable<int32_t>(std::string const   & variableName,
                                                       int32_t           * & positionInBufferOut)
@@ -70,14 +69,12 @@ namespace exo_simu
         return internalRegisterVariable<int32_t>(integersHeader_, variableName, positionInBufferOut);
     }
 
-
     template<>
     result_t TelemetryData::registerVariable<float32_t>(std::string const   & variableName,
                                                         float32_t         * & positionInBufferOut)
     {
         return internalRegisterVariable<float32_t>(floatsHeader_, variableName, positionInBufferOut);
     }
-
 
     result_t TelemetryData::registerConstant(std::string const & variableNameIn,
                                              std::string const & constantValueIn)
@@ -113,7 +110,6 @@ namespace exo_simu
         return result_t::SUCCESS;;
     }
 
-
     int32_t TelemetryData::findEntry(struct memHeader        * header, 
                                      std::string       const & name)
     {
@@ -138,7 +134,6 @@ namespace exo_simu
         return -1;
     }
 
-
     void TelemetryData::formatHeader(std::vector<char_t> & header) const
     {
         // Lock registering.
@@ -147,39 +142,52 @@ namespace exo_simu
         floatsHeader_->isRegisteringAvailable = false;
 
         header.clear();
+        header.reserve(64 * 1024);
 
-        // // Record constants.
-        char_t const * startConstantsHeader = reinterpret_cast<char_t *>(constantsHeader_) + constantsHeader_->startNameSection;
-        char_t const * stopConstantsHeader = reinterpret_cast<char_t *>(constantsHeader_) + constantsHeader_->nextFreeNameOffset;
-        header.insert(header.end(), startConstantsHeader, stopConstantsHeader);
-        header.push_back('\n');
+        // Record format version.
+        header.resize(sizeof(int32_t)); // version.
+        header[0] = ((TELEMETRY_VERSION & 0x000000ff) >> 0);
+        header[1] = ((TELEMETRY_VERSION & 0x0000ff00) >> 8);
+        header[2] = ((TELEMETRY_VERSION & 0x00ff0000) >> 16);
+        header[3] = ((TELEMETRY_VERSION & 0xff000000) >> 24);
+
+        // Record constants.
+        header.insert(header.end(), START_CONSTANTS.data(), START_CONSTANTS.data() + START_CONSTANTS.size());
+        header.push_back('\0');
+        char_t const* startConstants = reinterpret_cast<char_t*>(constantsHeader_) + constantsHeader_->startNameSection;
+        char_t const* stopConstants = reinterpret_cast<char_t*>(constantsHeader_) + constantsHeader_->nextFreeNameOffset;
+        header.insert(header.end(), startConstants, stopConstants);
 
         // Record entries numbers.
         std::string entriesNumbers;
         entriesNumbers += NUM_INTS;
         entriesNumbers += std::to_string((integersHeader_->nextFreeDataOffset - integersHeader_->startDataSection) /
-                                          static_cast<int64_t>(sizeof(int32_t))); 
+                                         static_cast<int64_t>(sizeof(int32_t)) + 1); // +1 because we add Global.Time
         entriesNumbers += '\0';
         entriesNumbers += NUM_FLOATS;
         entriesNumbers += std::to_string((floatsHeader_->nextFreeDataOffset - floatsHeader_->startDataSection) / 
-                                          static_cast<int64_t>(sizeof(float32_t)) + 1); // +1 because we add Global.Time
+                                         static_cast<int64_t>(sizeof(float32_t)));
         entriesNumbers += '\0';
         header.insert(header.end(), entriesNumbers.data(), entriesNumbers.data() + entriesNumbers.size());
-        header.push_back('\n');
 
-        // Record header - Global.Time - integers, floats.
+        // Record header - GLobal.Time - integers, floats.
+        header.insert(header.end(), START_COLUMNS.data(), START_COLUMNS.data() + START_COLUMNS.size());
+        header.push_back('\0');
+
         header.insert(header.end(), GLOBAL_TIME.data(), GLOBAL_TIME.data() + GLOBAL_TIME.size());
         header.push_back('\0');
 
-        char_t const * startIntegersHeader = reinterpret_cast<char_t *>(integersHeader_) + integersHeader_->startNameSection;
-        char_t const * stopIntegersHeader  = reinterpret_cast<char_t *>(integersHeader_) + integersHeader_->nextFreeNameOffset;
+        char_t const* startIntegersHeader = reinterpret_cast<char_t*>(integersHeader_) + integersHeader_->startNameSection;
+        char_t const* stopIntegersHeader  = reinterpret_cast<char_t*>(integersHeader_) + integersHeader_->nextFreeNameOffset;
         header.insert(header.end(), startIntegersHeader, stopIntegersHeader);
 
-        char_t const * startFloatsHeader = reinterpret_cast<char_t *>(floatsHeader_) + floatsHeader_->startNameSection;
-        char_t const * stopFloatsHeader  = reinterpret_cast<char_t *>(floatsHeader_) + floatsHeader_->nextFreeNameOffset;
+        char_t const* startFloatsHeader = reinterpret_cast<char_t*>(floatsHeader_) + floatsHeader_->startNameSection;
+        char_t const* stopFloatsHeader  = reinterpret_cast<char_t*>(floatsHeader_) + floatsHeader_->nextFreeNameOffset;
         header.insert(header.end(), startFloatsHeader, stopFloatsHeader);
-    }
 
+        // Start data section.
+        header.insert(header.end(), START_DATA.data(), START_DATA.data() + START_DATA.size());
+    }
 
     void TelemetryData::getData(char_t  const * & intAddrOut,   
                                 int64_t         & intSizeOut,

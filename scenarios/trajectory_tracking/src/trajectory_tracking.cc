@@ -1,7 +1,6 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <iostream>
-#include <fstream>
 #include <iomanip>
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,9 +156,10 @@ int main(int argc, char *argv[])
     // Write the log file
     std::vector<std::string> header;
     matrixN_t log;
-    engine.getLog(header, log);
+    engine.getLogData(header, log);
     std::cout << log.rows() << " log points" << std::endl;
-    engine.writeLog(outputDirPath + std::string("/log.csv"));
+    engine.writeLogTxt(outputDirPath + std::string("/log.txt"));
+    engine.writeLogBinary(outputDirPath + std::string("/log.data"));
 
     return 0;
 }
