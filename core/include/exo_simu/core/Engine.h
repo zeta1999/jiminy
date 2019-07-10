@@ -11,21 +11,31 @@
 
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Model.h"
+#include "exo_simu/core/TelemetrySender.h"
 
 
 namespace exo_simu
 {
-    using namespace boost::numeric::odeint;
+    std::string const ENGINE_OBJECT_NAME("Global");
 
+    using namespace boost::numeric::odeint;
+    
     class AbstractController;
+    class TelemetryData;
+    class TelemetryRecorder;
         
     class Engine
     {
     protected:
-        typedef std::function<bool(float64_t const &/*t*/,
-                                   vectorN_t const &/*x*/)> callbackFct_t;
+        typedef std::function<bool(float64_t const & /*t*/,
+                                   vectorN_t const & /*x*/)> callbackFct_t;
 
         typedef runge_kutta_dopri5<vectorN_t, float64_t, vectorN_t, float64_t, vector_space_algebra> stepper_t;
+
+    public:
+        // Disable the copy of the class
+        Engine(Engine const & engine) = delete;
+        Engine & operator = (Engine const & other) = delete;
 
     public:
         configHolder_t getDefaultContactOptions()
@@ -128,7 +138,34 @@ namespace exo_simu
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
             tolRel(boost::get<float64_t>(options.at("tolRel"))),
             sensorsUpdatePeriod(boost::get<float64_t>(options.at("sensorsUpdatePeriod"))),
-            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod")))//,
+            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod")))
+            {
+                // Empty.
+            }
+        };
+
+        configHolder_t getDefaultTelemetryOptions()
+        {
+            configHolder_t config;
+            config["logConfiguration"] = true;
+            config["logVelocity"] = true;
+            config["logAcceleration"] = true;
+            config["logCommand"] = true;
+            return config;
+        };
+
+        struct telemetryOptions_t
+        {
+            bool const logConfiguration;
+            bool const logVelocity;
+            bool const logAcceleration;
+            bool const logCommand;
+
+            telemetryOptions_t(configHolder_t const & options):
+            logConfiguration(boost::get<bool>(options.at("logConfiguration"))),
+            logVelocity(boost::get<bool>(options.at("logVelocity"))),
+            logAcceleration(boost::get<bool>(options.at("logAcceleration"))),
+            logCommand(boost::get<bool>(options.at("logCommand")))
             {
                 // Empty.
             }
@@ -137,6 +174,7 @@ namespace exo_simu
         configHolder_t getDefaultOptions()
         {
             configHolder_t config;
+            config["telemetry"] = getDefaultTelemetryOptions();
             config["stepper"] = getDefaultStepperOptions();
             config["world"] = getDefaultWorldOptions();
             config["joints"] = getDefaultJointOptions();
@@ -147,12 +185,14 @@ namespace exo_simu
 
         struct engineOptions_t
         {
+            telemetryOptions_t const telemetry;
             stepperOptions_t const stepper;
             worldOptions_t   const world;
             jointOptions_t   const joints;
             contactOptions_t const contacts;
 
             engineOptions_t(configHolder_t const & options) :
+            telemetry(boost::get<configHolder_t>(options.at("telemetry"))),
             stepper(boost::get<configHolder_t>(options.at("stepper"))),
             world(boost::get<configHolder_t>(options.at("world"))),
             joints(boost::get<configHolder_t>(options.at("joints"))),
@@ -176,6 +216,10 @@ namespace exo_simu
             aLast(),
             uLast(),
             uCommandLast(),
+            qNames(),
+            vNames(),
+            aNames(),
+            uCommandNames(),
             x(),
             dxdt(),
             uControl(),
@@ -190,6 +234,13 @@ namespace exo_simu
             bool getIsInitialized(void) const
             {
                 return isInitialized;
+            }
+
+
+            result_t initialize(Model const & model)
+            {
+                vectorN_t x_init = vectorN_t::Zero(model.nx());
+                return initialize(model, x_init);
             }
 
             result_t initialize(Model     const & model, 
@@ -212,6 +263,11 @@ namespace exo_simu
                     aLast = vectorN_t::Zero(model.nv());
                     uLast = vectorN_t::Zero(model.nv());
                     uCommandLast = vectorN_t::Zero(model.getJointsVelocityIdx().size());
+
+                    qNames = defaultVectorFieldnames("q", qLast.size());
+                    vNames = defaultVectorFieldnames("v", vLast.size());
+                    aNames = defaultVectorFieldnames("a", aLast.size());
+                    uCommandNames = defaultVectorFieldnames("uCommand", uCommandLast.size());
 
                     x = x_init;
                     dxdt = vectorN_t::Zero(model.nx());
@@ -254,6 +310,11 @@ namespace exo_simu
             vectorN_t uLast;
             vectorN_t uCommandLast;
 
+            std::vector<std::string> qNames;
+            std::vector<std::string> vNames;
+            std::vector<std::string> aNames;
+            std::vector<std::string> uCommandNames;
+            
             // Internal buffers required for the adaptive step computation and system dynamics
             vectorN_t x;
             vectorN_t dxdt;
@@ -284,30 +345,34 @@ namespace exo_simu
         bool getIsInitialized(void) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
+        void getLogData(std::vector<std::string> & header, 
+                        matrixN_t                & logData);
+        void writeLogTxt(std::string const & filename);
+        void writeLogBinary(std::string const & filename);
 
     protected:
         void systemDynamics(float64_t const & t,
                             vectorN_t const & x,
                             vectorN_t       & dxdt);
-
         void boundsDynamics(vectorN_t const & q,
                             vectorN_t const & v,
                             vectorN_t       & u);
-
         vectorN_t contactDynamics(int32_t const & frameId) const;
 
     public:
-        matrixN_t log; // TODO: To be removed
-        std::shared_ptr<engineOptions_t const> engineOptions_;
+        std::unique_ptr<engineOptions_t const> engineOptions_;
 
     protected:
         bool isInitialized_;
-        std::shared_ptr<Model> model_;
-        std::shared_ptr<AbstractController> controller_;
+        Model * model_;
+        AbstractController * controller_;
         configHolder_t engineOptionsHolder_;
         callbackFct_t callbackFct_;
 
     private:
+        TelemetrySender telemetrySender_;
+        std::shared_ptr<TelemetryData> telemetryData_;
+        std::unique_ptr<TelemetryRecorder> telemetryRecorder_;
         stepperState_t stepperState_; // Internal state for the integration loop
     };
 }

@@ -4,6 +4,8 @@
 #include <Eigen/Geometry>
 
 #include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/TelemetrySender.h"
+
 
 namespace exo_simu
 {
@@ -27,14 +29,55 @@ namespace exo_simu
         dt = timeDiff.count();
     }
 
-	void toVectorString(vectorN_t                & data, 
-                        std::vector<std::string> & dataStrings)
+    void registerNewVectorEntry(TelemetrySender                & telemetrySender,
+                                std::vector<std::string> const & fieldNames,
+                                vectorN_t                const & initialValues)
     {
-        dataStrings.resize(data.size());
-        for (uint32_t i = 0; i < data.size(); i++) 
+        std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
+        std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
+        float64_t const * valueIt = initialValues.data();
+        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
         {
-            dataStrings[i] = std::to_string(data[i]);
+            (void) telemetrySender.registerNewEntry<float64_t>(*fieldIt, *valueIt);
         }
+    }
+
+    void updateVectorValue(TelemetrySender                & telemetrySender,
+                           std::vector<std::string> const & fieldNames,
+                           vectorN_t                const & values)
+    {
+        std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
+        std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
+        float64_t const * valueIt = values.data();
+        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        {
+            telemetrySender.updateValue(*fieldIt, *valueIt);
+        }
+    }
+
+    void updateVectorValue(TelemetrySender                & telemetrySender,
+                           std::vector<std::string> const & fieldNames,
+                           matrixN_t::ConstRowXpr           values)
+    {
+        std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
+        std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
+        float64_t const * valueIt = values.data();
+        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        {
+            telemetrySender.updateValue(*fieldIt, *valueIt);
+        }
+    }
+
+    std::vector<std::string> defaultVectorFieldnames(std::string const & baseName, 
+                                                     uint32_t    const & size)
+    {
+        std::vector<std::string> fieldnames;
+        fieldnames.reserve(size);
+        for (uint32_t i=0; i<size; i++)
+        {
+            fieldnames.emplace_back(baseName + "_" + std::to_string(i)); // TODO: MR going to support "." delimiter
+        }
+        return fieldnames;
     }
 
     float64_t saturateSoft(float64_t const & in,

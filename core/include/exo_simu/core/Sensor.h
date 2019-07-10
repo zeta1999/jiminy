@@ -10,12 +10,12 @@ namespace exo_simu
 {
     class Model;
 
-    class ImuSensor : public virtual AbstractSensor, public SensorDataHolder<ImuSensor>
+    class ImuSensor : public AbstractSensorTpl<ImuSensor>
     {
     public:
         configHolder_t getDefaultOptions(void) override
         {
-            configHolder_t config = AbstractSensor::getDefaultOptions();
+            configHolder_t config = AbstractSensorTpl<ImuSensor>::getDefaultOptions();
             // No extra configuration parameter
 
             return config;
@@ -31,35 +31,36 @@ namespace exo_simu
         };
 
     public:
-        ImuSensor(std::string const & name);
+        ImuSensor(Model                               const & model,
+                  std::shared_ptr<SensorDataHolder_t> const & dataHolder,
+                  std::string                         const & name);
         ~ImuSensor(void);
-        AbstractSensor* clone(void) override;
 
         void initialize(int32_t const & frameIdx);
 
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
 
-        result_t set(Model     const & model,
-                     float64_t const & t,
+    protected:
+        result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
                      vectorN_t const & a,
                      vectorN_t const & u) override;
 
     public:
-        std::shared_ptr<imuSensorOptions_t const> imuSensorOptions_;
+        std::unique_ptr<imuSensorOptions_t const> imuSensorOptions_;
 
     private:
         int32_t frameIdx_;
     };
 
-    class ForceSensor : public virtual AbstractSensor, public SensorDataHolder<ForceSensor>
+    class ForceSensor : public AbstractSensorTpl<ForceSensor>
     {
     public:
         configHolder_t getDefaultOptions(void) override
         {
-            configHolder_t config = AbstractSensor::getDefaultOptions();
+            configHolder_t config = AbstractSensorTpl<ForceSensor>::getDefaultOptions();
             // No extra configuration parameter
 
             return config;
@@ -75,35 +76,36 @@ namespace exo_simu
         };
 
     public:
-        ForceSensor(std::string const & name);
+        ForceSensor(Model                               const & model,
+                    std::shared_ptr<SensorDataHolder_t> const & dataHolder,
+                    std::string                         const & name);
         ~ForceSensor(void);
-        AbstractSensor* clone(void);
 
         void initialize(int32_t const & frameIdx);
 
         void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
         
-        result_t set(Model     const & model,
-                     float64_t const & t,
+    protected:
+        result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
                      vectorN_t const & a,
                      vectorN_t const & u);
 
     public:
-        std::shared_ptr<forceSensorOptions_t const> forceSensorOptions_;
+        std::unique_ptr<forceSensorOptions_t const> forceSensorOptions_;
 
     private:
         int32_t frameIdx_;
     };
 
-    class EncoderSensor : public virtual AbstractSensor, public SensorDataHolder<EncoderSensor>
+    class EncoderSensor : public AbstractSensorTpl<EncoderSensor>
     {
     public:
         configHolder_t getDefaultOptions(void) override
         {
-            configHolder_t config = AbstractSensor::getDefaultOptions();
+            configHolder_t config = AbstractSensorTpl<EncoderSensor>::getDefaultOptions();
             // No extra configuration parameter
 
             return config;
@@ -119,9 +121,10 @@ namespace exo_simu
         };
 
     public:
-        EncoderSensor(std::string const & name);
+        EncoderSensor(Model                               const & model,
+                      std::shared_ptr<SensorDataHolder_t> const & dataHolder,
+                      std::string                         const & name);
         ~EncoderSensor(void);
-        AbstractSensor* clone(void);
 
         void initialize(int32_t const & jointPositionIdx,
                         int32_t const & jointVelocityIdx);
@@ -130,15 +133,15 @@ namespace exo_simu
         int32_t getJointPositionIdx(void) const;
         int32_t getJointVelocityIdx(void) const;
         
-        result_t set(Model     const & model,
-                     float64_t const & t,
+    protected:
+        result_t set(float64_t const & t,
                      vectorN_t const & q,
                      vectorN_t const & v,
                      vectorN_t const & a,
                      vectorN_t const & u);
 
     public:
-        std::shared_ptr<encoderSensorOptions_t const> encoderSensorOptions_;
+        std::unique_ptr<encoderSensorOptions_t const> encoderSensorOptions_;
 
     private:
         int32_t jointPositionIdx_;

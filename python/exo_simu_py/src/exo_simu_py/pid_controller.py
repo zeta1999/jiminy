@@ -74,12 +74,12 @@ def _compute_command(Kp, Kd, traj_ref, t_rel, qe, v, forceSensorsData, imuSensor
 class pid_feedforward:
     def __init__(self, trajectory_data_ref, Kp=None, Kd=None):
         if Kp is None:
-            Kp = np.array([[12000.0, 8000.0, 8000.0, 8000.0, 3000.0, 3000.0,
-                            12000.0, 8000.0, 8000.0, 8000.0, 3000.0, 3000.0]]).T
+            Kp = np.array([[20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
+                            20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0]]).T
         self.Kp = Kp
         if Kd is None:
-            Kd = np.array([[400.0, 400.0, 400.0, 400.0, 100.0, 100.0, 
-                            400.0, 400.0, 400.0, 400.0, 100.0, 100.0]]).T
+            Kd = np.array([[250.0, 150.0, 100.0, 100.0, 150.0, 100.0, 
+                            250.0, 150.0, 100.0, 100.0, 150.0, 100.0]]).T
         self.Kd = Kd
         
         self.state_machine = OrderedDict()
@@ -145,4 +145,4 @@ class pid_feedforward:
             self.state_machine_switch_prev()
             t_rel = t_cur - self.time_offset
         
-        return  _compute_command(self.Kp, self.Kd, self.traj_ref, t_rel, qe, v, forceSensorsData, imuSensorsData, encoderSensorsData)
+        return _compute_command(self.Kp, self.Kd, self.traj_ref, t_rel, qe, v, forceSensorsData, imuSensorsData, encoderSensorsData)

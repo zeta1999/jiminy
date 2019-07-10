@@ -1,7 +1,9 @@
 #include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/Sensor.h"
 #include "exo_simu/core/Model.h"
 #include "exo_simu/wdc/ExoModel.h"
 #include "exo_simu/wdc/ExoController.h"
+
 
 namespace exo_simu
 {
@@ -26,11 +28,6 @@ namespace exo_simu
         // Empty.
     }
 
-    AbstractController* ExoController::clone(void)
-    {
-        return new ExoController(*this);
-    }
-
     result_t ExoController::initialize(commandFct_t commandFct)
     {
         result_t returnCode = result_t::SUCCESS;
@@ -44,15 +41,37 @@ namespace exo_simu
         return returnCode;
     }
 
+    result_t ExoController::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
+    {
+        result_t returnCode = result_t::SUCCESS; 
+
+        returnCode = AbstractController::configureTelemetry(telemetryData);
+
+        if (getIsTelemetryConfigured())
+        {
+            // (void) registerNewVectorEntry(telemetrySender_, fieldNames_, get());
+        }
+
+        return returnCode;
+    }
+
+    void ExoController::updateTelemetry(void)
+    {
+        if(getIsTelemetryConfigured())
+        {
+            // updateVectorValue(telemetrySender_, fieldNames_, get());
+        }
+    }
+
     void ExoController::compute_command(Model     const & model,
                                         float64_t const & t,
                                         vectorN_t const & q,
                                         vectorN_t const & v,
                                         vectorN_t       & u)
     {
-        matrixN_t const & forceSensorsData = model.getSensorsData("ForceSensor");
-        matrixN_t const & imuSensorsData = model.getSensorsData("IMUSensor");
-        matrixN_t const & encoderSensorsData = model.getSensorsData("EncoderSensor");
+        matrixN_t const & forceSensorsData = model.getSensorsData(ForceSensor::type_);
+        matrixN_t const & imuSensorsData = model.getSensorsData(ImuSensor::type_);
+        matrixN_t const & encoderSensorsData = model.getSensorsData(EncoderSensor::type_);
         commandFct_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData, u);
     }
 

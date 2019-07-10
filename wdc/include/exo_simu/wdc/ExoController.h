@@ -10,20 +10,22 @@ namespace exo_simu
     class ExoController : public AbstractController
     {
     protected:
-        typedef std::function<void(float64_t const &/*t*/,
-                                   vectorN_t const &/*q*/,
-                                   vectorN_t const &/*v*/,
-                                   matrixN_t const &/*forceSensorsData*/,
-                                   matrixN_t const &/*imuSensorsData*/,
-                                   matrixN_t const &/*encoderSensorsData*/,
-                                   vectorN_t       &/*u*/)> commandFct_t;
+        typedef std::function<void(float64_t const & /*t*/,
+                                   vectorN_t const & /*q*/,
+                                   vectorN_t const & /*v*/,
+                                   matrixN_t const & /*forceSensorsData*/,
+                                   matrixN_t const & /*imuSensorsData*/,
+                                   matrixN_t const & /*encoderSensorsData*/,
+                                   vectorN_t       & /*u*/)> commandFct_t;
 
     public:
         ExoController(void);
         ~ExoController(void);
-        AbstractController* clone(void) override;
 
         result_t initialize(commandFct_t commandFct);
+        result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+
+        virtual void updateTelemetry(void) override;
 
         void compute_command(Model     const & model,
                              float64_t const & t,

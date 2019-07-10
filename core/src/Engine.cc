@@ -14,14 +14,17 @@
 #include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/TelemetryData.h"
+#include "exo_simu/core/TelemetryRecorder.h"
 #include "exo_simu/core/AbstractController.h"
 #include "exo_simu/core/AbstractSensor.h"
+#include "exo_simu/core/Model.h"
 #include "exo_simu/core/Engine.h"
+
 
 namespace exo_simu
 {
     Engine::Engine(void):
-    log(),
     engineOptions_(nullptr),
     isInitialized_(false),
     model_(nullptr),
@@ -32,8 +35,14 @@ namespace exo_simu
                  {
                      return true;
                  }),
+    telemetrySender_(),
+    telemetryData_(nullptr),
+    telemetryRecorder_(nullptr),
     stepperState_()
     {
+        telemetryData_ = std::make_shared<TelemetryData>();
+        telemetryRecorder_ = std::make_unique<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
+
         setOptions(getDefaultOptions());
     }
 
@@ -53,7 +62,7 @@ namespace exo_simu
             std::cout << "Error - Engine::initialize - Model not initialized." << std::endl;
             return result_t::ERROR_INIT_FAILED;
         }
-        model_ = std::shared_ptr<Model>(model.clone());
+        model_ = &model;
 
         if (returnCode == result_t::SUCCESS)
         {
@@ -95,7 +104,7 @@ namespace exo_simu
         }
         if (returnCode == result_t::SUCCESS)
         {
-            controller_ = std::shared_ptr<AbstractController>(controller.clone());
+            controller_ = &controller;
         }
 
         if (returnCode == result_t::SUCCESS)
@@ -109,6 +118,29 @@ namespace exo_simu
             isInitialized_ = true;
             setOptions(engineOptionsHolder_); // Make sure the gravity is properly set at model level
         }
+
+        // Initialize the logger
+        stepperState_.initialize(*model_);
+        telemetryData_->reset();
+        telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
+        if (engineOptions_->telemetry.logConfiguration)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+        }
+        if (engineOptions_->telemetry.logVelocity)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+        }
+        if (engineOptions_->telemetry.logAcceleration)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+        }
+        if (engineOptions_->telemetry.logCommand)
+        {
+            (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+        }
+        model_->configureTelemetry(telemetryData_);
+        telemetryRecorder_->initialize();
 
         return returnCode;
     }
@@ -149,8 +181,7 @@ namespace exo_simu
         model_->pncData_ = pinocchio::Data(model_->pncModel_);
         stepperState_.initialize(*model_, x_init);
         systemDynamics(0, stepperState_.x, stepperState_.dxdt);
-        log.resize(0, 1 + model_->nq() + model_->nv() + model_->nv() + model_->getJointsVelocityIdx().size()); // Log [t, q, v, a, uCommand]
-        log.conservativeResize(1000, Eigen::NoChange);
+        telemetryRecorder_->initialize();
 
         // Compute the breakpoints' period (for command or observation) during the integration loop
         float64_t updatePeriod = 0.0;
@@ -185,17 +216,25 @@ namespace exo_simu
         failed_step_checker fail_checker; // to throw a runtime_error if step size adjustment fail
         while (true)
         {
-            /* Reserve a new chunk of rows to the log buffer and save the
-               current state and time. */
-            if (stepperState_.iterLast >= log.rows())
+            // Log the current time, state, command, and sensors
+            if (engineOptions_->telemetry.logConfiguration)
             {
-                log.conservativeResize(log.rows() + 1000, Eigen::NoChange);
+                updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
             }
-            log.row(stepperState_.iterLast) = (vectorN_t(log.cols()) << stepperState_.tLast, 
-                                                                        stepperState_.qLast, 
-                                                                        stepperState_.vLast, 
-                                                                        stepperState_.aLast, 
-                                                                        stepperState_.uCommandLast).finished();
+            if (engineOptions_->telemetry.logVelocity)
+            {
+                updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+            }
+            if (engineOptions_->telemetry.logAcceleration)
+            {
+                updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+            }
+            if (engineOptions_->telemetry.logCommand)
+            {
+                updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+            }
+            model_->updateSensorsTelemetry();
+            telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
             /* Stop the simulation if the end time has been reached, if
                the callback returns false, or if the number of integration
@@ -295,9 +334,6 @@ namespace exo_simu
             stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a);
             stepperState_.updateLast(current_time, q, v, a, stepperState_.uLast, stepperState_.uCommandLast); // uLast and uCommandLast are already up-to-date
         }
-
-        // Cleanup any extra rows of the log buffer
-        log.conservativeResize(stepperState_.iterLast, Eigen::NoChange);
         
         return returnCode;
     }
@@ -378,21 +414,24 @@ namespace exo_simu
 
         contactOptions_t const * const contactOptions_ = &engineOptions_->contacts;
         
-        Eigen::Matrix4d tformFrame = model_->pncData_.oMf[frameId].toHomogeneousMatrix();
-        Eigen::Vector3d posFrame = tformFrame.topRightCorner<3,1>();
+        Eigen::Matrix3d const & tformFrameRot = model_->pncData_.oMf[frameId].rotation();
+        Eigen::Vector3d const & posFrame = model_->pncData_.oMf[frameId].translation();
 
         vectorN_t fextLocal = vectorN_t::Zero(6);
 
         if(posFrame(2) < 0.0)
         {
+            // Initialize the contact force
+            Eigen::Vector3d fextInWorld(0.0, 0.0, 0.0);
+
             // Get various transformations
-            Eigen::Matrix4d const tformFrame2Jt = model_->pncModel_.frames[frameId].placement.toHomogeneousMatrix();
-            Eigen::Vector3d fextInWorld(0.0,0.0,0.0);
-            Eigen::Vector3d const posFrameJoint = tformFrame2Jt.topRightCorner<3,1>();
-            pinocchio::Motion const motionFrame = pinocchio::getFrameVelocity(model_->pncModel_, 
-                                                                              model_->pncData_,
-                                                                              frameId);
-            Eigen::Vector3d const vFrameInWorld = tformFrame.topLeftCorner<3,3>() * motionFrame.linear();
+            Eigen::Matrix3d const & tformFrameJointRot = model_->pncModel_.frames[frameId].placement.rotation();
+            Eigen::Vector3d const & posFrameJoint = model_->pncModel_.frames[frameId].placement.translation();
+
+            Eigen::Vector3d motionFrame = pinocchio::getFrameVelocity(model_->pncModel_, 
+                                                                      model_->pncData_,
+                                                                      frameId).linear();
+            Eigen::Vector3d vFrameInWorld = tformFrameRot * motionFrame;
 
             // Compute normal force
             float64_t damping = 0;
@@ -403,8 +442,8 @@ namespace exo_simu
             fextInWorld(2) = -contactOptions_->stiffness * posFrame(2) + damping;
 
             // Compute friction forces
-            Eigen::Vector2d const vxy = vFrameInWorld.head<2>();
-            float64_t const vNorm = vxy.norm();
+            Eigen::Vector2d const & vxy = vFrameInWorld.head<2>();
+            float64_t vNorm = vxy.norm();
             float64_t frictionCoeff;
             if(vNorm > contactOptions_->dryFrictionVelEps)
             {
@@ -425,17 +464,20 @@ namespace exo_simu
             }
             fextInWorld.head<2>() = -vxy * frictionCoeff * fextInWorld(2);
 
+            // Make sure that the tangential force never exceeds 1e5 N for the sake of numerical stability
+            fextInWorld.head<2>() = fextInWorld.head<2>().unaryExpr([](float64_t x) -> float64_t 
+                                                                    {
+                                                                        return std::min(std::max(x, -1e5), 1e5);
+                                                                    });
+
             // Compute the forces at the origin of the parent joint frame
-            fextLocal.head<3>() = tformFrame2Jt.topLeftCorner<3,3>()*tformFrame.topLeftCorner<3,3>().transpose()*fextInWorld;
-            fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>()).eval();
+            fextLocal.head<3>() = tformFrameJointRot * tformFrameRot.transpose() * fextInWorld;
+            fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>());
 
             // Add blending factor
             float64_t blendingFactor = -posFrame(2) / contactOptions_->transitionEps;
-            if(blendingFactor > 1.0)
-            {
-                blendingFactor = 1.0;
-            }
-            fextLocal *= blendingFactor;
+            float64_t blendingLaw = std::tanh(2 * blendingFactor);
+            fextLocal *= blendingLaw;
         }
 
         return fextLocal;
@@ -476,8 +518,7 @@ namespace exo_simu
             }
 
             float64_t blendingFactor = qJointError / engineJointOptions_.boundTransitionEps;
-            // float64_t blendingLaw = std::tanh(2 * blendingFactor);
-            float64_t blendingLaw = std::min(blendingFactor, 1.0);
+            float64_t blendingLaw = std::tanh(2 * blendingFactor);
             forceJoint *= blendingLaw;
             
             u(jointsVelocityIdx[i]) += forceJoint;
@@ -492,7 +533,7 @@ namespace exo_simu
     void Engine::setOptions(configHolder_t const & engineOptions)
     {
         engineOptionsHolder_ = engineOptions;
-        engineOptions_ = std::make_shared<engineOptions_t const>(engineOptionsHolder_);
+        engineOptions_ = std::make_unique<engineOptions_t const>(engineOptionsHolder_);
         if (isInitialized_)
         {
             model_->pncModel_.gravity = engineOptions_->world.gravity; // It is reversed (Third Newton law)
@@ -506,6 +547,59 @@ namespace exo_simu
 
     Model const & Engine::getModel(void) const
     {
-        return *model_.get();
+        return *model_;
+    }
+
+    void Engine::getLogData(std::vector<std::string> & header, 
+                            matrixN_t                & logData)
+    {
+        std::vector<float32_t> timestamps;
+        std::vector<std::vector<int32_t> > intData;
+        std::vector<std::vector<float32_t> > floatData;
+        telemetryRecorder_->getData(header, timestamps, intData, floatData);
+
+        // Never empty since it contains at least the initial state
+        logData.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
+        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(timestamps.data(), 
+                                                                          timestamps.size()).cast<float64_t>();
+        for (uint32_t i=0; i<intData.size(); i++)
+        {
+            logData.block(i, 1, 1, intData[i].size()) = 
+                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(intData[i].data(), 
+                                                               intData[i].size()).cast<float64_t>();
+        }
+        for (uint32_t i=0; i<floatData.size(); i++)
+        {
+            logData.block(i, 1 + intData[0].size(), 1, floatData[i].size()) = 
+                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(), 
+                                                                 floatData[i].size()).cast<float64_t>();
+        }
+    }
+
+    void Engine::writeLogTxt(std::string const & filename)
+    {
+        std::vector<std::string> header;
+        matrixN_t log;
+        getLogData(header, log);
+
+        std::ofstream myfile = std::ofstream(filename, 
+                                             std::ios::out | 
+                                             std::ofstream::trunc);
+
+        auto indexConstantEnd = std::find(header.begin(), header.end(), START_COLUMNS);
+        std::copy(header.begin()+1, indexConstantEnd-1, std::ostream_iterator<std::string>(myfile, ", ")); // Discard the first one (start constant flag)
+        std::copy(indexConstantEnd-1, indexConstantEnd, std::ostream_iterator<std::string>(myfile, "\n"));
+        std::copy(indexConstantEnd+1, header.end()-2, std::ostream_iterator<std::string>(myfile, ", "));
+        std::copy(header.end()-2, header.end()-1, std::ostream_iterator<std::string>(myfile, "\n")); // Discard the last one (start data flag)
+        
+        Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
+        myfile << log.format(CSVFormat);
+
+        myfile.close();
+    }
+
+    void Engine::writeLogBinary(std::string const & filename)
+    {
+        telemetryRecorder_->writeDataBinary(filename);
     }
 }

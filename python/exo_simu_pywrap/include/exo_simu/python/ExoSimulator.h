@@ -7,6 +7,7 @@
 #ifndef WDC_EXO_SIMULATOR_PYTHON_H
 #define WDC_EXO_SIMULATOR_PYTHON_H
 
+#include <boost/weak_ptr.hpp>
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/dict.hpp>
@@ -17,22 +18,23 @@
 #include "exo_simu/wdc/ExoController.h"
 #include "exo_simu/python/Utilities.h"
 
+
 namespace exo_simu
 {
 namespace python
 {
     namespace bp = boost::python;
 
-    typedef std::function<void(float64_t const &/*t*/,
-                                vectorN_t const &/*q*/,
-                                vectorN_t const &/*v*/,
-                                matrixN_t const &/*forceSensorsData*/,
-                                matrixN_t const &/*imuSensorsData*/,
-                                matrixN_t const &/*encoderSensorsData*/,
-                                vectorN_t       &/*u*/)> commandFct_t;
+    typedef std::function<void(float64_t const & /*t*/,
+                               vectorN_t const & /*q*/,
+                               vectorN_t const & /*v*/,
+                               matrixN_t const & /*forceSensorsData*/,
+                               matrixN_t const & /*imuSensorsData*/,
+                               matrixN_t const & /*encoderSensorsData*/,
+                               vectorN_t       & /*u*/)> commandFct_t;
 
-    typedef std::function<bool(float64_t const &/*t*/,
-                                vectorN_t const &/*x*/)> callbackFct_t;
+    typedef std::function<bool(float64_t const & /*t*/,
+                               vectorN_t const & /*x*/)> callbackFct_t;
 
     class PyEngine // Composition over inheritance
     {
@@ -88,12 +90,31 @@ namespace python
             return urdfPath_;
         }
 
+        static boost::shared_ptr<PyEngine> pyEngineFactory(void)
+        {
+            if (pyEnginePtr_.use_count())
+            {
+                return pyEnginePtr_.lock(); 
+            } 
+            else 
+            {
+                boost::shared_ptr<PyEngine> strong = boost::shared_ptr<PyEngine>(new PyEngine());
+                pyEnginePtr_ = strong;
+                return strong;
+            }
+        }
+
     public:
         std::string urdfPath_;
         ExoModel model_;
         ExoController controller_;
         Engine simulator_;
+
+    private:
+        static boost::weak_ptr<PyEngine> pyEnginePtr_;
     };
+
+    boost::weak_ptr<PyEngine> PyEngine::pyEnginePtr_ = boost::weak_ptr<PyEngine>();
 
     struct controllerPyWrapper {
     public:
@@ -123,8 +144,8 @@ namespace python
         bp::object funcPyPtr_;
     };
 
-    struct ExoSimulatorVisitor
-        : public bp::def_visitor<ExoSimulatorVisitor>
+    struct PyEngineVisitor
+        : public bp::def_visitor<PyEngineVisitor>
     {
     public:
         ///////////////////////////////////////////////////////////////////////////////
@@ -134,24 +155,27 @@ namespace python
         void visit(PyClass& cl) const
         {
             cl
-                .def("init", &ExoSimulatorVisitor::init, 
+                .def("__init__", bp::make_constructor(&PyEngine::pyEngineFactory))
+                .def("init", &PyEngineVisitor::init, 
                              (bp::arg("self"), "urdf_path"))
-                .def("simulate", &ExoSimulatorVisitor::simulate, 
+                .def("simulate", &PyEngineVisitor::simulate, 
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle"))
-                .def("simulate", &ExoSimulatorVisitor::simulate_with_callback, 
+                .def("simulate", &PyEngineVisitor::simulate_with_callback, 
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle", "callback_handle"))
-                .def("get_log", &ExoSimulatorVisitor::getLog)
+                .def("get_log", &PyEngineVisitor::getLog)
+                .def("write_log", &PyEngineVisitor::writeLog, 
+                                 (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
                 .def("get_urdf_path", &PyEngine::getUrdfPath, 
                                       bp::return_value_policy<bp::return_by_value>())
-                .def("get_model_options", &ExoSimulatorVisitor::getModelOptions, 
+                .def("get_model_options", &PyEngineVisitor::getModelOptions, 
                                           bp::return_value_policy<bp::return_by_value>())
-                .def("set_model_options", &ExoSimulatorVisitor::setModelOptions)
-                .def("get_controller_options", &ExoSimulatorVisitor::getControllerOptions, 
+                .def("set_model_options", &PyEngineVisitor::setModelOptions)
+                .def("get_controller_options", &PyEngineVisitor::getControllerOptions, 
                                                bp::return_value_policy<bp::return_by_value>())
-                .def("set_controller_options", &ExoSimulatorVisitor::setControllerOptions)
-                .def("get_simulation_options", &ExoSimulatorVisitor::getSimulationOptions, 
+                .def("set_controller_options", &PyEngineVisitor::setControllerOptions)
+                .def("get_simulation_options", &PyEngineVisitor::getSimulationOptions, 
                                                bp::return_value_policy<bp::return_by_value>())
-                .def("set_simulation_options", &ExoSimulatorVisitor::setSimulationOptions)
+                .def("set_simulation_options", &PyEngineVisitor::setSimulationOptions)
                 ;
         }
 
@@ -192,13 +216,30 @@ namespace python
             self.simulate(x_init, end_time, controllerFct, callbackFct);
         }
 
+        static void writeLog(PyEngine          & self, 
+                             std::string const & filename,
+                             bool        const & isModeBinary)
+        {
+            if (isModeBinary)
+            {
+                self.simulator_.writeLogBinary(filename);
+            }
+            else
+            {
+                self.simulator_.writeLogTxt(filename);
+            }
+        }
+
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief      Getters and Setters
         ///////////////////////////////////////////////////////////////////////////////
 
-        static matrixN_t getLog(PyEngine & self)
+        static bp::tuple getLog(PyEngine & self)
         {
-            return self.simulator_.log;
+            std::vector<std::string> header;
+            matrixN_t log;
+            self.simulator_.getLogData(header, log);
+            return bp::make_tuple(header, log);
         }
 
         static bp::dict getModelOptions(PyEngine & self)
@@ -255,8 +296,9 @@ namespace python
             bp::to_python_converter<std::vector<vectorN_t>, VecToList<vectorN_t> >();
             bp::to_python_converter<std::vector<matrixN_t>, VecToList<matrixN_t> >();
             bp::to_python_converter<std::vector<std::vector<float64_t> >, VecToList<std::vector<float64_t> > >();
-            bp::class_<PyEngine>("simulator", "PyEngine class").def(ExoSimulatorVisitor());
+            bp::class_<PyEngine, boost::shared_ptr<PyEngine>, boost::noncopyable>("simulator").def(PyEngineVisitor());
         }
+        
     };
 }  // End of namespace python.
 }  // End of namespace exo_simu.
