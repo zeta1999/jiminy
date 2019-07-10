@@ -464,14 +464,19 @@ namespace exo_simu
             }
             fextInWorld.head<2>() = -vxy * frictionCoeff * fextInWorld(2);
 
+            // Make sure that the tangential force never exceeds 1e5 N for the sake of numerical stability
+            fextInWorld.head<2>() = fextInWorld.head<2>().unaryExpr([](float64_t x) -> float64_t 
+                                                                    {
+                                                                        return std::min(std::max(x, -1e5), 1e5);
+                                                                    });
+
             // Compute the forces at the origin of the parent joint frame
             fextLocal.head<3>() = tformFrameJointRot * tformFrameRot.transpose() * fextInWorld;
             fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>());
 
             // Add blending factor
             float64_t blendingFactor = -posFrame(2) / contactOptions_->transitionEps;
-            // float64_t blendingLaw = std::tanh(2 * blendingFactor);
-            float64_t blendingLaw = std::min(blendingFactor, 1.0);
+            float64_t blendingLaw = std::tanh(2 * blendingFactor);
             fextLocal *= blendingLaw;
         }
 
@@ -513,8 +518,7 @@ namespace exo_simu
             }
 
             float64_t blendingFactor = qJointError / engineJointOptions_.boundTransitionEps;
-            // float64_t blendingLaw = std::tanh(2 * blendingFactor);
-            float64_t blendingLaw = std::min(blendingFactor, 1.0);
+            float64_t blendingLaw = std::tanh(2 * blendingFactor);
             forceJoint *= blendingLaw;
             
             u(jointsVelocityIdx[i]) += forceJoint;

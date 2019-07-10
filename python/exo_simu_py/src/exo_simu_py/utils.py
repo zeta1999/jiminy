@@ -217,7 +217,7 @@ def get_initial_state_simulation(trajectory_data):
     dqe = evolution_robot[0].v
 
     x0 = np.concatenate((qe, dqe))
-    x0[2] -= 0.02 # Compensate the vertical offset of the foot contact frames
+    x0[2] -= 0.019 # Compensate the vertical offset of the foot contact frames
 
     return x0
 

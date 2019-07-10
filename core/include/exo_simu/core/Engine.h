@@ -16,7 +16,7 @@
 
 namespace exo_simu
 {
-    std::string const ENGINE_OBJECT_NAME("Engine");
+    std::string const ENGINE_OBJECT_NAME("Global");
 
     using namespace boost::numeric::odeint;
     
