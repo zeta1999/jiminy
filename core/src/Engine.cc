@@ -144,6 +144,9 @@ namespace exo_simu
         model_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
+        // initialize the random number generators
+        resetRandGenerators(engineOptions_->stepper.randomSeed);
+
         return returnCode;
     }
 

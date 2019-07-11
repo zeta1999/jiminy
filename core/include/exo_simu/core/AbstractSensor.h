@@ -21,6 +21,7 @@ namespace exo_simu
         {
             configHolder_t config;
             config["enablePostProccess"] = true;
+            config["noiseStd"] = 0.0;
 
             return config;
         };
@@ -33,9 +34,11 @@ namespace exo_simu
         struct abstractSensorOptions_t
         {
             bool const enablePostProccess;
+            float64_t const noiseStd;
 
             abstractSensorOptions_t(configHolder_t const & options) :
-            enablePostProccess(boost::get<bool>(options.at("enablePostProccess")))
+            enablePostProccess(boost::get<bool>(options.at("enablePostProccess"))),
+            noiseStd(boost::get<float64_t>(options.at("noiseStd")))
             {
                 // Empty.
             }

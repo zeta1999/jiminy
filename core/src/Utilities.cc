@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdlib.h>     /* srand, rand */
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -9,6 +10,10 @@
 
 namespace exo_simu
 {
+    std::default_random_engine generator; // Global random number generator
+    std::uniform_real_distribution<float64_t> distributionNormal(0.0, 1.0);
+    std::uniform_real_distribution<float64_t> distributionUniform(0.0, 1.0);
+
     Timer::Timer(void) :
     t0(),
     tf(),
@@ -27,6 +32,35 @@ namespace exo_simu
         tf = Time::now();
         std::chrono::duration<float64_t> timeDiff = tf - t0;
         dt = timeDiff.count();
+    }
+
+	void resetRandGenerators(uint32_t seed)
+	{
+		srand(seed); // Eigen relies on srand for genering random matrix
+		generator.seed(seed);
+	}
+
+	float64_t randUniform(float64_t const & lo, 
+	                      float64_t const & hi)
+    {
+        return lo + distributionUniform(generator) * (hi - lo);
+    }
+
+	float64_t randNormal(float64_t const & mean, 
+	                     float64_t const & std)
+    {
+        return mean + distributionNormal(generator) * std;
+    }
+
+    matrixN_t::RowXpr addWhiteNoise(matrixN_t::RowXpr vector, 
+                                    float64_t const & std)
+    {
+        vectorN_t noise(vector.size());
+        vector += noise.unaryExpr([std](float64_t x) -> float64_t 
+                                  {
+                                      return randNormal(0, std);
+                                  }); // unaryExpr returns a view. It does not update the original data
+        return vector;
     }
 
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,

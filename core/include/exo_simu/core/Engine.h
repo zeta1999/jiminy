@@ -123,6 +123,7 @@ namespace exo_simu
             config["tolRel"] = 1.0e-4;
             config["sensorsUpdatePeriod"] = 0.0;
             config["controllerUpdatePeriod"] = 0.0;
+            config["randomSeed"] = 0;
 
             return config;
         };
@@ -133,12 +134,14 @@ namespace exo_simu
             float64_t const tolRel;
             float64_t const sensorsUpdatePeriod;
             float64_t const controllerUpdatePeriod;
+            int32_t const randomSeed;
 
             stepperOptions_t(configHolder_t const & options):
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
             tolRel(boost::get<float64_t>(options.at("tolRel"))),
             sensorsUpdatePeriod(boost::get<float64_t>(options.at("sensorsUpdatePeriod"))),
-            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod")))
+            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod"))),
+            randomSeed(boost::get<int32_t>(options.at("randomSeed")))
             {
                 // Empty.
             }

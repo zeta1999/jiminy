@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <string>
+#include <time.h>
 
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Utilities.h"
@@ -104,6 +105,7 @@ int main(int argc, char *argv[])
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logForceSensors")) = true;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = false;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logEncoderSensors")) = false;
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("ForceSensor")).at("noiseStd")) = 50.0;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
 
@@ -126,6 +128,7 @@ int main(int argc, char *argv[])
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 0.0; //1.0e-3;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 0.0; //1.0e-3;
+    boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("randomSeed")) = 0; // Use time(nullptr) for random seed.
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;

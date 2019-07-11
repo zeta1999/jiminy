@@ -61,6 +61,7 @@ simu_options["stepper"]["tolRel"] = 1.0e-5
 simu_options["stepper"]["tolAbs"] = 1.0e-4
 simu_options["stepper"]["sensorsUpdatePeriod"] = 0.0
 simu_options["stepper"]["controllerUpdatePeriod"] = 0.0
+simu_options["stepper"]["randomSeed"] = 0
 
 simu_options['contacts']['stiffness'] = 1.0e6
 simu_options['contacts']['damping'] = 2000.0
@@ -68,6 +69,8 @@ simu_options['contacts']['dryFrictionVelEps'] = 0.01
 simu_options['contacts']['frictionDry'] = 5.0
 simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
+
+model_options['ForceSensor']['noiseStd'] = 50.0
 
 simulator.init(urdf_path)
 simulator.set_model_options(model_options)
@@ -116,4 +119,5 @@ trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 # Save the log in TSV
 # simulator.write_log("/tmp/blackbox/log.data", True)
 # log = LogFile("/tmp/blackbox/log.data")
-# plt.plot(log.parser.get_data("Global.Time"),log.parser.get_data("Global.q_0"))
+# plt.plot(log.parser.get_data("Global.Time"),log.parser.get_data("ForceSensor.LeftExternalHeel.F_z"))
+# plt.show()

@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <vector>
+#include <random>
 
 #include "exo_simu/core/Types.h"
 
@@ -25,6 +26,17 @@ namespace exo_simu
 		std::chrono::time_point<Time> tf;
 		float32_t dt;
 	};
+
+	void resetRandGenerators(uint32_t seed);
+
+	float64_t randUniform(float64_t const & lo, 
+	                      float64_t const & hi);
+
+	float64_t randNormal(float64_t const & mean, 
+	                     float64_t const & std);
+
+	matrixN_t::RowXpr addWhiteNoise(matrixN_t::RowXpr vector, 
+                                    float64_t const & std);
 
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,

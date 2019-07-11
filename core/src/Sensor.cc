@@ -3,6 +3,7 @@
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
+#include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/Model.h"
 #include "exo_simu/core/Sensor.h"
 
@@ -61,6 +62,7 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
+            // Compute the true value
             Eigen::Matrix4d const tformIMU = model_->pncData_.oMf[frameIdx_].toHomogeneousMatrix();
             Eigen::Matrix3d const rotIMU = tformIMU.topLeftCorner<3,3>();
             quaternion_t const quatIMU(rotIMU); // Convert a rotation matrix to a quaternion
@@ -68,6 +70,9 @@ namespace exo_simu
             pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_->pncModel_, model_->pncData_, frameIdx_);
             Eigen::Vector3d omegaIMU = motionIMU.angular();
             data().tail(3) = omegaIMU;
+
+            // Add white noise
+            addWhiteNoise(data(), sensorOptions_->noiseStd);
         }
 
         return returnCode;
@@ -125,9 +130,13 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
+            // Compute the true value
             std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
             std::vector<int32_t>::const_iterator it = std::find(contactFramesIdx.begin(), contactFramesIdx.end(), frameIdx_);
             data() = model_->contactForces_[std::distance(contactFramesIdx.begin(), it)].linear();
+
+            // Add white noise
+            addWhiteNoise(data(), sensorOptions_->noiseStd);
         }
 
         return returnCode;
@@ -193,8 +202,12 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
+            // Compute the true value
             data().head(1) = q.segment<1>(jointPositionIdx_);
             data().tail(1) = v.segment<1>(jointVelocityIdx_);
+
+            // Add white noise
+            addWhiteNoise(data(), sensorOptions_->noiseStd);
         }
 
         return returnCode;
