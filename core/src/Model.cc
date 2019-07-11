@@ -41,9 +41,10 @@ namespace exo_simu
         // Empty.
     }
 
-    result_t Model::initialize(std::string              const & urdfPath, 
-                               std::vector<std::string> const & contactFramesNames, 
-                               std::vector<std::string> const & jointsNames)
+    result_t Model::initialize(std::string              const & urdfPath,
+                               std::vector<std::string> const & contactFramesNames,
+                               std::vector<std::string> const & jointsNames,
+                               bool const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
 
@@ -51,7 +52,7 @@ namespace exo_simu
         removeSensors();
         contactFramesNames_ = contactFramesNames;
         jointsNames_ = jointsNames;
-        returnCode = setUrdfPath(urdfPath);
+        returnCode = setUrdfPath(urdfPath, hasFreeflyer);
 
         // Update the bounds if necessary
         if (returnCode == result_t::SUCCESS)
@@ -67,7 +68,7 @@ namespace exo_simu
         if (returnCode == result_t::SUCCESS)
         {
             returnCode = getFramesIdx(contactFramesNames_, contactFramesIdx_);
-            contactForces_ = pinocchio::container::aligned_vector<pinocchio::Force>(contactFramesNames_.size(), 
+            contactForces_ = pinocchio::container::aligned_vector<pinocchio::Force>(contactFramesNames_.size(),
                                                                                     pinocchio::Force::Zero());
         }
         if (returnCode == result_t::SUCCESS)
@@ -81,8 +82,8 @@ namespace exo_simu
     result_t Model::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         telemetryData_ = std::shared_ptr<TelemetryData>(telemetryData);
-        
-        return result_t::SUCCESS; 
+
+        return result_t::SUCCESS;
     }
 
     result_t Model::removeSensor(std::string const & name)
@@ -107,14 +108,14 @@ namespace exo_simu
                 {
                     // Remove the sensor from its group
                     sensorGroup.second.erase(sensorIt);
-                    
+
                     // Remove the sensor group if there is no more sensors left.
                     if (sensorGroup.second.empty())
                     {
                         sensorsGroupHolder_.erase(sensorGroup.first);
                         sensorsDataHolder_.erase(sensorGroup.first);
                     }
-                    
+
                     isSensorDeleted = true;
                     break;
                 }
@@ -192,7 +193,7 @@ namespace exo_simu
         return urdfPath_;
     }
 
-    result_t Model::setUrdfPath(std::string const & urdfPath)
+    result_t Model::setUrdfPath(std::string const & urdfPath, bool const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
 
@@ -208,7 +209,14 @@ namespace exo_simu
             try
             {
                 pinocchio::Model modelEmpty;
-                pinocchio::urdf::buildModel(urdfPath,pinocchio::JointModelFreeFlyer(),modelEmpty);
+                if (hasFreeflyer)
+                {
+                    pinocchio::urdf::buildModel(urdfPath, pinocchio::JointModelFreeFlyer(), modelEmpty);
+                }
+                else
+                {
+                    pinocchio::urdf::buildModel(urdfPath, modelEmpty);
+                }
                 pncModel_ = modelEmpty;
             }
             catch (std::exception& e)
@@ -278,7 +286,7 @@ namespace exo_simu
         return jointsVelocityIdx_;
     }
 
-    result_t Model::getFrameIdx(std::string const & frameName, 
+    result_t Model::getFrameIdx(std::string const & frameName,
                                 int32_t           & frameIdx) const
     {
         result_t returnCode = result_t::SUCCESS;
@@ -297,7 +305,7 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Model::getFramesIdx(std::vector<std::string> const & framesNames, 
+    result_t Model::getFramesIdx(std::vector<std::string> const & framesNames,
                                  std::vector<int32_t>           & framesIdx) const
     {
         result_t returnCode = result_t::SUCCESS;
@@ -316,14 +324,14 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Model::getJointIdx(std::string const & jointName, 
-                                int32_t           & jointPositionIdx, 
+    result_t Model::getJointIdx(std::string const & jointName,
+                                int32_t           & jointPositionIdx,
                                 int32_t           & jointVelocityIdx) const
     {
         // It only return the index of the first element if the joint has multiple degrees of freedom
 
-        /* Obtained using the cumulative sum of number of variables for each joint previous 
-            to the desired one in the kinematic chain but skipping the first joint, which 
+        /* Obtained using the cumulative sum of number of variables for each joint previous
+            to the desired one in the kinematic chain but skipping the first joint, which
             is always the "universe" and is irrelevant (enforced by pinocchio itself). */
 
         result_t returnCode = result_t::SUCCESS;
@@ -349,8 +357,8 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Model::getJointsIdx(std::vector<std::string> const & jointsNames, 
-                                 std::vector<int32_t>           & jointsPositionIdx, 
+    result_t Model::getJointsIdx(std::vector<std::string> const & jointsNames,
+                                 std::vector<int32_t>           & jointsPositionIdx,
                                  std::vector<int32_t>           & jointsVelocityIdx) const
     {
         result_t returnCode = result_t::SUCCESS;

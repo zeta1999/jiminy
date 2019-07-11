@@ -33,7 +33,7 @@ namespace exo_simu
         ~SensorDataHolder_t(void)
         {
             // Empty.
-        }; 
+        };
 
         matrixN_t data_;
         std::vector<uint32_t> counters_;
@@ -99,12 +99,13 @@ namespace exo_simu
         Model(void);
         virtual ~Model(void);
 
-        result_t initialize(std::string              const & urdfPath, 
-                            std::vector<std::string> const & contactFramesNames, 
-                            std::vector<std::string> const & jointsNames);
+        result_t initialize(std::string              const & urdfPath,
+                            std::vector<std::string> const & contactFramesNames,
+                            std::vector<std::string> const & jointsNames,
+                            bool const & hasFreeflyer = true);
 
         template<typename TSensor>
-        result_t addSensor(std::string              const & sensorName, 
+        result_t addSensor(std::string              const & sensorName,
                            std::shared_ptr<TSensor>       & sensor);
         result_t removeSensor(std::string const & name);
         void removeSensors(void);
@@ -132,21 +133,21 @@ namespace exo_simu
 
     protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
-        
+
         template<typename TSensor>
         std::shared_ptr<TSensor> getSensor(std::string const & sensorType,
                                            std::string const & sensorName);
 
-        result_t setUrdfPath(std::string const & urdfPath);
-        result_t getFrameIdx(std::string const & frameName, 
+        result_t setUrdfPath(std::string const & urdfPath, bool const & hasFreeflyer);
+        result_t getFrameIdx(std::string const & frameName,
                              int32_t           & frameIdx) const;
-        result_t getFramesIdx(std::vector<std::string> const & framesNames, 
+        result_t getFramesIdx(std::vector<std::string> const & framesNames,
                               std::vector<int32_t>           & framesIdx) const;
-        result_t getJointIdx(std::string const & jointName, 
-                             int32_t           & jointPositionIdx, 
+        result_t getJointIdx(std::string const & jointName,
+                             int32_t           & jointPositionIdx,
                              int32_t           & jointVelocityIdx) const;
-        result_t getJointsIdx(std::vector<std::string> const & jointsNames, 
-                              std::vector<int32_t>           & jointsPositionIdx, 
+        result_t getJointsIdx(std::vector<std::string> const & jointsNames,
+                              std::vector<int32_t>           & jointsPositionIdx,
                               std::vector<int32_t>           & jointsVelocityIdx) const;
 
     public:
