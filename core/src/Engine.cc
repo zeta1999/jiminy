@@ -12,6 +12,7 @@
 #include "pinocchio/algorithm/aba.hpp"
 #include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/algorithm/joint-configuration.hpp"
+#include "pinocchio/algorithm/energy.hpp"
 
 #include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/TelemetryData.h"
@@ -30,7 +31,7 @@ namespace exo_simu
     model_(nullptr),
     controller_(nullptr),
     engineOptionsHolder_(),
-    callbackFct_([](float64_t const & t, 
+    callbackFct_([](float64_t const & t,
                     vectorN_t const & x) -> bool
                  {
                      return true;
@@ -139,6 +140,7 @@ namespace exo_simu
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
         }
+        telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
         model_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
@@ -173,7 +175,7 @@ namespace exo_simu
                             std::placeholders::_3,
                             std::placeholders::_1,
                             std::placeholders::_2);
-        auto stepper = make_controlled(engineOptions_->stepper.tolAbs, 
+        auto stepper = make_controlled(engineOptions_->stepper.tolAbs,
                                        engineOptions_->stepper.tolRel,
                                        stepper_t());
 
@@ -195,10 +197,10 @@ namespace exo_simu
         }
         else
         {
-            updatePeriod = std::min(engineOptions_->stepper.sensorsUpdatePeriod, 
+            updatePeriod = std::min(engineOptions_->stepper.sensorsUpdatePeriod,
                                     engineOptions_->stepper.controllerUpdatePeriod);
         }
-        
+
         // Set the initial time step
         float64_t dt = 0.0;
         if (updatePeriod > 0)
@@ -233,6 +235,7 @@ namespace exo_simu
             {
                 updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
             }
+            telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
             model_->updateSensorsTelemetry();
             telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
@@ -251,18 +254,18 @@ namespace exo_simu
                 // Get the current time and target time at next iteration
                 current_time = next_time;
                 next_time += std::min(updatePeriod, end_time - current_time); // Make sure it ends exactly at the end_time
-            
+
                 // Update the sensor data if necessary (only for finite update frequency)
                 if (engineOptions_->stepper.sensorsUpdatePeriod > 0)
                 {
-                    float64_t next_time_update_sensor = std::round(current_time / engineOptions_->stepper.sensorsUpdatePeriod) * 
+                    float64_t next_time_update_sensor = std::round(current_time / engineOptions_->stepper.sensorsUpdatePeriod) *
                         engineOptions_->stepper.sensorsUpdatePeriod;
                     if (std::abs(current_time - next_time_update_sensor) < 1e-8)
                     {
-                        model_->setSensorsData(stepperState_.tLast, 
-                                               stepperState_.qLast, 
-                                               stepperState_.vLast, 
-                                               stepperState_.aLast, 
+                        model_->setSensorsData(stepperState_.tLast,
+                                               stepperState_.qLast,
+                                               stepperState_.vLast,
+                                               stepperState_.aLast,
                                                stepperState_.uLast);
                     }
                 }
@@ -270,14 +273,14 @@ namespace exo_simu
                 // Update the controller command if necessary (only for finite update frequency)
                 if (engineOptions_->stepper.controllerUpdatePeriod > 0)
                 {
-                    float64_t next_time_update_controller = std::round(current_time / engineOptions_->stepper.controllerUpdatePeriod) * 
+                    float64_t next_time_update_controller = std::round(current_time / engineOptions_->stepper.controllerUpdatePeriod) *
                         engineOptions_->stepper.controllerUpdatePeriod;
                     if (std::abs(current_time - next_time_update_controller) < 1e-8)
                     {
-                        controller_->compute_command(*model_, 
-                                                     stepperState_.tLast, 
-                                                     stepperState_.qLast, 
-                                                     stepperState_.vLast, 
+                        controller_->compute_command(*model_,
+                                                     stepperState_.tLast,
+                                                     stepperState_.qLast,
+                                                     stepperState_.vLast,
                                                      stepperState_.uCommandLast);
                         std::vector<int32_t> jointsVelocityIdx = model_->getJointsVelocityIdx();
                         for (uint32_t i=0; i < jointsVelocityIdx.size(); i++)
@@ -332,9 +335,12 @@ namespace exo_simu
             vectorN_t const & v = stepperState_.x.tail(model_->nv());
             vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
             stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a);
-            stepperState_.updateLast(current_time, q, v, a, stepperState_.uLast, stepperState_.uCommandLast); // uLast and uCommandLast are already up-to-date
+            // Get system energy, kinematic computation are not needed since they were already done in RNEA.
+            float64_t energy =  pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false) +
+                                pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
+            stepperState_.updateLast(current_time, q, v, a, stepperState_.uLast, stepperState_.uCommandLast, energy); // uLast and uCommandLast are already up-to-date
         }
-        
+
         return returnCode;
     }
 
@@ -342,9 +348,9 @@ namespace exo_simu
                                 vectorN_t const & x,
                                 vectorN_t       & dxdt)
     {
-        /* Note that the position of the free flyer is in world frame, whereas the 
+        /* Note that the position of the free flyer is in world frame, whereas the
            velocities and accelerations are relative to the parent body frame. */
-           
+
         // Extract configuration and velocity vectors
         vectorN_t const & q = x.head(model_->nq());
         vectorN_t const & v = x.tail(model_->nv());
@@ -354,7 +360,7 @@ namespace exo_simu
         pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
 
         // Compute the external forces
-        pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(), 
+        pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(),
                                                                     pinocchio::Force::Zero());
         std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
         for(uint32_t i=0; i < contactFramesIdx.size(); i++)
@@ -393,7 +399,7 @@ namespace exo_simu
         // Compute dynamics
         vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, v, u, fext);
 
-        /* Hack to compute the configuration vector derivative, including the 
+        /* Hack to compute the configuration vector derivative, including the
            quaternions on SO3 automatically. Note that the time difference must
            not be too small to avoid failure. Note that pinocchio::integrate is
            quite slow (more than 5ns, compare to 85ns for pinocchio::aba). */
@@ -407,13 +413,13 @@ namespace exo_simu
         dxdt.head(model_->nq()) = qDot;
         dxdt.tail(model_->nv()) = a;
     }
- 
+
     vectorN_t Engine::contactDynamics(int32_t const & frameId) const
     {
         // /* /!\ Note that the contact dynamics depends only on kinematics data. /!\ */
 
         contactOptions_t const * const contactOptions_ = &engineOptions_->contacts;
-        
+
         Eigen::Matrix3d const & tformFrameRot = model_->pncData_.oMf[frameId].rotation();
         Eigen::Vector3d const & posFrame = model_->pncData_.oMf[frameId].translation();
 
@@ -428,7 +434,7 @@ namespace exo_simu
             Eigen::Matrix3d const & tformFrameJointRot = model_->pncModel_.frames[frameId].placement.rotation();
             Eigen::Vector3d const & posFrameJoint = model_->pncModel_.frames[frameId].placement.translation();
 
-            Eigen::Vector3d motionFrame = pinocchio::getFrameVelocity(model_->pncModel_, 
+            Eigen::Vector3d motionFrame = pinocchio::getFrameVelocity(model_->pncModel_,
                                                                       model_->pncData_,
                                                                       frameId).linear();
             Eigen::Vector3d vFrameInWorld = tformFrameRot * motionFrame;
@@ -465,7 +471,7 @@ namespace exo_simu
             fextInWorld.head<2>() = -vxy * frictionCoeff * fextInWorld(2);
 
             // Make sure that the tangential force never exceeds 1e5 N for the sake of numerical stability
-            fextInWorld.head<2>() = fextInWorld.head<2>().unaryExpr([](float64_t x) -> float64_t 
+            fextInWorld.head<2>() = fextInWorld.head<2>().unaryExpr([](float64_t x) -> float64_t
                                                                     {
                                                                         return std::min(std::max(x, -1e5), 1e5);
                                                                     });
@@ -520,7 +526,7 @@ namespace exo_simu
             float64_t blendingFactor = qJointError / engineJointOptions_.boundTransitionEps;
             float64_t blendingLaw = std::tanh(2 * blendingFactor);
             forceJoint *= blendingLaw;
-            
+
             u(jointsVelocityIdx[i]) += forceJoint;
         }
     }
@@ -550,7 +556,7 @@ namespace exo_simu
         return *model_;
     }
 
-    void Engine::getLogData(std::vector<std::string> & header, 
+    void Engine::getLogData(std::vector<std::string> & header,
                             matrixN_t                & logData)
     {
         std::vector<float32_t> timestamps;
@@ -560,18 +566,18 @@ namespace exo_simu
 
         // Never empty since it contains at least the initial state
         logData.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
-        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(timestamps.data(), 
+        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(timestamps.data(),
                                                                           timestamps.size()).cast<float64_t>();
         for (uint32_t i=0; i<intData.size(); i++)
         {
-            logData.block(i, 1, 1, intData[i].size()) = 
-                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(intData[i].data(), 
+            logData.block(i, 1, 1, intData[i].size()) =
+                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(intData[i].data(),
                                                                intData[i].size()).cast<float64_t>();
         }
         for (uint32_t i=0; i<floatData.size(); i++)
         {
-            logData.block(i, 1 + intData[0].size(), 1, floatData[i].size()) = 
-                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(), 
+            logData.block(i, 1 + intData[0].size(), 1, floatData[i].size()) =
+                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(),
                                                                  floatData[i].size()).cast<float64_t>();
         }
     }
@@ -582,8 +588,8 @@ namespace exo_simu
         matrixN_t log;
         getLogData(header, log);
 
-        std::ofstream myfile = std::ofstream(filename, 
-                                             std::ios::out | 
+        std::ofstream myfile = std::ofstream(filename,
+                                             std::ios::out |
                                              std::ofstream::trunc);
 
         auto indexConstantEnd = std::find(header.begin(), header.end(), START_COLUMNS);
@@ -591,7 +597,7 @@ namespace exo_simu
         std::copy(indexConstantEnd-1, indexConstantEnd, std::ostream_iterator<std::string>(myfile, "\n"));
         std::copy(indexConstantEnd+1, header.end()-2, std::ostream_iterator<std::string>(myfile, ", "));
         std::copy(header.end()-2, header.end()-1, std::ostream_iterator<std::string>(myfile, "\n")); // Discard the last one (start data flag)
-        
+
         Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
         myfile << log.format(CSVFormat);
 
