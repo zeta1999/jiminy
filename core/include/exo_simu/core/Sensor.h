@@ -13,22 +13,7 @@ namespace exo_simu
     class ImuSensor : public AbstractSensorTpl<ImuSensor>
     {
     public:
-        configHolder_t getDefaultOptions(void) override
-        {
-            configHolder_t config = AbstractSensorTpl<ImuSensor>::getDefaultOptions();
-            // No extra configuration parameter
-
-            return config;
-        };
-        
-        struct imuSensorOptions_t : public abstractSensorOptions_t
-        {
-            imuSensorOptions_t(configHolder_t const & options):
-            abstractSensorOptions_t(options)
-            {
-                // Empty.
-            }
-        };
+        using AbstractSensorTpl<ImuSensor>::getDefaultOptions;
 
     public:
         ImuSensor(Model                               const & model,
@@ -38,7 +23,6 @@ namespace exo_simu
 
         void initialize(int32_t const & frameIdx);
 
-        void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
 
     protected:
@@ -48,9 +32,6 @@ namespace exo_simu
                      vectorN_t const & a,
                      vectorN_t const & u) override;
 
-    public:
-        std::unique_ptr<imuSensorOptions_t const> imuSensorOptions_;
-
     private:
         int32_t frameIdx_;
     };
@@ -58,22 +39,7 @@ namespace exo_simu
     class ForceSensor : public AbstractSensorTpl<ForceSensor>
     {
     public:
-        configHolder_t getDefaultOptions(void) override
-        {
-            configHolder_t config = AbstractSensorTpl<ForceSensor>::getDefaultOptions();
-            // No extra configuration parameter
-
-            return config;
-        };
-        
-        struct forceSensorOptions_t : public abstractSensorOptions_t
-        {
-            forceSensorOptions_t(configHolder_t const & options):
-            abstractSensorOptions_t(options)
-            {
-                // Empty.
-            }
-        };
+        using AbstractSensorTpl<ForceSensor>::getDefaultOptions;
 
     public:
         ForceSensor(Model                               const & model,
@@ -83,7 +49,6 @@ namespace exo_simu
 
         void initialize(int32_t const & frameIdx);
 
-        void setOptions(configHolder_t const & sensorOptions);
         int32_t getFrameIdx(void) const;
         
     protected:
@@ -93,9 +58,6 @@ namespace exo_simu
                      vectorN_t const & a,
                      vectorN_t const & u);
 
-    public:
-        std::unique_ptr<forceSensorOptions_t const> forceSensorOptions_;
-
     private:
         int32_t frameIdx_;
     };
@@ -103,22 +65,7 @@ namespace exo_simu
     class EncoderSensor : public AbstractSensorTpl<EncoderSensor>
     {
     public:
-        configHolder_t getDefaultOptions(void) override
-        {
-            configHolder_t config = AbstractSensorTpl<EncoderSensor>::getDefaultOptions();
-            // No extra configuration parameter
-
-            return config;
-        };
-        
-        struct encoderSensorOptions_t : public abstractSensorOptions_t
-        {
-            encoderSensorOptions_t(configHolder_t const & options):
-            abstractSensorOptions_t(options)
-            {
-                // Empty.
-            }
-        };
+        using AbstractSensorTpl<EncoderSensor>::getDefaultOptions;
 
     public:
         EncoderSensor(Model                               const & model,
@@ -129,7 +76,6 @@ namespace exo_simu
         void initialize(int32_t const & jointPositionIdx,
                         int32_t const & jointVelocityIdx);
 
-        void setOptions(configHolder_t const & sensorOptions);
         int32_t getJointPositionIdx(void) const;
         int32_t getJointVelocityIdx(void) const;
         
@@ -139,9 +85,6 @@ namespace exo_simu
                      vectorN_t const & v,
                      vectorN_t const & a,
                      vectorN_t const & u);
-
-    public:
-        std::unique_ptr<encoderSensorOptions_t const> encoderSensorOptions_;
 
     private:
         int32_t jointPositionIdx_;

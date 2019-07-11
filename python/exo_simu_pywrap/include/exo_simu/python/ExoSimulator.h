@@ -252,7 +252,7 @@ namespace python
         static void setModelOptions(PyEngine       & self, 
                                     bp::dict const & configPy)
         {
-            configHolder_t config = self.model_.getDefaultOptions();
+            configHolder_t config = self.model_.getOptions();
             loadConfigHolder(configPy, config);
             self.model_.setOptions(config);
         }
@@ -267,7 +267,7 @@ namespace python
         static void setControllerOptions(PyEngine       & self, 
                                          bp::dict const & configPy)
         {
-            configHolder_t config = self.controller_.getDefaultOptions();
+            configHolder_t config = self.controller_.getOptions();
             loadConfigHolder(configPy, config);
             self.controller_.setOptions(config);
         }
@@ -282,7 +282,7 @@ namespace python
         static void setSimulationOptions(PyEngine       & self, 
                                          bp::dict const & configPy)
         {
-            configHolder_t config = self.simulator_.getDefaultOptions();
+            configHolder_t config = self.simulator_.getOptions();
             loadConfigHolder(configPy, config);
             self.simulator_.setOptions(config);
         }

@@ -15,15 +15,18 @@ namespace exo_simu
     std::string const AbstractSensorTpl<ImuSensor>::type_("ImuSensor");
     template<>
     uint32_t const AbstractSensorTpl<ImuSensor>::sizeOf_(7);
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPreProcess_({"w_x", "w_y", "w_z", "a_x", "a_y", "a_z"});
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPostProcess_({"quat_x", "quat_y", "quat_z", "quat_w", "w_x", "w_y", "w_z"});
 
     ImuSensor::ImuSensor(Model                               const & model,
                          std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                          std::string                         const & name) :
     AbstractSensorTpl(model, dataHolder, name),
-    imuSensorOptions_(nullptr),
     frameIdx_()
     {
-        setOptions(getDefaultOptions());
+        // Empty.
     }
 
     ImuSensor::~ImuSensor(void)
@@ -35,12 +38,6 @@ namespace exo_simu
     {
         frameIdx_ = frameIdx;
         isInitialized_ = true;
-    }
-
-    void ImuSensor::setOptions(configHolder_t const & sensorOptions)
-    {
-        sensorOptionsHolder_ = sensorOptions;
-        imuSensorOptions_ = std::make_unique<imuSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     int32_t ImuSensor::getFrameIdx(void) const
@@ -82,15 +79,18 @@ namespace exo_simu
     std::string const AbstractSensorTpl<ForceSensor>::type_("ForceSensor");
     template<>
     uint32_t const AbstractSensorTpl<ForceSensor>::sizeOf_(3);
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<ForceSensor>::fieldNamesPreProcess_({"F_x", "F_y", "F_z"});
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<ForceSensor>::fieldNamesPostProcess_({"F_x", "F_y", "F_z"});
 
     ForceSensor::ForceSensor(Model                               const & model,
                              std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                              std::string                         const & name) :
     AbstractSensorTpl(model, dataHolder, name),
-    forceSensorOptions_(nullptr),
     frameIdx_()
     {
-        setOptions(getDefaultOptions());
+        // Empty.
     }
 
     ForceSensor::~ForceSensor(void)
@@ -102,12 +102,6 @@ namespace exo_simu
     {
         frameIdx_ = frameIdx;
         isInitialized_ = true;
-    }
-
-    void ForceSensor::setOptions(configHolder_t const & sensorOptions)
-    {
-        sensorOptionsHolder_ = sensorOptions;
-        forceSensorOptions_ = std::make_unique<forceSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     int32_t ForceSensor::getFrameIdx(void) const
@@ -145,16 +139,19 @@ namespace exo_simu
     std::string const AbstractSensorTpl<EncoderSensor>::type_("EncoderSensor");
     template<>
     uint32_t const AbstractSensorTpl<EncoderSensor>::sizeOf_(2);
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<EncoderSensor>::fieldNamesPreProcess_({"q"});
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<EncoderSensor>::fieldNamesPostProcess_({"q", "v"});
 
     EncoderSensor::EncoderSensor(Model                               const & model,
                                  std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                                  std::string                         const & name) :
     AbstractSensorTpl(model, dataHolder, name),
-    encoderSensorOptions_(nullptr),
     jointPositionIdx_(),
     jointVelocityIdx_()
     {
-        setOptions(getDefaultOptions());
+        // Empty.
     }
 
     EncoderSensor::~EncoderSensor(void)
@@ -168,12 +165,6 @@ namespace exo_simu
         jointPositionIdx_ = jointPositionIdx;
         jointVelocityIdx_ = jointVelocityIdx;
         isInitialized_ = true;
-    }
-
-    void EncoderSensor::setOptions(configHolder_t const & sensorOptions)
-    {
-        sensorOptionsHolder_ = sensorOptions;
-        encoderSensorOptions_ = std::make_unique<encoderSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     int32_t EncoderSensor::getJointPositionIdx(void) const

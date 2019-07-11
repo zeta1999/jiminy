@@ -137,16 +137,40 @@ namespace exo_simu
         sensorsDataHolder_.clear();
     }
 
-    configHolder_t Model::getOptions(void) const
+    configHolder_t Model::getSensorsOptions(void) const
     {
-        return mdlOptionsHolder_;
+        /* Be careful, it requires knowing the sensor types
+           apriori to implement this method, so it is disable. */
+
+        configHolder_t sensorOptions;
+        return sensorOptions;
     }
 
-    result_t Model::setOptions(configHolder_t const & mdlOptions)
+    void Model::setSensorsOptions(configHolder_t & sensorOptions)
+    {
+        /* Be careful, it requires knowing the sensor types
+           apriori to implement this method, so it is disable. */
+    }
+
+    configHolder_t Model::getOptions(void) const
+    {
+        configHolder_t allOptionsHolder;
+
+        configHolder_t sensorsOptions = getSensorsOptions();
+
+        allOptionsHolder.insert(mdlOptionsHolder_.begin(), mdlOptionsHolder_.end());
+        allOptionsHolder.insert(sensorsOptions.begin(), sensorsOptions.end());
+
+        return allOptionsHolder;
+    }
+
+    result_t Model::setOptions(configHolder_t allOptions)
     {
         result_t returnCode = result_t::SUCCESS;
 
-        mdlOptionsHolder_ = mdlOptions;
+        setSensorsOptions(allOptions);
+
+        mdlOptionsHolder_ = allOptions;
 
         configHolder_t & jointOptionsHolder_ = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
         vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMin"));

@@ -91,8 +91,6 @@ namespace exo_simu
             if (returnCode == result_t::SUCCESS)
             {
                 // Configure the sensor
-                configHolder_t imuOptions = imuSensor->getOptions();
-                imuSensor->setOptions(imuOptions);
                 imuSensor->initialize(imuFramesIdx[i]);
             }
         }
@@ -112,8 +110,6 @@ namespace exo_simu
             if (returnCode == result_t::SUCCESS)
             {
                 // Configure the sensor
-                configHolder_t forceOptions = forceSensor->getOptions();
-                forceSensor->setOptions(forceOptions);
                 forceSensor->initialize(contactFramesIdx_[i]);
             }
         }
@@ -126,19 +122,17 @@ namespace exo_simu
 
             if (returnCode == result_t::SUCCESS)
             {
-                // Create a new IMU sensor
+                // Create a new encoder sensor
                 returnCode = addSensor(encoderName, encoderSensor);
             }
             
             if (returnCode == result_t::SUCCESS)
             {
                 // Configure the sensor
-                configHolder_t encoderOptions = encoderSensor->getOptions();
-                encoderSensor->setOptions(encoderOptions);
                 encoderSensor->initialize(jointsPositionIdx_[i], jointsVelocityIdx_[i]);
             }
         }
-        
+
          // Update the bounds if necessary and set the initialization flag
         if (returnCode == result_t::SUCCESS)
         {
@@ -155,10 +149,6 @@ namespace exo_simu
 
         returnCode = Model::configureTelemetry(telemetryData);
 
-        std::vector<std::string> imuFieldNames =  {"Quat_x", "Quat_y", "Quat_z", "Quat_w", "W_x", "W_y", "W_z"};
-        std::vector<std::string> forceFieldNames =  {"F_x", "F_y", "F_z"};
-        std::vector<std::string> encoderFieldNames =  {"q", "dq"};
-
         for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
         {
             for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
@@ -169,21 +159,21 @@ namespace exo_simu
                     {
                         if (exoMdlOptions_->telemetry.logImuSensors)
                         {
-                            returnCode = sensor.second->configureTelemetry(imuFieldNames, telemetryData_);
+                            returnCode = sensor.second->configureTelemetry(telemetryData_);
                         }
                     }
                     else if (sensorGroup.first == ForceSensor::type_)
                     {
                         if (exoMdlOptions_->telemetry.logForceSensors)
                         {
-                            returnCode = sensor.second->configureTelemetry(forceFieldNames, telemetryData_);
+                            returnCode = sensor.second->configureTelemetry(telemetryData_);
                         }
                     }
                     else
                     {
                         if (exoMdlOptions_->telemetry.logEncoderSensors)
                         {
-                            returnCode = sensor.second->configureTelemetry(encoderFieldNames, telemetryData_);
+                            returnCode = sensor.second->configureTelemetry(telemetryData_);
                         }
                     }
                 }
@@ -191,6 +181,41 @@ namespace exo_simu
         }
 
         return returnCode;
+    }
+
+    configHolder_t ExoModel::getSensorsOptions(void) const
+    {
+        configHolder_t sensorOptions;
+
+        sensorOptions[ImuSensor::type_] = ImuSensor::getOptions();
+        sensorOptions[ForceSensor::type_] = ForceSensor::getOptions();
+        sensorOptions[EncoderSensor::type_] = EncoderSensor::getOptions();
+
+        return sensorOptions;
+    }
+    
+    void ExoModel::setSensorsOptions(configHolder_t & sensorOptions)
+    {
+        // Set sensor options and delete the associated key, if any
+
+        configHolder_t::const_iterator it = sensorOptions.find(ImuSensor::type_);
+        if (it != sensorOptions.end())
+        {
+            ImuSensor::setOptions(boost::get<configHolder_t>(sensorOptions.at(ImuSensor::type_)));
+            sensorOptions.erase(ImuSensor::type_);
+        }
+        it = sensorOptions.find(ForceSensor::type_);
+        if (it != sensorOptions.end())
+        {
+            ForceSensor::setOptions(boost::get<configHolder_t>(sensorOptions.at(ForceSensor::type_)));
+            sensorOptions.erase(ForceSensor::type_);
+        }
+        it = sensorOptions.find(EncoderSensor::type_);
+        if (it != sensorOptions.end())
+        {
+            EncoderSensor::setOptions(boost::get<configHolder_t>(sensorOptions.at(EncoderSensor::type_)));
+            sensorOptions.erase(EncoderSensor::type_);
+        }
     }
 
     result_t ExoModel::setOptions(configHolder_t const & mdlOptions)

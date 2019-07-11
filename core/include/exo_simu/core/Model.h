@@ -18,28 +18,7 @@ namespace exo_simu
     class Engine;
     class AbstractSensorBase;
     class TelemetryData;
-
-    struct SensorDataHolder_t
-    {
-        SensorDataHolder_t(void) :
-        data_(),
-        counters_(),
-        sensors_(),
-        num_()
-        {
-            // Empty.
-        };
-
-        ~SensorDataHolder_t(void)
-        {
-            // Empty.
-        };
-
-        matrixN_t data_;
-        std::vector<uint32_t> counters_;
-        std::vector<AbstractSensorBase *> sensors_;
-        uint32_t num_;
-    };
+    struct SensorDataHolder_t;
 
     class Model
     {
@@ -102,7 +81,7 @@ namespace exo_simu
         result_t initialize(std::string              const & urdfPath,
                             std::vector<std::string> const & contactFramesNames,
                             std::vector<std::string> const & jointsNames,
-                            bool const & hasFreeflyer = true);
+                            bool                     const & hasFreeflyer = true);
 
         template<typename TSensor>
         result_t addSensor(std::string              const & sensorName,
@@ -111,7 +90,7 @@ namespace exo_simu
         void removeSensors(void);
 
         configHolder_t getOptions(void) const;
-        result_t setOptions(configHolder_t const & mdlOptions);
+        result_t setOptions(configHolder_t mdlOptions); // Make a copy !
         bool getIsInitialized(void) const;
         bool getIsTelemetryConfigured(void) const;
         std::string getUrdfPath(void) const;
@@ -134,11 +113,15 @@ namespace exo_simu
     protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
 
+        virtual configHolder_t getSensorsOptions(void) const;
+        virtual void setSensorsOptions(configHolder_t & sensorOptions);
+
         template<typename TSensor>
         std::shared_ptr<TSensor> getSensor(std::string const & sensorType,
                                            std::string const & sensorName);
 
-        result_t setUrdfPath(std::string const & urdfPath, bool const & hasFreeflyer);
+        result_t setUrdfPath(std::string const & urdfPath, 
+                             bool        const & hasFreeflyer);
         result_t getFrameIdx(std::string const & frameName,
                              int32_t           & frameIdx) const;
         result_t getFramesIdx(std::vector<std::string> const & framesNames,
@@ -176,6 +159,28 @@ namespace exo_simu
         uint32_t nq_;
         uint32_t nv_;
         uint32_t nx_;
+    };
+
+    struct SensorDataHolder_t
+    {
+        SensorDataHolder_t(void) :
+        data_(),
+        counters_(),
+        sensors_(),
+        num_()
+        {
+            // Empty.
+        };
+
+        ~SensorDataHolder_t(void)
+        {
+            // Empty.
+        }; 
+
+        matrixN_t data_;
+        std::vector<uint32_t> counters_;
+        std::vector<AbstractSensorBase *> sensors_;
+        uint32_t num_;
     };
 }
 
