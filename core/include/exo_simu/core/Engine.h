@@ -19,11 +19,11 @@ namespace exo_simu
     std::string const ENGINE_OBJECT_NAME("Global");
 
     using namespace boost::numeric::odeint;
-    
+
     class AbstractController;
     class TelemetryData;
     class TelemetryRecorder;
-        
+
     class Engine
     {
     protected:
@@ -133,7 +133,7 @@ namespace exo_simu
             float64_t const tolRel;
             float64_t const sensorsUpdatePeriod;
             float64_t const controllerUpdatePeriod;
-            
+
             stepperOptions_t(configHolder_t const & options):
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
             tolRel(boost::get<float64_t>(options.at("tolRel"))),
@@ -226,6 +226,7 @@ namespace exo_simu
             fext(),
             uBounds(),
             uInternal(),
+            energyLast(0.0),
             isInitialized()
             {
                 // Empty.
@@ -243,7 +244,7 @@ namespace exo_simu
                 return initialize(model, x_init);
             }
 
-            result_t initialize(Model     const & model, 
+            result_t initialize(Model     const & model,
                                 vectorN_t const & x_init)
             {
                 result_t returnCode = result_t::SUCCESS;
@@ -253,7 +254,7 @@ namespace exo_simu
                     std::cout << "Error - stepperState_t::initialize - Something is wrong with the Model." << std::endl;
                     returnCode = result_t::ERROR_INIT_FAILED;
                 }
-                
+
                 if (returnCode == result_t::SUCCESS)
                 {
                     iterLast = 0;
@@ -273,7 +274,7 @@ namespace exo_simu
                     dxdt = vectorN_t::Zero(model.nx());
                     uControl = vectorN_t::Zero(model.nv());
 
-                    fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(), 
+                    fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(),
                                                                                   pinocchio::Force::Zero());
                     uBounds = vectorN_t::Zero(model.nv());
                     uInternal = vectorN_t::Zero(model.nv());
@@ -289,7 +290,8 @@ namespace exo_simu
                             vectorN_t const & v,
                             vectorN_t const & a,
                             vectorN_t const & u,
-                            vectorN_t const & uCommand)
+                            vectorN_t const & uCommand,
+                            float64_t const & energy)
             {
                 tLast = t;
                 qLast = q;
@@ -297,6 +299,7 @@ namespace exo_simu
                 aLast = a;
                 uLast = u;
                 uCommandLast = uCommand;
+                energyLast = energy;
                 ++iterLast;
             }
 
@@ -309,12 +312,13 @@ namespace exo_simu
             vectorN_t aLast;
             vectorN_t uLast;
             vectorN_t uCommandLast;
+            float64_t energyLast; ///< Energy (kinetic + potential) of the system at the last state.
 
             std::vector<std::string> qNames;
             std::vector<std::string> vNames;
             std::vector<std::string> aNames;
             std::vector<std::string> uCommandNames;
-            
+
             // Internal buffers required for the adaptive step computation and system dynamics
             vectorN_t x;
             vectorN_t dxdt;
@@ -328,7 +332,7 @@ namespace exo_simu
         private:
             bool isInitialized;
         };
-        
+
     public:
         Engine(void);
         ~Engine(void);
@@ -345,7 +349,7 @@ namespace exo_simu
         bool getIsInitialized(void) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
-        void getLogData(std::vector<std::string> & header, 
+        void getLogData(std::vector<std::string> & header,
                         matrixN_t                & logData);
         void writeLogTxt(std::string const & filename);
         void writeLogBinary(std::string const & filename);
