@@ -70,7 +70,9 @@ simu_options['contacts']['frictionDry'] = 5.0
 simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
 
-model_options['ForceSensor']['noiseStd'] = 50.0
+model_options['ForceSensor']['noiseStd'] = 20.0
+model_options['ForceSensor']['biasMean'] = 100.0
+model_options['ForceSensor']['biasStd'] = 50.0
 
 simulator.init(urdf_path)
 simulator.set_model_options(model_options)

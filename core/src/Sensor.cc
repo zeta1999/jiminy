@@ -71,8 +71,9 @@ namespace exo_simu
             Eigen::Vector3d omegaIMU = motionIMU.angular();
             data().tail(3) = omegaIMU;
 
-            // Add white noise
-            addWhiteNoise(data(), sensorOptions_->noiseStd);
+            // Add white noise and bias
+            data() += randVectorNormal(sizeOf_, 0, sensorOptions_->noiseStd);
+            data() += getBias();
         }
 
         return returnCode;
@@ -136,7 +137,8 @@ namespace exo_simu
             data() = model_->contactForces_[std::distance(contactFramesIdx.begin(), it)].linear();
 
             // Add white noise
-            addWhiteNoise(data(), sensorOptions_->noiseStd);
+            data() += randVectorNormal(sizeOf_, 0, sensorOptions_->noiseStd);
+            data() += getBias();
         }
 
         return returnCode;
@@ -207,7 +209,8 @@ namespace exo_simu
             data().tail(1) = v.segment<1>(jointVelocityIdx_);
 
             // Add white noise
-            addWhiteNoise(data(), sensorOptions_->noiseStd);
+            data() += randVectorNormal(sizeOf_, 0, sensorOptions_->noiseStd);
+            data() += getBias();
         }
 
         return returnCode;

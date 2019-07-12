@@ -20,6 +20,11 @@ namespace exo_simu
         // Empty.
     }
 
+    void AbstractSensorBase::reset(void)
+    {
+        data().setZero();
+    }
+
     result_t AbstractSensorBase::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         result_t returnCode = result_t::SUCCESS; 

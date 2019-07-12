@@ -21,6 +21,11 @@ namespace exo_simu
         // Empty.
     }
 
+    void AbstractController::reset(void)
+    {
+        // Empty.
+    }
+
     result_t AbstractController::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         result_t returnCode = result_t::SUCCESS; 

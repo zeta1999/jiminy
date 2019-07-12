@@ -79,6 +79,18 @@ namespace exo_simu
         return returnCode;
     }
 
+    void Model::reset(void)
+    {
+        // Reset the sensors
+        for (sensorsGroupHolder_t::value_type & sensorGroup : sensorsGroupHolder_)
+        {
+            for (sensorsHolder_t::value_type & sensor : sensorGroup.second)
+            {
+                sensor.second->reset();
+            }
+        }
+    }
+
     result_t Model::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         telemetryData_ = std::shared_ptr<TelemetryData>(telemetryData);

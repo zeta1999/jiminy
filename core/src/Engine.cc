@@ -144,9 +144,6 @@ namespace exo_simu
         model_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
-        // initialize the random number generators
-        resetRandGenerators(engineOptions_->stepper.randomSeed);
-
         return returnCode;
     }
 
@@ -182,6 +179,11 @@ namespace exo_simu
                                        engineOptions_->stepper.tolRel,
                                        stepper_t());
 
+        // initialize the random number generators
+        resetRandGenerators(engineOptions_->stepper.randomSeed);
+        model_->reset();
+        controller_->reset();
+        
         // Initialize the logger, model, and stepper internal state
         model_->pncData_ = pinocchio::Data(model_->pncModel_);
         stepperState_.initialize(*model_, x_init);

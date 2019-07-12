@@ -82,6 +82,7 @@ namespace exo_simu
                             std::vector<std::string> const & contactFramesNames,
                             std::vector<std::string> const & jointsNames,
                             bool                     const & hasFreeflyer = true);
+        void reset(void);
 
         template<typename TSensor>
         result_t addSensor(std::string              const & sensorName,

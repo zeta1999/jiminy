@@ -105,7 +105,9 @@ int main(int argc, char *argv[])
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logForceSensors")) = true;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = false;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logEncoderSensors")) = false;
-    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("ForceSensor")).at("noiseStd")) = 50.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("ForceSensor")).at("noiseStd")) = 20.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("ForceSensor")).at("biasMean")) = 100.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("ForceSensor")).at("biasStd")) = 50.0;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
 

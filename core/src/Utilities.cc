@@ -1,4 +1,5 @@
 #include <math.h>
+#include <climits>
 #include <stdlib.h>     /* srand, rand */
 
 #include <Eigen/Dense>
@@ -10,11 +11,9 @@
 
 namespace exo_simu
 {
-    std::default_random_engine generator; // Global random number generator
-    std::uniform_real_distribution<float64_t> distributionNormal(0.0, 1.0);
-    std::uniform_real_distribution<float64_t> distributionUniform(0.0, 1.0);
+    // *********************** Timer **************************
 
-    Timer::Timer(void) :
+    Timer::Timer(void) : 
     t0(),
     tf(),
     dt(0)
@@ -34,31 +33,156 @@ namespace exo_simu
         dt = timeDiff.count();
     }
 
+    // **************** Random number generator *****************
+    // Based on Ziggurat generator by Marsaglia and Tsang (JSS, 2000) 
+    
+    std::mt19937 generator;
+    std::uniform_real_distribution<float32_t> distUniform(0.0,1.0);
+
+    uint32_t kn[128];
+    float32_t fn[128];
+    float32_t wn[128];
+
+    void r4_nor_setup(void)
+    {
+        float64_t const m1 = 2147483648.0;
+        float64_t const vn = 9.91256303526217E-03;
+        float64_t dn = 3.442619855899;
+        float64_t tn = 3.442619855899;
+
+        float64_t q = vn / exp (-0.5 * dn * dn);
+
+        kn[0] = (uint32_t) ((dn / q) * m1);
+        kn[1] = 0;
+
+        wn[0] = static_cast<float32_t>(q / m1);
+        wn[127] = static_cast<float32_t>(dn / m1);
+
+        fn[0] = 1.0f;
+        fn[127] = static_cast<float32_t>(exp(-0.5 * dn * dn));
+
+        for (uint8_t i=126; 1 <= i; i--)
+        {
+            dn = sqrt (-2.0 * log(vn / dn + exp(-0.5 * dn * dn)));
+            kn[i+1] = static_cast<uint32_t>((dn / tn) * m1);
+            tn = dn;
+            fn[i] = static_cast<float32_t>(exp(-0.5 * dn * dn));
+            wn[i] = static_cast<float32_t>(dn / m1);
+        }
+    }
+
+    float32_t r4_uni(void)
+    {
+        return distUniform(generator);
+    }
+
+    float32_t r4_nor(void)
+    {
+        float32_t const r = 3.442620f;
+        int32_t hz;
+        uint32_t iz;
+        float32_t x;
+        float32_t y;
+
+        hz = static_cast<int32_t>(generator());
+        iz = (hz & 127U);
+
+        if (fabs(hz) < kn[iz])
+        {
+            return static_cast<float32_t>(hz) * wn[iz];
+        }
+        else
+        {
+            while(true)
+            {
+                if (iz == 0)
+                {
+                    while(true)
+                    {
+                        x = - 0.2904764f * log(r4_uni());
+                        y = - log(r4_uni());
+                        if (x * x <= y + y)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (hz <= 0)
+                    {
+                        return - r - x;
+                    }
+                    else
+                    {
+                        return + r + x;
+                    }
+                }
+
+                x = static_cast<float32_t>(hz) * wn[iz];
+
+                if (fn[iz] + r4_uni() * (fn[iz-1] - fn[iz]) < exp (-0.5f * x * x))
+                {
+                    return x;
+                }
+
+                hz = static_cast<int32_t>(generator());
+                iz = (hz & 127);
+
+                if (fabs(hz) < kn[iz])
+                {
+                    return static_cast<float32_t>(hz) * wn[iz];
+                }
+            }
+        }
+    }
+
+    // ********************** Other **********************
+
 	void resetRandGenerators(uint32_t seed)
 	{
 		srand(seed); // Eigen relies on srand for genering random matrix
-		generator.seed(seed);
+        generator.seed(seed);
+        r4_nor_setup();
 	}
 
 	float64_t randUniform(float64_t const & lo, 
 	                      float64_t const & hi)
     {
-        return lo + distributionUniform(generator) * (hi - lo);
+        return lo + r4_uni() * (hi - lo);
     }
 
 	float64_t randNormal(float64_t const & mean, 
 	                     float64_t const & std)
     {
-        return mean + distributionNormal(generator) * std;
+        return mean + r4_nor() * std;
     }
 
-    matrixN_t::RowXpr addWhiteNoise(matrixN_t::RowXpr vector, 
-                                    float64_t const & std)
+    vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & mean,
+                               float64_t const & std)
+    {
+        if (std > 0.0)
+        {
+            return vectorN_t::NullaryExpr(size, 
+                                        [&mean, &std] (vectorN_t::Index const &) -> float64_t 
+                                        {
+                                            return randNormal(mean, std);
+                                        });
+        }
+        else
+        {
+            return vectorN_t::Constant(size, mean);
+        }
+        
+    }
+
+    matrixN_t::RowXpr addRandNormal(matrixN_t::RowXpr         vector, 
+                                    float64_t         const & mean,
+                                    float64_t         const & std)
     {
         vectorN_t noise(vector.size());
-        vector += noise.unaryExpr([std](float64_t x) -> float64_t 
+        vector += noise.unaryExpr([mean, std](float64_t x) -> float64_t 
                                   {
-                                      return randNormal(0, std);
+                                      return randNormal(mean, std);
                                   }); // unaryExpr returns a view. It does not update the original data
         return vector;
     }

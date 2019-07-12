@@ -8,12 +8,13 @@ namespace exo_simu
             std::make_unique<AbstractSensorBase::abstractSensorOptions_t const>(AbstractSensorTpl<T>::sensorOptionsHolder_);
 
     template <typename T>
-    AbstractSensorTpl<T>::AbstractSensorTpl(Model                            const & model,
+    AbstractSensorTpl<T>::AbstractSensorTpl(Model                               const & model,
                                             std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                                             std::string                         const & name) :
     AbstractSensorBase(model, name),
     dataHolder_(dataHolder),
-    sensorId_(dataHolder_->num_)
+    sensorId_(dataHolder_->num_),
+    bias(sizeOf_)
     {
         ++dataHolder_->num_;
         dataHolder_->data_.conservativeResize(dataHolder_->num_, sizeOf_);
@@ -53,6 +54,13 @@ namespace exo_simu
     }
 
     template <typename T>
+    void AbstractSensorTpl<T>::reset(void)
+    {
+        AbstractSensorBase::reset();
+        bias = randVectorNormal(sizeOf_, sensorOptions_->biasMean, sensorOptions_->biasStd);
+    }
+
+    template <typename T>
     configHolder_t AbstractSensorTpl<T>::getOptions(void)
     {
         return sensorOptionsHolder_;
@@ -78,6 +86,12 @@ namespace exo_simu
         }
     }
     
+    template <typename T>
+    vectorN_t const & AbstractSensorTpl<T>::getBias(void) const
+    {
+        return bias;
+    }
+
     template <typename T>
     matrixN_t::ConstRowXpr AbstractSensorTpl<T>::get(void) const
     {

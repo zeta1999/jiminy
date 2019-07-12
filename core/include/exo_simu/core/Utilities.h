@@ -35,8 +35,13 @@ namespace exo_simu
 	float64_t randNormal(float64_t const & mean, 
 	                     float64_t const & std);
 
-	matrixN_t::RowXpr addWhiteNoise(matrixN_t::RowXpr vector, 
-                                    float64_t const & std);
+	matrixN_t::RowXpr addRandNormal(matrixN_t::RowXpr         vector, 
+                                    float64_t         const & mean,
+                                    float64_t         const & std);
+
+	vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & mean,
+                               float64_t const & std);
 
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,

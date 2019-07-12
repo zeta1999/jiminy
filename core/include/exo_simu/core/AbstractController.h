@@ -59,8 +59,9 @@ namespace exo_simu
         AbstractController(void);
         virtual ~AbstractController(void);
 
-        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+        virtual void reset(void);
 
+        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
         virtual void updateTelemetry(void) = 0;
 
         configHolder_t getOptions(void) const;
