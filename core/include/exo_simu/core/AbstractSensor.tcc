@@ -2,19 +2,12 @@
 namespace exo_simu
 {
     template <typename T>
-    configHolder_t AbstractSensorTpl<T>::sensorOptionsHolder_(T::getDefaultOptions());
-    template <typename T>
-    std::unique_ptr<AbstractSensorBase::abstractSensorOptions_t const> AbstractSensorTpl<T>::sensorOptions_ = 
-            std::make_unique<AbstractSensorBase::abstractSensorOptions_t const>(AbstractSensorTpl<T>::sensorOptionsHolder_);
-
-    template <typename T>
     AbstractSensorTpl<T>::AbstractSensorTpl(Model                               const & model,
                                             std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                                             std::string                         const & name) :
     AbstractSensorBase(model, name),
     dataHolder_(dataHolder),
-    sensorId_(dataHolder_->num_),
-    bias(sizeOf_)
+    sensorId_(dataHolder_->num_)
     {
         ++dataHolder_->num_;
         dataHolder_->data_.conservativeResize(dataHolder_->num_, sizeOf_);
@@ -57,22 +50,18 @@ namespace exo_simu
     void AbstractSensorTpl<T>::reset(void)
     {
         AbstractSensorBase::reset();
-        bias = randVectorNormal(sizeOf_, sensorOptions_->biasMean, sensorOptions_->biasStd);
+        bias_ = randVectorNormal(sizeOf_, sensorOptions_->biasMean, sensorOptions_->biasStd);
     }
 
     template <typename T>
-    configHolder_t AbstractSensorTpl<T>::getOptions(void)
+    void AbstractSensorTpl<T>::setOptionsAll(configHolder_t const & sensorOptions)
     {
-        return sensorOptionsHolder_;
+        for (AbstractSensorBase * sensor : dataHolder_->sensors_)
+        {
+            sensor->setOptions(sensorOptions);
+        }
     }
-
-    template <typename T>
-    void AbstractSensorTpl<T>::setOptions(configHolder_t const & sensorOptions)
-    {
-        sensorOptionsHolder_ = sensorOptions;
-        sensorOptions_ = std::make_unique<abstractSensorOptions_t const>(sensorOptionsHolder_);
-    }
-
+    
     template <typename T>
     std::vector<std::string> const & AbstractSensorTpl<T>::getFieldNames(void) const
     {
@@ -84,12 +73,6 @@ namespace exo_simu
         {
             return fieldNamesPreProcess_;
         }
-    }
-    
-    template <typename T>
-    vectorN_t const & AbstractSensorTpl<T>::getBias(void) const
-    {
-        return bias;
     }
 
     template <typename T>

@@ -99,8 +99,6 @@ namespace exo_simu
                             std::vector<int32_t> const & contactFramesIdx) = delete;
         result_t initialize(std::string const & urdfPath);
 
-        virtual configHolder_t getSensorsOptions(void) const override;
-        virtual void setSensorsOptions(configHolder_t & sensorOptions) override;
         result_t setOptions(configHolder_t const & mdlOptions);
 
     protected:

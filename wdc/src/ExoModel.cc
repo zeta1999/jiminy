@@ -183,41 +183,6 @@ namespace exo_simu
         return returnCode;
     }
 
-    configHolder_t ExoModel::getSensorsOptions(void) const
-    {
-        configHolder_t sensorOptions;
-
-        sensorOptions[ImuSensor::type_] = ImuSensor::getOptions();
-        sensorOptions[ForceSensor::type_] = ForceSensor::getOptions();
-        sensorOptions[EncoderSensor::type_] = EncoderSensor::getOptions();
-
-        return sensorOptions;
-    }
-    
-    void ExoModel::setSensorsOptions(configHolder_t & sensorOptions)
-    {
-        // Set sensor options and delete the associated key, if any
-
-        configHolder_t::const_iterator it = sensorOptions.find(ImuSensor::type_);
-        if (it != sensorOptions.end())
-        {
-            ImuSensor::setOptions(boost::get<configHolder_t>(sensorOptions.at(ImuSensor::type_)));
-            sensorOptions.erase(ImuSensor::type_);
-        }
-        it = sensorOptions.find(ForceSensor::type_);
-        if (it != sensorOptions.end())
-        {
-            ForceSensor::setOptions(boost::get<configHolder_t>(sensorOptions.at(ForceSensor::type_)));
-            sensorOptions.erase(ForceSensor::type_);
-        }
-        it = sensorOptions.find(EncoderSensor::type_);
-        if (it != sensorOptions.end())
-        {
-            EncoderSensor::setOptions(boost::get<configHolder_t>(sensorOptions.at(EncoderSensor::type_)));
-            sensorOptions.erase(EncoderSensor::type_);
-        }
-    }
-
     result_t ExoModel::setOptions(configHolder_t const & mdlOptions)
     {
         result_t returnCode = result_t::SUCCESS;

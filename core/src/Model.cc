@@ -148,41 +148,58 @@ namespace exo_simu
         sensorsGroupHolder_.clear();
         sensorsDataHolder_.clear();
     }
-
-    configHolder_t Model::getSensorsOptions(void) const
+    
+    configHolder_t Model::getSensorsOptions(std::string const & sensorType) const
     {
-        /* Be careful, it requires knowing the sensor types
-           apriori to implement this method, so it is disable. */
-
-        configHolder_t sensorOptions;
-        return sensorOptions;
+        configHolder_t sensorsOptions;
+        for (sensorsHolder_t::value_type const & sensor : sensorsGroupHolder_.at(sensorType))
+        {
+            sensorsOptions[sensor.first] = sensor.second->getOptions();
+        }
+        return sensorsOptions;
     }
 
-    void Model::setSensorsOptions(configHolder_t & sensorOptions)
+    configHolder_t Model::getSensorOptions(std::string const & sensorType,
+                                           std::string const & sensorName) const
     {
-        /* Be careful, it requires knowing the sensor types
-           apriori to implement this method, so it is disable. */
+        return sensorsGroupHolder_.at(sensorType).at(sensorName)->getOptions();
+    }
+
+    void Model::setSensorOptions(std::string    const & sensorType,
+                                 std::string    const & sensorName,
+                                 configHolder_t const & sensorOptions)
+    {
+        return sensorsGroupHolder_.at(sensorType).at(sensorName)->setOptions(sensorOptions);
+    }
+
+    void Model::setSensorsOptions(std::string    const & sensorType,
+                                  configHolder_t const & sensorsOptions)
+    {
+        for (sensorsHolder_t::value_type const & sensor : sensorsGroupHolder_.at(sensorType))
+        {
+            configHolder_t::const_iterator it = sensorsOptions.find(sensor.first);
+            if (it != sensorsOptions.end())
+            {
+                sensor.second->setOptions(boost::get<configHolder_t>(it->second));
+            }
+            else
+            {
+                sensor.second->setOptionsAll(sensorsOptions);
+                break;
+            }
+        }
     }
 
     configHolder_t Model::getOptions(void) const
     {
-        configHolder_t allOptionsHolder;
-
-        configHolder_t sensorsOptions = getSensorsOptions();
-
-        allOptionsHolder.insert(mdlOptionsHolder_.begin(), mdlOptionsHolder_.end());
-        allOptionsHolder.insert(sensorsOptions.begin(), sensorsOptions.end());
-
-        return allOptionsHolder;
+        return mdlOptionsHolder_;
     }
 
-    result_t Model::setOptions(configHolder_t allOptions)
+    result_t Model::setOptions(configHolder_t mdlOptions)
     {
         result_t returnCode = result_t::SUCCESS;
 
-        setSensorsOptions(allOptions);
-
-        mdlOptionsHolder_ = allOptions;
+        mdlOptionsHolder_ = mdlOptions;
 
         configHolder_t & jointOptionsHolder_ = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
         vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMin"));
@@ -229,7 +246,21 @@ namespace exo_simu
         return urdfPath_;
     }
 
-    result_t Model::setUrdfPath(std::string const & urdfPath, bool const & hasFreeflyer)
+    std::map<std::string, std::vector<std::string> > Model::getSensorsNames(void) const
+    {
+        std::map<std::string, std::vector<std::string> > sensorNames;
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        {
+            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+            {
+                sensorNames[sensorGroup.first].push_back(sensor.first);
+            }
+        }
+        return sensorNames;
+    }
+
+    result_t Model::setUrdfPath(std::string const & urdfPath, 
+                                bool        const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
 

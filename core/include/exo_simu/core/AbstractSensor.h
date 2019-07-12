@@ -17,7 +17,7 @@ namespace exo_simu
         template<typename> friend class AbstractSensorTpl;
 
     public:
-        static configHolder_t getDefaultOptions(void)
+        virtual configHolder_t getDefaultOptions(void)
         {
             configHolder_t config;
             config["enablePostProccess"] = true;
@@ -26,11 +26,6 @@ namespace exo_simu
             config["biasStd"] = 0.0;
 
             return config;
-        };
-
-        virtual configHolder_t getDefaultInstanceOptions(void)
-        {
-            return getDefaultOptions();
         };
 
         struct abstractSensorOptions_t
@@ -63,14 +58,17 @@ namespace exo_simu
         virtual void reset(void);
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
 
+        configHolder_t getOptions(void);
+        void setOptions(configHolder_t const & sensorOptions);
+        virtual void setOptionsAll(configHolder_t const & sensorOptions) = 0;
         bool getIsInitialized(void) const;
         bool getIsTelemetryConfigured(void) const;
         virtual std::string getName(void) const;
         virtual std::vector<std::string> const & getFieldNames(void) const = 0;
+        vectorN_t const & getBias(void) const;
+
         virtual matrixN_t::ConstRowXpr get(void) const = 0;
         virtual matrixN_t const & getAll(void) const = 0;
-
-        // It assumes that the model internal state is consistent with other input arguments
         virtual result_t setAll(float64_t const & t,
                                 vectorN_t const & q,
                                 vectorN_t const & v,
@@ -88,14 +86,20 @@ namespace exo_simu
                              vectorN_t const & a,
                              vectorN_t const & u) = 0;
 
-    private:
-        std::string name_;
 
+    public:
+        std::unique_ptr<abstractSensorOptions_t const> sensorOptions_;
+        
     protected:
+        configHolder_t sensorOptionsHolder_;
         TelemetrySender telemetrySender_;
         bool isInitialized_;
         bool isTelemetryConfigured_;
-        Model const * model_; // Must be a pointer to avoid managing its deletion
+        Model const * model_; // Raw pointer to avoid managing its deletion
+
+    private:
+        std::string name_;
+        vectorN_t bias_;
     };
 
     template<class T>
@@ -117,11 +121,9 @@ namespace exo_simu
 
         virtual void reset(void) override;
 
-        static configHolder_t getOptions(void);
-        static void setOptions(configHolder_t const & sensorOptions);
         std::vector<std::string> const & getFieldNames(void) const;
-        vectorN_t const & getBias(void) const;
 
+        virtual void setOptionsAll(configHolder_t const & sensorOptions) override;
         matrixN_t::ConstRowXpr get(void) const override;
         matrixN_t const & getAll(void) const override;
         result_t setAll(float64_t const & t,
@@ -139,15 +141,10 @@ namespace exo_simu
         static uint32_t const sizeOf_;
         static std::vector<std::string> const fieldNamesPostProcess_;
         static std::vector<std::string> const fieldNamesPreProcess_;
-        static std::unique_ptr<abstractSensorOptions_t const> sensorOptions_;
-
-    protected:
-        static configHolder_t sensorOptionsHolder_;
 
     private:
         std::shared_ptr<SensorDataHolder_t> dataHolder_;
         uint32_t sensorId_;
-        vectorN_t bias;
     };
 }
 

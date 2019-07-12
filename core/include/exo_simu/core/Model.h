@@ -92,9 +92,18 @@ namespace exo_simu
 
         configHolder_t getOptions(void) const;
         result_t setOptions(configHolder_t mdlOptions); // Make a copy !
+        configHolder_t getSensorOptions(std::string const & sensorType,
+                                        std::string const & sensorName) const;
+        configHolder_t getSensorsOptions(std::string const & sensorType) const;
+        void setSensorOptions(std::string    const & sensorType,
+                              std::string    const & sensorName,
+                              configHolder_t const & sensorOptions);
+        void setSensorsOptions(std::string    const & sensorType,
+                               configHolder_t const & sensorsOptions);
         bool getIsInitialized(void) const;
         bool getIsTelemetryConfigured(void) const;
         std::string getUrdfPath(void) const;
+        std::map<std::string, std::vector<std::string> > getSensorsNames(void) const;
         matrixN_t const & getSensorsData(std::string const & sensorType) const;
         matrixN_t::ConstRowXpr getSensorData(std::string const & sensorType,
                                              std::string const & sensorName) const;
@@ -113,10 +122,7 @@ namespace exo_simu
 
     protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
-
-        virtual configHolder_t getSensorsOptions(void) const;
-        virtual void setSensorsOptions(configHolder_t & sensorOptions);
-
+        
         template<typename TSensor>
         std::shared_ptr<TSensor> getSensor(std::string const & sensorType,
                                            std::string const & sensorName);

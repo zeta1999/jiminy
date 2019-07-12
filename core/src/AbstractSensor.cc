@@ -6,13 +6,16 @@ namespace exo_simu
 {
     AbstractSensorBase::AbstractSensorBase(Model       const & model,
                                            std::string const & name) :
-    name_(name),
+    sensorOptions_(),
+    sensorOptionsHolder_(),
     telemetrySender_(),
     isInitialized_(false),
     isTelemetryConfigured_(false),
-    model_(&model)
+    model_(&model),                     
+    name_(name),
+    bias_()
     {
-        // Empty.
+        setOptions(getDefaultOptions());
     }
 
     AbstractSensorBase::~AbstractSensorBase(void)
@@ -37,11 +40,22 @@ namespace exo_simu
         }
         else
         {
-            std::cout << "Error - AbstractSensorTpl::configureTelemetry - Telemetry not initialized. Impossible to log sensor data." << std::endl;
+            std::cout << "Error - AbstractSensorBase::configureTelemetry - Telemetry not initialized. Impossible to log sensor data." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         return returnCode;
+    }
+
+    configHolder_t AbstractSensorBase::getOptions(void)
+    {
+        return sensorOptionsHolder_;
+    }
+
+    void AbstractSensorBase::setOptions(configHolder_t const & sensorOptions)
+    {
+        sensorOptionsHolder_ = sensorOptions;
+        sensorOptions_ = std::make_unique<abstractSensorOptions_t const>(sensorOptionsHolder_);
     }
 
     bool AbstractSensorBase::getIsInitialized(void) const
@@ -57,6 +71,11 @@ namespace exo_simu
     std::string AbstractSensorBase::getName(void) const
     {
         return name_;
+    }
+    
+    vectorN_t const & AbstractSensorBase::getBias(void) const
+    {
+        return bias_;
     }
 
     void AbstractSensorBase::updateTelemetry(void)

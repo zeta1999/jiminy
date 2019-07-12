@@ -135,7 +135,7 @@ namespace exo_simu
         }
     }
 
-    // ********************** Other **********************
+    // ***************** Random number generator utilities **********************
 
 	void resetRandGenerators(uint32_t seed)
 	{
@@ -187,6 +187,8 @@ namespace exo_simu
         return vector;
     }
 
+    // ********************** Telemetry utilities **********************
+
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,
                                 vectorN_t                const & initialValues)
@@ -237,6 +239,8 @@ namespace exo_simu
         }
         return fieldnames;
     }
+
+    // ********************** Math utilities *************************
 
     float64_t saturateSoft(float64_t const & in,
                            float64_t const & mi,
