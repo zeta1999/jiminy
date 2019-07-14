@@ -22,8 +22,7 @@ namespace exo_simu
             configHolder_t config;
             config["enablePostProccess"] = true;
             config["noiseStd"] = 0.0;
-            config["biasMean"] = 0.0;
-            config["biasStd"] = 0.0;
+            config["bias"] = rowN_t();
 
             return config;
         };
@@ -32,14 +31,12 @@ namespace exo_simu
         {
             bool const enablePostProccess;
             float64_t const noiseStd;
-            float64_t const biasMean;
-            float64_t const biasStd;
+            rowN_t const bias;
 
             abstractSensorOptions_t(configHolder_t const & options) :
             enablePostProccess(boost::get<bool>(options.at("enablePostProccess"))),
             noiseStd(boost::get<float64_t>(options.at("noiseStd"))),
-            biasMean(boost::get<float64_t>(options.at("biasMean"))),
-            biasStd(boost::get<float64_t>(options.at("biasStd")))
+            bias(boost::get<rowN_t>(options.at("bias")))
             {
                 // Empty.
             }
@@ -64,8 +61,8 @@ namespace exo_simu
         bool getIsInitialized(void) const;
         bool getIsTelemetryConfigured(void) const;
         virtual std::string getName(void) const;
+        virtual std::string getType(void) const = 0;
         virtual std::vector<std::string> const & getFieldNames(void) const = 0;
-        vectorN_t const & getBias(void) const;
 
         virtual matrixN_t::ConstRowXpr get(void) const = 0;
         virtual matrixN_t const & getAll(void) const = 0;
@@ -99,7 +96,6 @@ namespace exo_simu
 
     private:
         std::string name_;
-        vectorN_t bias_;
     };
 
     template<class T>
@@ -119,8 +115,7 @@ namespace exo_simu
                           std::string                         const & name);
         virtual ~AbstractSensorTpl(void);
 
-        virtual void reset(void) override;
-
+        virtual std::string getType(void) const override;
         std::vector<std::string> const & getFieldNames(void) const;
 
         virtual void setOptionsAll(configHolder_t const & sensorOptions) override;

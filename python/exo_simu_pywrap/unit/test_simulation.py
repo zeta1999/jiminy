@@ -42,7 +42,10 @@ trajectory_data = extract_state_from_neural_network_prediction(urdf_path, pred)
 ################################ Simulate the system ####################################
 
 simulator = exo_simu.simulator()
+simulator.init(urdf_path)
+
 model_options = simulator.get_model_options()
+sensors_options = simulator.get_sensors_options()
 simu_options = simulator.get_simulation_options()
 ctrl_options = simulator.get_controller_options()
 
@@ -70,12 +73,11 @@ simu_options['contacts']['frictionDry'] = 5.0
 simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
 
-model_options['ForceSensor']['noiseStd'] = 20.0
-model_options['ForceSensor']['biasMean'] = 100.0
-model_options['ForceSensor']['biasStd'] = 50.0
+sensors_options['ForceSensor'][sensors_options['ForceSensor'].keys()[0]]['noiseStd'] = 5.0
+sensors_options['ForceSensor'][sensors_options['ForceSensor'].keys()[0]]['bias'] = [-50, +20, +0]
 
-simulator.init(urdf_path)
 simulator.set_model_options(model_options)
+simulator.set_sensors_options(sensors_options)
 simulator.set_simulation_options(simu_options)
 simulator.set_controller_options(ctrl_options)
 
@@ -105,6 +107,11 @@ log_data = np.asarray(log_data)
 log_constants = log_info[1:log_info.index('StartColumns')]
 log_header = log_info[(log_info.index('StartColumns')+1):-1]
 
+# Plot some data using standard tools only
+# plt.plot(log_data[:,["Global.Time" in field for field in log_header]],
+#          log_data[:,[sensors_options['ForceSensor'].keys()[0] in field for field in log_header]])
+# plt.show()
+
 print('%i log points' % log_data.shape[0])
 print(log_constants)
 trajectory_data_log = extract_state_from_simulation_log(urdf_path, log_header, log_data)
@@ -121,5 +128,7 @@ trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 # Save the log in TSV
 # simulator.write_log("/tmp/blackbox/log.data", True)
 # log = LogFile("/tmp/blackbox/log.data")
-# plt.plot(log.parser.get_data("Global.Time"),log.parser.get_data("ForceSensor.LeftExternalHeel.F_z"))
+
+# Plot some data using logviewer
+# plt.plot(log.parser.get_data("Global.Time"), log.parser.get_data("ForceSensor.LeftExternalHeel.F_z"))
 # plt.show()

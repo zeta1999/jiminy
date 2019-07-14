@@ -195,10 +195,9 @@ namespace exo_simu
     {
         std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
         std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        float64_t const * valueIt = initialValues.data();
-        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
         {
-            (void) telemetrySender.registerNewEntry<float64_t>(*fieldIt, *valueIt);
+            (void) telemetrySender.registerNewEntry<float64_t>(*fieldIt, initialValues[i]);
         }
     }
 
@@ -208,10 +207,9 @@ namespace exo_simu
     {
         std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
         std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        float64_t const * valueIt = values.data();
-        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
         {
-            telemetrySender.updateValue(*fieldIt, *valueIt);
+            telemetrySender.updateValue(*fieldIt, values[i]);
         }
     }
 
@@ -221,10 +219,9 @@ namespace exo_simu
     {
         std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
         std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        float64_t const * valueIt = values.data();
-        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
         {
-            telemetrySender.updateValue(*fieldIt, *valueIt);
+            telemetrySender.updateValue(*fieldIt, values[i]);
         }
     }
 

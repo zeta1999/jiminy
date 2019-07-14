@@ -47,13 +47,6 @@ namespace exo_simu
     }
 
     template <typename T>
-    void AbstractSensorTpl<T>::reset(void)
-    {
-        AbstractSensorBase::reset();
-        bias_ = randVectorNormal(sizeOf_, sensorOptions_->biasMean, sensorOptions_->biasStd);
-    }
-
-    template <typename T>
     void AbstractSensorTpl<T>::setOptionsAll(configHolder_t const & sensorOptions)
     {
         for (AbstractSensorBase * sensor : dataHolder_->sensors_)
@@ -62,6 +55,12 @@ namespace exo_simu
         }
     }
     
+    template <typename T>
+    std::string AbstractSensorTpl<T>::getType(void) const
+    {
+        return type_;
+    }
+
     template <typename T>
     std::vector<std::string> const & AbstractSensorTpl<T>::getFieldNames(void) const
     {

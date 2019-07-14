@@ -80,7 +80,7 @@ namespace exo_simu
         for(uint32_t i = 0; i < imuFramesNames.size(); i++)
         {
             std::shared_ptr<ImuSensor> imuSensor;
-            std::string imuName = ImuSensor::type_ + "." + imuFramesNames[i];
+            std::string imuName = imuFramesNames[i];
 
             if (returnCode == result_t::SUCCESS)
             {
@@ -99,7 +99,7 @@ namespace exo_simu
         for (uint32_t i = 0; i<contactFramesNames_.size(); i++)
         {
             std::shared_ptr<ForceSensor> forceSensor;
-            std::string forceName = ForceSensor::type_ + "." + contactFramesNames_[i];
+            std::string forceName = contactFramesNames_[i];
 
             if (returnCode == result_t::SUCCESS)
             {
@@ -118,7 +118,7 @@ namespace exo_simu
         for (uint32_t i = 0; i<jointsNames_.size(); i++)
         {
             std::shared_ptr<EncoderSensor> encoderSensor;
-            std::string encoderName = EncoderSensor::type_ + "." + jointsNames_[i];
+            std::string encoderName = jointsNames_[i];
 
             if (returnCode == result_t::SUCCESS)
             {

@@ -104,16 +104,16 @@ int main(int argc, char *argv[])
     ExoModel model;
     configHolder_t mdlOptions = model.getOptions();
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logForceSensors")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = false;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = false; 
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logEncoderSensors")) = false;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
     std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
     configHolder_t forceSensorOptions = model.getSensorOptions(ForceSensor::type_, sensorsNames.at(ForceSensor::type_)[0]);
-    boost::get<float64_t>(forceSensorOptions.at("noiseStd")) = 20.0;
-    boost::get<float64_t>(forceSensorOptions.at("biasMean")) = 100.0;
-    boost::get<float64_t>(forceSensorOptions.at("biasStd")) = 50.0;
+    boost::get<float64_t>(forceSensorOptions.at("noiseStd")) = 5.0;
     model.setSensorsOptions(ForceSensor::type_, forceSensorOptions);
+    boost::get<rowN_t>(forceSensorOptions.at("bias")) = (rowN_t(3) << -50, +20, +0).finished();
+    model.setSensorOptions(ForceSensor::type_, sensorsNames.at(ForceSensor::type_)[0], forceSensorOptions);
 
     // Instantiate and configuration the exoskeleton controller
     ExoController controller;

@@ -40,7 +40,6 @@ namespace python
     {
     public:
         PyEngine(void) :
-        urdfPath_(),
         model_(),
         controller_(),
         simulator_()
@@ -55,12 +54,7 @@ namespace python
 
         result_t initialize(std::string urdfPath)
         {
-            result_t returnCode = result_t::SUCCESS;
-
-            urdfPath_ = urdfPath;
-            returnCode = model_.initialize(urdfPath_);
-
-            return returnCode;
+            return model_.initialize(urdfPath);
         }
 
         result_t simulate(vectorN_t     const & x_init,
@@ -85,11 +79,6 @@ namespace python
             return returnCode;
         }
 
-        std::string const & getUrdfPath(void) const
-        {
-            return urdfPath_;
-        }
-
         static boost::shared_ptr<PyEngine> pyEngineFactory(void)
         {
             if (pyEnginePtr_.use_count())
@@ -105,7 +94,6 @@ namespace python
         }
 
     public:
-        std::string urdfPath_;
         ExoModel model_;
         ExoController controller_;
         Engine simulator_;
@@ -165,11 +153,14 @@ namespace python
                 .def("get_log", &PyEngineVisitor::getLog)
                 .def("write_log", &PyEngineVisitor::writeLog, 
                                  (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
-                .def("get_urdf_path", &PyEngine::getUrdfPath, 
+                .def("get_urdf_path", &PyEngineVisitor::getUrdfPath, 
                                       bp::return_value_policy<bp::return_by_value>())
                 .def("get_model_options", &PyEngineVisitor::getModelOptions, 
                                           bp::return_value_policy<bp::return_by_value>())
                 .def("set_model_options", &PyEngineVisitor::setModelOptions)
+                .def("get_sensors_options", &PyEngineVisitor::getSensorsOptions, 
+                                          bp::return_value_policy<bp::return_by_value>())
+                .def("set_sensors_options", &PyEngineVisitor::setSensorsOptions)
                 .def("get_controller_options", &PyEngineVisitor::getControllerOptions, 
                                                bp::return_value_policy<bp::return_by_value>())
                 .def("set_controller_options", &PyEngineVisitor::setControllerOptions)
@@ -242,6 +233,11 @@ namespace python
             return bp::make_tuple(header, log);
         }
 
+        static std::string getUrdfPath(PyEngine & self)
+        {
+            return self.model_.getUrdfPath();
+        }
+
         static bp::dict getModelOptions(PyEngine & self)
         {
             bp::dict configPy;
@@ -256,6 +252,22 @@ namespace python
             loadConfigHolder(configPy, config);
             self.model_.setOptions(config);
         }
+
+        static bp::dict getSensorsOptions(PyEngine & self)
+        {
+            bp::dict configPy;
+            convertConfigHolderPy(self.model_.getSensorsOptions(), configPy);
+            return configPy;
+        }
+
+        static void setSensorsOptions(PyEngine       & self, 
+                                    bp::dict const & configPy)
+        {
+            configHolder_t config = self.model_.getSensorsOptions();
+            loadConfigHolder(configPy, config);
+            self.model_.setSensorsOptions(config);
+        }
+
 
         static bp::dict getControllerOptions(PyEngine & self)
         {

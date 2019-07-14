@@ -12,8 +12,7 @@ namespace exo_simu
     isInitialized_(false),
     isTelemetryConfigured_(false),
     model_(&model),                     
-    name_(name),
-    bias_()
+    name_(name)
     {
         setOptions(getDefaultOptions());
     }
@@ -34,7 +33,7 @@ namespace exo_simu
 
         if (telemetryData)
         {
-            telemetrySender_.configureObject(telemetryData, name_);
+            telemetrySender_.configureObject(telemetryData, getType() + "." + name_);
             (void) registerNewVectorEntry(telemetrySender_, getFieldNames(), get());
             isTelemetryConfigured_ = true;
         }
@@ -71,11 +70,6 @@ namespace exo_simu
     std::string AbstractSensorBase::getName(void) const
     {
         return name_;
-    }
-    
-    vectorN_t const & AbstractSensorBase::getBias(void) const
-    {
-        return bias_;
     }
 
     void AbstractSensorBase::updateTelemetry(void)

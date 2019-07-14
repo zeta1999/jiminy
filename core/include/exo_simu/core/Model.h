@@ -87,7 +87,9 @@ namespace exo_simu
         template<typename TSensor>
         result_t addSensor(std::string              const & sensorName,
                            std::shared_ptr<TSensor>       & sensor);
-        result_t removeSensor(std::string const & name);
+        result_t removeSensor(std::string const & sensorType,
+                              std::string const & sensorName);
+        result_t removeSensors(std::string const & sensorType);
         void removeSensors(void);
 
         configHolder_t getOptions(void) const;
@@ -95,11 +97,13 @@ namespace exo_simu
         configHolder_t getSensorOptions(std::string const & sensorType,
                                         std::string const & sensorName) const;
         configHolder_t getSensorsOptions(std::string const & sensorType) const;
+        configHolder_t getSensorsOptions(void) const;
         void setSensorOptions(std::string    const & sensorType,
                               std::string    const & sensorName,
                               configHolder_t const & sensorOptions);
         void setSensorsOptions(std::string    const & sensorType,
                                configHolder_t const & sensorsOptions);
+        void setSensorsOptions(configHolder_t const & sensorsOptions);
         bool getIsInitialized(void) const;
         bool getIsTelemetryConfigured(void) const;
         std::string getUrdfPath(void) const;

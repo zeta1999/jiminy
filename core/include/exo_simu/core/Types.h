@@ -33,6 +33,7 @@ namespace exo_simu
     // math types.
     typedef Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic> matrixN_t;
     typedef Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>              vectorN_t;
+    typedef Eigen::Matrix<scalar_t, 1, Eigen::Dynamic>              rowN_t;
 
     typedef Eigen::Block<matrixN_t const, Eigen::Dynamic, Eigen::Dynamic> constBlockXpr;
     typedef Eigen::Block<matrixN_t, Eigen::Dynamic, Eigen::Dynamic> blockXpr;
@@ -48,7 +49,7 @@ namespace exo_simu
         ERROR_INIT_FAILED = -3
     };
     
-    typedef boost::make_recursive_variant<bool_t, int32_t, real_t, std::string, vectorN_t, matrixN_t, 
+    typedef boost::make_recursive_variant<bool_t, int32_t, real_t, std::string, rowN_t, vectorN_t, matrixN_t, 
                                           std::map<std::string, boost::recursive_variant_> >::type configField_t;
     typedef std::map<std::string, configField_t> configHolder_t;
 
