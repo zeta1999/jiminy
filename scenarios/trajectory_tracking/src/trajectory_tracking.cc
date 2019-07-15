@@ -110,9 +110,9 @@ int main(int argc, char *argv[])
     model.initialize(urdfPath);
     std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
     configHolder_t forceSensorOptions = model.getSensorOptions(ForceSensor::type_, sensorsNames.at(ForceSensor::type_)[0]);
-    boost::get<float64_t>(forceSensorOptions.at("noiseStd")) = 5.0;
+    boost::get<vectorN_t>(forceSensorOptions.at("noiseStd")) = (vectorN_t(ForceSensor::sizeOf_) << 5.0, 5.0, 0.0).finished();
     model.setSensorsOptions(ForceSensor::type_, forceSensorOptions);
-    boost::get<rowN_t>(forceSensorOptions.at("bias")) = (rowN_t(3) << -50, +20, +0).finished();
+    boost::get<vectorN_t>(forceSensorOptions.at("bias")) = (vectorN_t(ForceSensor::sizeOf_) << -50.0, +20.0, +0.0).finished();
     model.setSensorOptions(ForceSensor::type_, sensorsNames.at(ForceSensor::type_)[0], forceSensorOptions);
 
     // Instantiate and configuration the exoskeleton controller
@@ -124,14 +124,17 @@ int main(int argc, char *argv[])
 
     // Instantiate and configuration the engine
     Engine engine;
-    configHolder_t simuOptions = engine.getDefaultOptions();
+    configHolder_t simuOptions = engine.getOptions();
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logConfiguration")) = true;
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logVelocity")) = true;
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logAcceleration")) = true;
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logCommand")) = true;
     boost::get<vectorN_t>(boost::get<configHolder_t>(simuOptions.at("world")).at("gravity"))(2) = -9.81;
+    boost::get<std::string>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("solver")) = std::string("runge_kutta_dopri5");
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("dtMax")) = 3.0e-3;
+    boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("iterMax")) = 1e5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 0.0; //1.0e-3;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 0.0; //1.0e-3;
     boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("randomSeed")) = 0; // Use time(nullptr) for random seed.

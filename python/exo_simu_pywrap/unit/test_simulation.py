@@ -60,8 +60,11 @@ simu_options["telemetry"]["logCommand"] = True
 
 # simu_options["world"]["gravity"][2] = 0
 
+simu_options["stepper"]["solver"] = "explicit_euler" # ["runge_kutta_dopri5", "explicit_euler"]
 simu_options["stepper"]["tolRel"] = 1.0e-5
 simu_options["stepper"]["tolAbs"] = 1.0e-4
+simu_options["stepper"]["dtMax"] = 2.0e-4
+simu_options["stepper"]["iterMax"] = int(1.0e5)
 simu_options["stepper"]["sensorsUpdatePeriod"] = 0.0
 simu_options["stepper"]["controllerUpdatePeriod"] = 0.0
 simu_options["stepper"]["randomSeed"] = 0
@@ -73,7 +76,7 @@ simu_options['contacts']['frictionDry'] = 5.0
 simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
 
-sensors_options['ForceSensor'][sensors_options['ForceSensor'].keys()[0]]['noiseStd'] = 5.0
+sensors_options['ForceSensor'][sensors_options['ForceSensor'].keys()[0]]['noiseStd'] = [5.0, 5.0, 0.0]
 sensors_options['ForceSensor'][sensors_options['ForceSensor'].keys()[0]]['bias'] = [-50, +20, +0]
 
 simulator.set_model_options(model_options)

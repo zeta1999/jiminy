@@ -188,7 +188,7 @@ namespace exo_simu
             // Empty.
         }; 
 
-        matrixN_t data_;
+        std::vector<matrixN_t> data_;
         std::vector<uint32_t> counters_;
         std::vector<AbstractSensorBase *> sensors_;
         uint32_t num_;

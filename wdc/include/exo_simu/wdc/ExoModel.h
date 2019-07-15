@@ -100,6 +100,7 @@ namespace exo_simu
         result_t initialize(std::string const & urdfPath);
 
         result_t setOptions(configHolder_t const & mdlOptions);
+        std::vector<int32_t> const & getToesVelocityIdx(void) const;
 
     protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData) override;
@@ -108,6 +109,10 @@ namespace exo_simu
 
     public:
         std::unique_ptr<exoModelOptions_t const> exoMdlOptions_;
+
+    private:
+        std::vector<std::string> toesNames_;
+        std::vector<int32_t> toesVelocityIdx_; // Indices of the toes in the velocity vector representation
     };
 }
 

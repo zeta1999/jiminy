@@ -13,9 +13,6 @@ namespace exo_simu
     class ImuSensor : public AbstractSensorTpl<ImuSensor>
     {
     public:
-        using AbstractSensorTpl<ImuSensor>::getDefaultOptions;
-
-    public:
         ImuSensor(Model                               const & model,
                   std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                   std::string                         const & name);
@@ -39,9 +36,6 @@ namespace exo_simu
     class ForceSensor : public AbstractSensorTpl<ForceSensor>
     {
     public:
-        using AbstractSensorTpl<ForceSensor>::getDefaultOptions;
-
-    public:
         ForceSensor(Model                               const & model,
                     std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                     std::string                         const & name);
@@ -64,9 +58,6 @@ namespace exo_simu
 
     class EncoderSensor : public AbstractSensorTpl<EncoderSensor>
     {
-    public:
-        using AbstractSensorTpl<EncoderSensor>::getDefaultOptions;
-
     public:
         EncoderSensor(Model                               const & model,
                       std::shared_ptr<SensorDataHolder_t> const & dataHolder,

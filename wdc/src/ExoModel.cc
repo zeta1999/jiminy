@@ -6,7 +6,9 @@ namespace exo_simu
 {
     ExoModel::ExoModel(void) :
     Model(),
-    exoMdlOptions_(nullptr)
+    exoMdlOptions_(nullptr),
+    toesNames_(),
+    toesVelocityIdx_()
     {
         /* Model constructor calls the base implementations of the virtual methods since the derived 
            class is not available at this point. Thus it must be called explicitly in the constructor. */
@@ -46,23 +48,28 @@ namespace exo_simu
         {
             // The joint names are obtained by removing the universe and root joint from the joint list
             jointsNames_.assign(pncModel_.names.begin() + 2, pncModel_.names.end());
+            toesNames_ = jointsNames_;
 
-            // Discard the toes since they are not actuated nor physically meaningful
-            jointsNames_.erase(
-                std::remove_if(
-                    jointsNames_.begin(), 
-                    jointsNames_.end(),
-                    [](std::string const & joint) -> bool
-                    {
-                        return joint.find("Toe") != std::string::npos;
-                    }
-                ), 
-                jointsNames_.end()
-            );
+            auto detectToeFct = [](std::string const & joint) -> bool
+                                {
+                                    return joint.find("Toe") != std::string::npos;
+                                };
+
+            // Separate the toes froms the other joints since they are not actuated nor physically meaningful
+            jointsNames_.erase(std::remove_if(jointsNames_.begin(), 
+                                              jointsNames_.end(),
+                                              detectToeFct), 
+                               jointsNames_.end());
+            toesNames_.erase(std::remove_if(toesNames_.begin(), 
+                                            toesNames_.end(),
+                                            not_f(detectToeFct)), 
+                             toesNames_.end());
 
             /* Update the joint names manually to avoid calling back Model::initialize
                (It cannot throw an error since the names are extracted dynamically from the model) */
             getJointsIdx(jointsNames_, jointsPositionIdx_, jointsVelocityIdx_);
+            std::vector<int32_t> toesPositionIdx;
+            getJointsIdx(toesNames_, toesPositionIdx, toesVelocityIdx_);
 
             // The names of the frames of the IMUs end with IMU
             for (int32_t i = 0; i < pncModel_.nframes; i++)
@@ -194,5 +201,10 @@ namespace exo_simu
         }
 
         return returnCode;
+    }
+
+    std::vector<int32_t> const & ExoModel::getToesVelocityIdx(void) const
+    {
+        return toesVelocityIdx_;
     }
 }

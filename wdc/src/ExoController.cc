@@ -91,5 +91,12 @@ namespace exo_simu
             u(jointId) = -exoJointOptions_.frictionViscous(i)*v(jointId) - exoJointOptions_.frictionDry(i) * \
                 saturateSoft(v(jointId) / exoJointOptions_.dryFrictionVelEps,-1.0,1.0,0.7);
         }
+
+        // Add friction to the toes to avoid numerical instabilities
+        float64_t const frictionViscous = 1e-4;
+        for (uint32_t const & jointId : exoModel.getToesVelocityIdx())
+        {
+            u(jointId) = -frictionViscous * v(jointId);
+        }
     }
 }

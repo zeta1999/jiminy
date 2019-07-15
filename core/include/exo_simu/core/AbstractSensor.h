@@ -21,8 +21,8 @@ namespace exo_simu
         {
             configHolder_t config;
             config["enablePostProccess"] = true;
-            config["noiseStd"] = 0.0;
-            config["bias"] = rowN_t();
+            config["noiseStd"] = vectorN_t();
+            config["bias"] = vectorN_t();
 
             return config;
         };
@@ -30,13 +30,14 @@ namespace exo_simu
         struct abstractSensorOptions_t
         {
             bool const enablePostProccess;
-            float64_t const noiseStd;
+            vectorN_t const noiseStd;
             rowN_t const bias;
+            float64_t const delay;
 
             abstractSensorOptions_t(configHolder_t const & options) :
             enablePostProccess(boost::get<bool>(options.at("enablePostProccess"))),
-            noiseStd(boost::get<float64_t>(options.at("noiseStd"))),
-            bias(boost::get<rowN_t>(options.at("bias")))
+            noiseStd(boost::get<vectorN_t>(options.at("noiseStd"))),
+            bias(boost::get<vectorN_t>(options.at("bias")))
             {
                 // Empty.
             }
@@ -101,9 +102,6 @@ namespace exo_simu
     template<class T>
     class AbstractSensorTpl : public AbstractSensorBase
     {
-    public:
-        using AbstractSensorBase::getDefaultOptions;
-
     public:
         // Disable the copy of the class
         AbstractSensorTpl(AbstractSensorTpl const & abstractSensor) = delete;

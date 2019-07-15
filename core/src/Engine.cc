@@ -160,7 +160,7 @@ namespace exo_simu
 
         if(x_init.rows() != model_->nx())
         {
-            std::cout << "Error - Engine::simulate - Size of x_init (" << x_init.size() << ") inconsistent with model size (" << model_->nx() << ")." << std::endl;
+            std::cout << "Error - Engine::simulate - Size of x_init inconsistent with model size." << std::endl;
             return result_t::ERROR_BAD_INPUT;
         }
 
@@ -175,9 +175,23 @@ namespace exo_simu
                             std::placeholders::_3,
                             std::placeholders::_1,
                             std::placeholders::_2);
-        auto stepper = make_controlled(engineOptions_->stepper.tolAbs,
-                                       engineOptions_->stepper.tolRel,
-                                       stepper_t());
+        stepper_t stepper;
+        if (engineOptions_->stepper.solver == "runge_kutta_dopri5")
+        {
+            stepper = make_controlled(engineOptions_->stepper.tolAbs, 
+                                      engineOptions_->stepper.tolRel,
+                                      runge_kutta_stepper_t());
+        }
+        else if (engineOptions_->stepper.solver == "explicit_euler")
+        {
+            stepper = explicit_euler();
+        }
+        else
+        {
+            std::cout << "Error - Engine::simulate - The requested solver is not available." << std::endl;
+            return result_t::ERROR_BAD_INPUT;
+        }
+
 
         // initialize the random number generators
         resetRandGenerators(engineOptions_->stepper.randomSeed);
@@ -208,13 +222,13 @@ namespace exo_simu
 
         // Set the initial time step
         float64_t dt = 0.0;
-        if (updatePeriod > 0)
+        if (updatePeriod > std::numeric_limits<float64_t>::epsilon())
         {
             dt = updatePeriod; // The initial time step is the update period
         }
         else
         {
-            dt = 5e-4;
+            dt = engineOptions_->stepper.dtMax; // Use the maximum allowed time step as default
         }
 
         // Integration loop based on boost::numeric::odeint::detail::integrate_times
@@ -248,10 +262,19 @@ namespace exo_simu
                the callback returns false, or if the number of integration
                steps exceeds 1e5. */
             if (std::abs(end_time - current_time) < std::numeric_limits<float64_t>::epsilon()
-            || !callbackFct_(current_time, stepperState_.x)
-            || stepperState_.iterLast >= 1e5)
+            || !callbackFct_(current_time, stepperState_.x))
             {
                 break;
+            }
+            else if (engineOptions_->stepper.iterMax > 0 
+            && stepperState_.iterLast >= (uint32_t) engineOptions_->stepper.iterMax)
+            {
+                break;
+            }
+            else if ((stepperState_.x.array() != stepperState_.x.array()).any()) // nan is NOT equal to itself
+            {
+                std::cout << "Error - Engine::simulate - The low-level solver failed. Consider increasing accuracy." << std::endl;
+                return result_t::ERROR_GENERIC;
             }
 
             if (updatePeriod > 0)
@@ -295,7 +318,10 @@ namespace exo_simu
                             stepperState_.uCommandLast[i] = boost::algorithm::clamp(stepperState_.uCommandLast[i], -torque_max, torque_max);
                             stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
                         }
-                        systemDynamics(current_time, stepperState_.x, stepperState_.dxdt); // Update the internal stepper state dxdt since the dynamics has changed.
+                        if (engineOptions_->stepper.solver != "explicit_euler")
+                        {
+                            systemDynamics(current_time, stepperState_.x, stepperState_.dxdt); // Update the internal stepper state dxdt since the dynamics has changed.
+                        }
                     }
                 }
 
@@ -304,7 +330,10 @@ namespace exo_simu
                 {
                     // adjust stepsize to end up exactly at the next breakpoint
                     float64_t current_dt = std::min(dt, next_time - current_time);
-                    if (success == stepper.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, current_dt))
+                    if (success == boost::apply_visitor([&](auto && one)
+                                                        {
+                                                            return one.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, current_dt);
+                                                        }, stepper))
                     {
                         fail_checker.reset(); // reset the fail counter, see #173
                         dt = std::max(dt, current_dt); // continue with the original step size if dt was reduced due to the next breakpoint
@@ -314,19 +343,23 @@ namespace exo_simu
                         fail_checker();  // check for possible overflow of failed steps in step size adjustment
                         dt = current_dt;
                     }
+                    dt = std::min(dt, engineOptions_->stepper.dtMax); // Make sure it never exceeds dtMax
                 }
             }
             else
             {
                 // Compute the next step using adaptive step method
-                dt = std::min(dt, end_time - current_time); // Make sure it ends exactly at the end_time
+                dt = std::min(std::min(dt, engineOptions_->stepper.dtMax), end_time - current_time); // Make sure it ends exactly at the end_time and never exceeds dtMax
                 controlled_step_result res = fail;
                 while (res == fail)
                 {
-                    res = stepper.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, dt);
+                    res = boost::apply_visitor([&](auto && one)
+                                               {
+                                                   return one.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, dt);
+                                               }, stepper);
                     if (res == success)
                     {
-                        fail_checker.reset(); // reset the fail counter, see #173
+                        fail_checker.reset(); // reset the fail counter
                     }
                     else
                     {

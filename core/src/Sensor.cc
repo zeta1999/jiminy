@@ -72,9 +72,9 @@ namespace exo_simu
             data().tail(3) = omegaIMU;
 
             // Add white noise and bias
-            if (sensorOptions_->noiseStd > 0)
+            if (sensorOptions_->noiseStd.size())
             {
-                data() += randVectorNormal(sizeOf_, 0, sensorOptions_->noiseStd); // Implement addVectorNormal
+                data() += randVectorNormal(sizeOf_, sensorOptions_->noiseStd);
             }
             if (sensorOptions_->bias.size())
             {
@@ -143,9 +143,9 @@ namespace exo_simu
             data() = model_->contactForces_[std::distance(contactFramesIdx.begin(), it)].linear();
 
             // Add white noise
-            if (sensorOptions_->noiseStd > 0)
+            if (sensorOptions_->noiseStd.size())
             {
-                data() += randVectorNormal(sizeOf_, 0, sensorOptions_->noiseStd);
+                data() += randVectorNormal(sizeOf_, sensorOptions_->noiseStd);
             }
             if (sensorOptions_->bias.size())
             {
@@ -221,9 +221,9 @@ namespace exo_simu
             data().tail(1) = v.segment<1>(jointVelocityIdx_);
 
             // Add white noise
-            if (sensorOptions_->noiseStd > 0)
+            if (sensorOptions_->noiseStd.size())
             {
-                data() += randVectorNormal(sizeOf_, 0, sensorOptions_->noiseStd);
+                data() += randVectorNormal(sizeOf_, sensorOptions_->noiseStd);
             }
             if (sensorOptions_->bias.size())
             {

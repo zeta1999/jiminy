@@ -35,13 +35,19 @@ namespace exo_simu
 	float64_t randNormal(float64_t const & mean, 
 	                     float64_t const & std);
 
-	matrixN_t::RowXpr addRandNormal(matrixN_t::RowXpr         vector, 
-                                    float64_t         const & mean,
-                                    float64_t         const & std);
-
 	vectorN_t randVectorNormal(uint32_t  const & size, 
                                float64_t const & mean,
                                float64_t const & std);
+
+	vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & std);
+
+	vectorN_t randVectorNormal(uint32_t  const & size, 
+                               vectorN_t const & std);
+
+	vectorN_t randVectorNormal(uint32_t  const & size, 
+                               vectorN_t const & mean,
+                               vectorN_t const & std);
 
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,
@@ -67,6 +73,9 @@ namespace exo_simu
 
 	template<typename typeOut, typename typeIn>
 	std::vector<std::shared_ptr<typeOut>> staticCastSharedPtrVector(std::vector<std::shared_ptr<typeIn>> vIn);
+
+	template<class F,class dF=std::decay_t<F>>// dF optional
+	auto not_f(F&& f);
 }
 
 #include "exo_simu/core/Utilities.tcc"

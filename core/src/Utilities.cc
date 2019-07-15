@@ -172,19 +172,33 @@ namespace exo_simu
         {
             return vectorN_t::Constant(size, mean);
         }
-        
     }
 
-    matrixN_t::RowXpr addRandNormal(matrixN_t::RowXpr         vector, 
-                                    float64_t         const & mean,
-                                    float64_t         const & std)
+    vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & std)
     {
-        vectorN_t noise(vector.size());
-        vector += noise.unaryExpr([mean, std](float64_t x) -> float64_t 
-                                  {
-                                      return randNormal(mean, std);
-                                  }); // unaryExpr returns a view. It does not update the original data
-        return vector;
+        return randVectorNormal(size, 0, std);
+    }
+
+    vectorN_t randVectorNormal(uint32_t  const & size, 
+                               vectorN_t const & mean,
+                               vectorN_t const & std)
+    {
+        return vectorN_t::NullaryExpr(size, 
+                                      [&mean, &std] (vectorN_t::Index const & i) -> float64_t 
+                                      {
+                                          return randNormal(mean[i], std[i]);
+                                      });
+    }
+
+    vectorN_t randVectorNormal(uint32_t  const & size, 
+                               vectorN_t const & std)
+    {
+        return vectorN_t::NullaryExpr(size, 
+                                      [&std] (vectorN_t::Index const & i) -> float64_t 
+                                      {
+                                          return randNormal(0, std[i]);
+                                      });
     }
 
     // ********************** Telemetry utilities **********************
