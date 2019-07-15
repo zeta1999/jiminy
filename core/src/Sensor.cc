@@ -63,13 +63,24 @@ namespace exo_simu
         if (returnCode == result_t::SUCCESS)
         {
             // Compute the true value
-            Eigen::Matrix4d const tformIMU = model_->pncData_.oMf[frameIdx_].toHomogeneousMatrix();
-            Eigen::Matrix3d const rotIMU = tformIMU.topLeftCorner<3,3>();
-            quaternion_t const quatIMU(rotIMU); // Convert a rotation matrix to a quaternion
-            data().head(4) = quatIMU.coeffs(); // (x,y,z,w)
-            pinocchio::Motion motionIMU = pinocchio::getFrameVelocity(model_->pncModel_, model_->pncData_, frameIdx_);
-            Eigen::Vector3d omegaIMU = motionIMU.angular();
-            data().tail(3) = omegaIMU;
+            if(sensorOptions_->rawData)
+            {
+                pinocchio::Motion const gyroIMU = pinocchio::getFrameVelocity(model_->pncModel_, model_->pncData_, frameIdx_);
+                Eigen::Vector3d const omega = gyroIMU.angular();
+                data().head(3) = omega;
+                pinocchio::Motion const acceleroIMU = pinocchio::getFrameAcceleration(model_->pncModel_, model_->pncData_, frameIdx_);
+                Eigen::Vector3d const accel = acceleroIMU.linear();
+                data().tail(3) = accel;
+            }
+            else
+            {
+                Eigen::Matrix3d const & rot = model_->pncData_.oMf[frameIdx_].rotation();
+                quaternion_t const quat(rot); // Convert a rotation matrix to a quaternion
+                data().head(4) = quat.coeffs(); // (x,y,z,w)
+                pinocchio::Motion const gyroIMU = pinocchio::getFrameVelocity(model_->pncModel_, model_->pncData_, frameIdx_);
+                Eigen::Vector3d const omega = rot * gyroIMU.angular(); // Get angular velocity in world frame
+                data().tail(3) = omega;
+            }
 
             // Add white noise and bias
             if (sensorOptions_->noiseStd.size())
@@ -217,8 +228,15 @@ namespace exo_simu
         if (returnCode == result_t::SUCCESS)
         {
             // Compute the true value
-            data().head(1) = q.segment<1>(jointPositionIdx_);
-            data().tail(1) = v.segment<1>(jointVelocityIdx_);
+            if(sensorOptions_->rawData)
+            {
+                data() = q.segment<1>(jointPositionIdx_);
+            }
+            else
+            {
+                data().head(1) = q.segment<1>(jointPositionIdx_);
+                data().tail(1) = v.segment<1>(jointVelocityIdx_);
+            }
 
             // Add white noise
             if (sensorOptions_->noiseStd.size())

@@ -20,7 +20,7 @@ namespace exo_simu
         virtual configHolder_t getDefaultOptions(void)
         {
             configHolder_t config;
-            config["enablePostProccess"] = true;
+            config["rawData"] = false;
             config["noiseStd"] = vectorN_t();
             config["bias"] = vectorN_t();
 
@@ -29,13 +29,13 @@ namespace exo_simu
 
         struct abstractSensorOptions_t
         {
-            bool const enablePostProccess;
+            bool const rawData;
             vectorN_t const noiseStd;
             rowN_t const bias;
             float64_t const delay;
 
             abstractSensorOptions_t(configHolder_t const & options) :
-            enablePostProccess(boost::get<bool>(options.at("enablePostProccess"))),
+            rawData(boost::get<bool>(options.at("rawData"))),
             noiseStd(boost::get<vectorN_t>(options.at("noiseStd"))),
             bias(boost::get<vectorN_t>(options.at("bias")))
             {

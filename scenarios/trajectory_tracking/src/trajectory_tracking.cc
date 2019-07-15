@@ -103,17 +103,18 @@ int main(int argc, char *argv[])
     // Instantiate and configuration the exoskeleton model
     ExoModel model;
     configHolder_t mdlOptions = model.getOptions();
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logForceSensors")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = false; 
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logForceSensors")) = false;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = true; 
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logEncoderSensors")) = false;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
     std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
-    configHolder_t forceSensorOptions = model.getSensorOptions(ForceSensor::type_, sensorsNames.at(ForceSensor::type_)[0]);
-    boost::get<vectorN_t>(forceSensorOptions.at("noiseStd")) = (vectorN_t(ForceSensor::sizeOf_) << 5.0, 5.0, 0.0).finished();
-    model.setSensorsOptions(ForceSensor::type_, forceSensorOptions);
-    boost::get<vectorN_t>(forceSensorOptions.at("bias")) = (vectorN_t(ForceSensor::sizeOf_) << -50.0, +20.0, +0.0).finished();
-    model.setSensorOptions(ForceSensor::type_, sensorsNames.at(ForceSensor::type_)[0], forceSensorOptions);
+    configHolder_t imuSensorOptions = model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0]);
+    boost::get<bool>(imuSensorOptions.at("rawData")) = true;
+    boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(ImuSensor::sizeOf_) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    model.setSensorsOptions(ImuSensor::type_, imuSensorOptions);
+    boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(ImuSensor::sizeOf_) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    model.setSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
 
     // Instantiate and configuration the exoskeleton controller
     ExoController controller;

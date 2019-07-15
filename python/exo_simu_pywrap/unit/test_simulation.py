@@ -50,8 +50,8 @@ simu_options = simulator.get_simulation_options()
 ctrl_options = simulator.get_controller_options()
 
 ctrl_options["telemetry"]["logController"] = False
-model_options["telemetry"]["logForceSensors"] = True
-model_options["telemetry"]["logImuSensors"] = False
+model_options["telemetry"]["logForceSensors"] = False
+model_options["telemetry"]["logImuSensors"] = True
 model_options["telemetry"]["logEncoderSensors"] = False
 simu_options["telemetry"]["logConfiguration"] = True
 simu_options["telemetry"]["logVelocity"] = True
@@ -64,7 +64,7 @@ simu_options["stepper"]["solver"] = "explicit_euler" # ["runge_kutta_dopri5", "e
 simu_options["stepper"]["tolRel"] = 1.0e-5
 simu_options["stepper"]["tolAbs"] = 1.0e-4
 simu_options["stepper"]["dtMax"] = 2.0e-4
-simu_options["stepper"]["iterMax"] = int(1.0e5)
+simu_options["stepper"]["iterMax"] = 100000
 simu_options["stepper"]["sensorsUpdatePeriod"] = 0.0
 simu_options["stepper"]["controllerUpdatePeriod"] = 0.0
 simu_options["stepper"]["randomSeed"] = 0
@@ -76,8 +76,11 @@ simu_options['contacts']['frictionDry'] = 5.0
 simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
 
-sensors_options['ForceSensor'][sensors_options['ForceSensor'].keys()[0]]['noiseStd'] = [5.0, 5.0, 0.0]
-sensors_options['ForceSensor'][sensors_options['ForceSensor'].keys()[0]]['bias'] = [-50, +20, +0]
+for sensorOptions in sensors_options['ImuSensor'].values():
+    sensorOptions['rawData'] = True
+for sensorOptions in sensors_options['ImuSensor'].values():
+    sensorOptions['noiseStd'] = [5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0]
+sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['bias'] = [-8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0]
 
 simulator.set_model_options(model_options)
 simulator.set_sensors_options(sensors_options)
@@ -112,7 +115,7 @@ log_header = log_info[(log_info.index('StartColumns')+1):-1]
 
 # Plot some data using standard tools only
 # plt.plot(log_data[:,["Global.Time" in field for field in log_header]],
-#          log_data[:,[sensors_options['ForceSensor'].keys()[0] in field for field in log_header]])
+#          log_data[:,[sensors_options['ImuSensor'].keys()[0] in field for field in log_header]])
 # plt.show()
 
 print('%i log points' % log_data.shape[0])
@@ -133,5 +136,5 @@ trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 # log = LogFile("/tmp/blackbox/log.data")
 
 # Plot some data using logviewer
-# plt.plot(log.parser.get_data("Global.Time"), log.parser.get_data("ForceSensor.LeftExternalHeel.F_z"))
+# plt.plot(log.parser.get_data("Global.Time"), log.parser.get_data("ImuSensor.LeftPelvisIMU.w_y"))
 # plt.show()
