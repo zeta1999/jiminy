@@ -25,6 +25,8 @@
 
 namespace exo_simu
 {
+    float64_t const MAX_TIME_STEP_MAX = 3e-3;
+
     Engine::Engine(void):
     engineOptions_(nullptr),
     isInitialized_(false),
@@ -124,19 +126,19 @@ namespace exo_simu
         stepperState_.initialize(*model_);
         telemetryData_->reset();
         telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
-        if (engineOptions_->telemetry.logConfiguration)
+        if (engineOptions_->telemetry.enableConfiguration)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
         }
-        if (engineOptions_->telemetry.logVelocity)
+        if (engineOptions_->telemetry.enableVelocity)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
         }
-        if (engineOptions_->telemetry.logAcceleration)
+        if (engineOptions_->telemetry.enableAcceleration)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
         }
-        if (engineOptions_->telemetry.logCommand)
+        if (engineOptions_->telemetry.enableCommand)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
         }
@@ -238,19 +240,19 @@ namespace exo_simu
         while (true)
         {
             // Log the current time, state, command, and sensors
-            if (engineOptions_->telemetry.logConfiguration)
+            if (engineOptions_->telemetry.enableConfiguration)
             {
                 updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
             }
-            if (engineOptions_->telemetry.logVelocity)
+            if (engineOptions_->telemetry.enableVelocity)
             {
                 updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
             }
-            if (engineOptions_->telemetry.logAcceleration)
+            if (engineOptions_->telemetry.enableAcceleration)
             {
                 updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
             }
-            if (engineOptions_->telemetry.logCommand)
+            if (engineOptions_->telemetry.enableCommand)
             {
                 updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
             }
@@ -576,8 +578,17 @@ namespace exo_simu
 
     void Engine::setOptions(configHolder_t const & engineOptions)
     {
+        // Update the internal options
         engineOptionsHolder_ = engineOptions;
+
+        // Make sure some parameters are in the required bounds
+        float64_t & dtMax = boost::get<float64_t>(boost::get<configHolder_t>(engineOptionsHolder_.at("stepper")).at("dtMax"));
+        dtMax = std::min(std::max(dtMax, MIN_TIME_STEP_MAX), MAX_TIME_STEP_MAX);
+
+        // Create a fast struct accessor
         engineOptions_ = std::make_unique<engineOptions_t const>(engineOptionsHolder_);
+
+        // Propagate the options at Model level
         if (isInitialized_)
         {
             model_->pncModel_.gravity = engineOptions_->world.gravity; // It is reversed (Third Newton law)

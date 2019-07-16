@@ -15,8 +15,6 @@ namespace exo_simu
     template<>
     std::string const AbstractSensorTpl<ImuSensor>::type_("ImuSensor");
     template<>
-    uint32_t const AbstractSensorTpl<ImuSensor>::sizeOf_(7);
-    template<>
     std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPreProcess_({"w_x", "w_y", "w_z", "a_x", "a_y", "a_z"});
     template<>
     std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPostProcess_({"quat_x", "quat_y", "quat_z", "quat_w", "w_x", "w_y", "w_z"});
@@ -62,7 +60,6 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            // Compute the true value
             if(sensorOptions_->rawData)
             {
                 pinocchio::Motion const gyroIMU = pinocchio::getFrameVelocity(model_->pncModel_, model_->pncData_, frameIdx_);
@@ -81,16 +78,6 @@ namespace exo_simu
                 Eigen::Vector3d const omega = rot * gyroIMU.angular(); // Get angular velocity in world frame
                 data().tail(3) = omega;
             }
-
-            // Add white noise and bias
-            if (sensorOptions_->noiseStd.size())
-            {
-                data() += randVectorNormal(sizeOf_, sensorOptions_->noiseStd);
-            }
-            if (sensorOptions_->bias.size())
-            {
-                data() += sensorOptions_->bias;
-            }
         }
 
         return returnCode;
@@ -100,8 +87,6 @@ namespace exo_simu
 
     template<>
     std::string const AbstractSensorTpl<ForceSensor>::type_("ForceSensor");
-    template<>
-    uint32_t const AbstractSensorTpl<ForceSensor>::sizeOf_(3);
     template<>
     std::vector<std::string> const AbstractSensorTpl<ForceSensor>::fieldNamesPreProcess_({"F_x", "F_y", "F_z"});
     template<>
@@ -148,20 +133,9 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            // Compute the true value
             std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
             std::vector<int32_t>::const_iterator it = std::find(contactFramesIdx.begin(), contactFramesIdx.end(), frameIdx_);
             data() = model_->contactForces_[std::distance(contactFramesIdx.begin(), it)].linear();
-
-            // Add white noise
-            if (sensorOptions_->noiseStd.size())
-            {
-                data() += randVectorNormal(sizeOf_, sensorOptions_->noiseStd);
-            }
-            if (sensorOptions_->bias.size())
-            {
-                data() += sensorOptions_->bias;
-            }
         }
 
         return returnCode;
@@ -171,8 +145,6 @@ namespace exo_simu
 
     template<>
     std::string const AbstractSensorTpl<EncoderSensor>::type_("EncoderSensor");
-    template<>
-    uint32_t const AbstractSensorTpl<EncoderSensor>::sizeOf_(2);
     template<>
     std::vector<std::string> const AbstractSensorTpl<EncoderSensor>::fieldNamesPreProcess_({"q"});
     template<>
@@ -227,7 +199,6 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            // Compute the true value
             if(sensorOptions_->rawData)
             {
                 data() = q.segment<1>(jointPositionIdx_);
@@ -236,16 +207,6 @@ namespace exo_simu
             {
                 data().head(1) = q.segment<1>(jointPositionIdx_);
                 data().tail(1) = v.segment<1>(jointVelocityIdx_);
-            }
-
-            // Add white noise
-            if (sensorOptions_->noiseStd.size())
-            {
-                data() += randVectorNormal(sizeOf_, sensorOptions_->noiseStd);
-            }
-            if (sensorOptions_->bias.size())
-            {
-                data() += sensorOptions_->bias;
             }
         }
 

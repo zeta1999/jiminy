@@ -164,21 +164,21 @@ namespace exo_simu
                 {
                     if (sensorGroup.first == ImuSensor::type_)
                     {
-                        if (exoMdlOptions_->telemetry.logImuSensors)
+                        if (exoMdlOptions_->telemetry.enableImuSensors)
                         {
                             returnCode = sensor.second->configureTelemetry(telemetryData_);
                         }
                     }
                     else if (sensorGroup.first == ForceSensor::type_)
                     {
-                        if (exoMdlOptions_->telemetry.logForceSensors)
+                        if (exoMdlOptions_->telemetry.enableForceSensors)
                         {
                             returnCode = sensor.second->configureTelemetry(telemetryData_);
                         }
                     }
                     else
                     {
-                        if (exoMdlOptions_->telemetry.logEncoderSensors)
+                        if (exoMdlOptions_->telemetry.enableEncoderSensors)
                         {
                             returnCode = sensor.second->configureTelemetry(telemetryData_);
                         }

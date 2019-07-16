@@ -12,7 +12,9 @@ namespace exo_simu
     isInitialized_(false),
     isTelemetryConfigured_(false),
     model_(&model),                     
-    name_(name)
+    name_(name),
+    data_(),
+    isDataUpToDate_(false)
     {
         setOptions(getDefaultOptions());
     }
@@ -22,11 +24,6 @@ namespace exo_simu
         // Empty.
     }
 
-    void AbstractSensorBase::reset(void)
-    {
-        data().setZero();
-    }
-
     result_t AbstractSensorBase::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         result_t returnCode = result_t::SUCCESS; 
@@ -34,7 +31,7 @@ namespace exo_simu
         if (telemetryData)
         {
             telemetrySender_.configureObject(telemetryData, getType() + "." + name_);
-            (void) registerNewVectorEntry(telemetrySender_, getFieldNames(), get());
+            (void) registerNewVectorEntry(telemetrySender_, getFieldNames(), data_);
             isTelemetryConfigured_ = true;
         }
         else
@@ -76,7 +73,8 @@ namespace exo_simu
     {
         if(getIsTelemetryConfigured())
         {
-            updateVectorValue(telemetrySender_, getFieldNames(), get());
+            get(data_); // Force update the internal buffer data_ if necessary
+            updateVectorValue(telemetrySender_, getFieldNames(), data_);
         }
     }
 }

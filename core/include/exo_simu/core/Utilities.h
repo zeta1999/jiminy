@@ -42,11 +42,9 @@ namespace exo_simu
 	vectorN_t randVectorNormal(uint32_t  const & size, 
                                float64_t const & std);
 
-	vectorN_t randVectorNormal(uint32_t  const & size, 
-                               vectorN_t const & std);
+	vectorN_t randVectorNormal(vectorN_t const & std);
 
-	vectorN_t randVectorNormal(uint32_t  const & size, 
-                               vectorN_t const & mean,
+	vectorN_t randVectorNormal(vectorN_t const & mean,
                                vectorN_t const & std);
 
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
@@ -58,7 +56,7 @@ namespace exo_simu
                            vectorN_t                const & values);
     void updateVectorValue(TelemetrySender                & telemetrySender,
                            std::vector<std::string> const & fieldNames,
-                           matrixN_t::ConstRowXpr           values);
+                           matrixN_t::ConstColXpr           values);
 
     std::vector<std::string> defaultVectorFieldnames(std::string const & baseName, 
                                                      uint32_t    const & size);

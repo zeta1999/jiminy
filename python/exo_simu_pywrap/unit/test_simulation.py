@@ -49,14 +49,14 @@ sensors_options = simulator.get_sensors_options()
 simu_options = simulator.get_simulation_options()
 ctrl_options = simulator.get_controller_options()
 
-ctrl_options["telemetry"]["logController"] = False
-model_options["telemetry"]["logForceSensors"] = False
-model_options["telemetry"]["logImuSensors"] = True
-model_options["telemetry"]["logEncoderSensors"] = False
-simu_options["telemetry"]["logConfiguration"] = True
-simu_options["telemetry"]["logVelocity"] = True
-simu_options["telemetry"]["logAcceleration"] = True
-simu_options["telemetry"]["logCommand"] = True
+ctrl_options["telemetryEnable"] = False
+model_options["telemetry"]["enableForceSensors"] = False
+model_options["telemetry"]["enableImuSensors"] = True
+model_options["telemetry"]["enableEncoderSensors"] = False
+simu_options["telemetry"]["enableConfiguration"] = True
+simu_options["telemetry"]["enableVelocity"] = True
+simu_options["telemetry"]["enableAcceleration"] = True
+simu_options["telemetry"]["enableCommand"] = True
 
 # simu_options["world"]["gravity"][2] = 0
 
@@ -78,9 +78,10 @@ simu_options['contacts']['transitionEps'] = 0.001
 
 for sensorOptions in sensors_options['ImuSensor'].values():
     sensorOptions['rawData'] = True
-for sensorOptions in sensors_options['ImuSensor'].values():
     sensorOptions['noiseStd'] = [5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0]
 sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['bias'] = [-8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0]
+sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['delay'] =  2.0e-3
+sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['delayInterpolationOrder'] = 0
 
 simulator.set_model_options(model_options)
 simulator.set_sensors_options(sensors_options)

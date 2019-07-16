@@ -17,6 +17,8 @@
 namespace exo_simu
 {
     std::string const ENGINE_OBJECT_NAME("Global");
+    float64_t const MIN_TIME_STEP_MAX(1e-5);
+    extern float64_t const MAX_TIME_STEP_MAX; // Must be external to be accessible by multiple .cpp
 
     using namespace boost::numeric::odeint;
 
@@ -122,20 +124,21 @@ namespace exo_simu
         configHolder_t getDefaultStepperOptions()
         {
             configHolder_t config;
+            config["randomSeed"] = 0;
             config["solver"] = std::string("runge_kutta_dopri5"); // ["runge_kutta_dopri5", "explicit_euler"]
             config["tolAbs"] = 1.0e-5;
             config["tolRel"] = 1.0e-4;
             config["dtMax"] = 1.0e-3;
-            config["iterMax"] = (int32_t) 1.0e5; // -1: illimited
+            config["iterMax"] = 100000; // -1: infinity
             config["sensorsUpdatePeriod"] = 0.0;
             config["controllerUpdatePeriod"] = 0.0;
-            config["randomSeed"] = 0;
 
             return config;
         };
 
         struct stepperOptions_t
         {
+            int32_t const randomSeed;
             std::string const solver;
             float64_t const tolAbs;
             float64_t const tolRel;
@@ -143,17 +146,16 @@ namespace exo_simu
             int32_t const iterMax;
             float64_t const sensorsUpdatePeriod;
             float64_t const controllerUpdatePeriod;
-            int32_t const randomSeed;
-
+            
             stepperOptions_t(configHolder_t const & options):
+            randomSeed(boost::get<int32_t>(options.at("randomSeed"))),
             solver(boost::get<std::string>(options.at("solver"))),
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
             tolRel(boost::get<float64_t>(options.at("tolRel"))),
             dtMax(boost::get<float64_t>(options.at("dtMax"))),
             iterMax(boost::get<int32_t>(options.at("iterMax"))),
             sensorsUpdatePeriod(boost::get<float64_t>(options.at("sensorsUpdatePeriod"))),
-            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod"))),
-            randomSeed(boost::get<int32_t>(options.at("randomSeed")))
+            controllerUpdatePeriod(boost::get<float64_t>(options.at("controllerUpdatePeriod")))
             {
                 // Empty.
             }
@@ -162,25 +164,25 @@ namespace exo_simu
         configHolder_t getDefaultTelemetryOptions()
         {
             configHolder_t config;
-            config["logConfiguration"] = true;
-            config["logVelocity"] = true;
-            config["logAcceleration"] = true;
-            config["logCommand"] = true;
+            config["enableConfiguration"] = true;
+            config["enableVelocity"] = true;
+            config["enableAcceleration"] = true;
+            config["enableCommand"] = true;
             return config;
         };
 
         struct telemetryOptions_t
         {
-            bool const logConfiguration;
-            bool const logVelocity;
-            bool const logAcceleration;
-            bool const logCommand;
+            bool const enableConfiguration;
+            bool const enableVelocity;
+            bool const enableAcceleration;
+            bool const enableCommand;
 
             telemetryOptions_t(configHolder_t const & options):
-            logConfiguration(boost::get<bool>(options.at("logConfiguration"))),
-            logVelocity(boost::get<bool>(options.at("logVelocity"))),
-            logAcceleration(boost::get<bool>(options.at("logAcceleration"))),
-            logCommand(boost::get<bool>(options.at("logCommand")))
+            enableConfiguration(boost::get<bool>(options.at("enableConfiguration"))),
+            enableVelocity(boost::get<bool>(options.at("enableVelocity"))),
+            enableAcceleration(boost::get<bool>(options.at("enableAcceleration"))),
+            enableCommand(boost::get<bool>(options.at("enableCommand")))
             {
                 // Empty.
             }

@@ -180,21 +180,19 @@ namespace exo_simu
         return randVectorNormal(size, 0, std);
     }
 
-    vectorN_t randVectorNormal(uint32_t  const & size, 
-                               vectorN_t const & mean,
+    vectorN_t randVectorNormal(vectorN_t const & mean,
                                vectorN_t const & std)
     {
-        return vectorN_t::NullaryExpr(size, 
+        return vectorN_t::NullaryExpr(std.size(), 
                                       [&mean, &std] (vectorN_t::Index const & i) -> float64_t 
                                       {
                                           return randNormal(mean[i], std[i]);
                                       });
     }
 
-    vectorN_t randVectorNormal(uint32_t  const & size, 
-                               vectorN_t const & std)
+    vectorN_t randVectorNormal(vectorN_t const & std)
     {
-        return vectorN_t::NullaryExpr(size, 
+        return vectorN_t::NullaryExpr(std.size(), 
                                       [&std] (vectorN_t::Index const & i) -> float64_t 
                                       {
                                           return randNormal(0, std[i]);
@@ -229,7 +227,7 @@ namespace exo_simu
 
     void updateVectorValue(TelemetrySender                & telemetrySender,
                            std::vector<std::string> const & fieldNames,
-                           matrixN_t::ConstRowXpr           values)
+                           matrixN_t::ConstColXpr           values)
     {
         std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
         std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();

@@ -342,15 +342,17 @@ namespace exo_simu
         return returnCode;
     }
 
-    matrixN_t const & Model::getSensorsData(std::string const & sensorType) const
+    result_t Model::getSensorsData(std::string const & sensorType,
+                                   matrixN_t         & data) const
     {
-        return sensorsGroupHolder_.at(sensorType).begin()->second->getAll();
+        return sensorsGroupHolder_.at(sensorType).begin()->second->getAll(data);
     }
 
-    matrixN_t::ConstRowXpr Model::getSensorData(std::string const & sensorType,
-                                                std::string const & sensorName) const
+    result_t Model::getSensorData(std::string const & sensorType,
+                                  std::string const & sensorName,
+                                  vectorN_t         & data) const
     {
-        return sensorsGroupHolder_.at(sensorType).at(sensorName)->get();
+        return sensorsGroupHolder_.at(sensorType).at(sensorName)->get(data);
     }
 
     void Model::setSensorsData(float64_t const & t,

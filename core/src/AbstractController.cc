@@ -32,7 +32,7 @@ namespace exo_simu
 
         if (telemetryData)
         {
-            if (ctrlOptions_->telemetry.logController)
+            if (ctrlOptions_->telemetryEnable)
             {
                 telemetrySender_.configureObject(telemetryData, CONTROLLER_OBJECT_NAME);
                 isTelemetryConfigured_ = true;

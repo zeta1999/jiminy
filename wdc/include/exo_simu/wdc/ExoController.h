@@ -41,6 +41,9 @@ namespace exo_simu
 
     private:
         commandFct_t commandFct_;
+        matrixN_t forceSensorsData_;
+        matrixN_t imuSensorsData_;
+        matrixN_t encoderSensorsData_;
     };
 }
 

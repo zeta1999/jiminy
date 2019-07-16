@@ -7,6 +7,8 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+#include <boost/circular_buffer.hpp>
+
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
@@ -108,9 +110,11 @@ namespace exo_simu
         bool getIsTelemetryConfigured(void) const;
         std::string getUrdfPath(void) const;
         std::map<std::string, std::vector<std::string> > getSensorsNames(void) const;
-        matrixN_t const & getSensorsData(std::string const & sensorType) const;
-        matrixN_t::ConstRowXpr getSensorData(std::string const & sensorType,
-                                             std::string const & sensorName) const;
+        result_t getSensorsData(std::string const & sensorType,
+                                matrixN_t         & data) const;
+        result_t getSensorData(std::string const & sensorType,
+                               std::string const & sensorName,
+                               vectorN_t         & data) const;
         void setSensorsData(float64_t const & t,
                             vectorN_t const & q,
                             vectorN_t const & v,
@@ -175,6 +179,7 @@ namespace exo_simu
     struct SensorDataHolder_t
     {
         SensorDataHolder_t(void) :
+        time_(),
         data_(),
         counters_(),
         sensors_(),
@@ -188,7 +193,8 @@ namespace exo_simu
             // Empty.
         }; 
 
-        std::vector<matrixN_t> data_;
+        boost::circular_buffer_space_optimized<float64_t> time_;
+        boost::circular_buffer_space_optimized<matrixN_t> data_;
         std::vector<uint32_t> counters_;
         std::vector<AbstractSensorBase *> sensors_;
         uint32_t num_;
