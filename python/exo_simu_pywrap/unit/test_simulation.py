@@ -57,6 +57,7 @@ simu_options["telemetry"]["enableConfiguration"] = True
 simu_options["telemetry"]["enableVelocity"] = True
 simu_options["telemetry"]["enableAcceleration"] = True
 simu_options["telemetry"]["enableCommand"] = True
+simu_options["telemetry"]["enableEnergy"] = True
 
 # simu_options["world"]["gravity"][2] = 0
 

@@ -168,6 +168,7 @@ namespace exo_simu
             config["enableVelocity"] = true;
             config["enableAcceleration"] = true;
             config["enableCommand"] = true;
+            config["enableEnergy"] = true;
             return config;
         };
 
@@ -177,12 +178,14 @@ namespace exo_simu
             bool const enableVelocity;
             bool const enableAcceleration;
             bool const enableCommand;
+            bool const enableEnergy;
 
             telemetryOptions_t(configHolder_t const & options):
             enableConfiguration(boost::get<bool>(options.at("enableConfiguration"))),
             enableVelocity(boost::get<bool>(options.at("enableVelocity"))),
             enableAcceleration(boost::get<bool>(options.at("enableAcceleration"))),
-            enableCommand(boost::get<bool>(options.at("enableCommand")))
+            enableCommand(boost::get<bool>(options.at("enableCommand"))),
+            enableEnergy(boost::get<bool>(options.at("enableEnergy")))
             {
                 // Empty.
             }
@@ -233,6 +236,7 @@ namespace exo_simu
             aLast(),
             uLast(),
             uCommandLast(),
+            energyLast(0.0),
             qNames(),
             vNames(),
             aNames(),
@@ -243,7 +247,6 @@ namespace exo_simu
             fext(),
             uBounds(),
             uInternal(),
-            energyLast(0.0),
             isInitialized()
             {
                 // Empty.

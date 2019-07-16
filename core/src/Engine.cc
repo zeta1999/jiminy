@@ -142,7 +142,10 @@ namespace exo_simu
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
         }
-        telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
+        if (engineOptions_->telemetry.enableEnergy)
+        {
+            telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
+        }
         model_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
@@ -256,7 +259,10 @@ namespace exo_simu
             {
                 updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
             }
-            telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
+            if (engineOptions_->telemetry.enableEnergy)
+            {
+                telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
+            }
             model_->updateSensorsTelemetry();
             telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
@@ -376,8 +382,8 @@ namespace exo_simu
             vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
             stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a);
             // Get system energy, kinematic computation are not needed since they were already done in RNEA.
-            float64_t energy =  pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false) +
-                                pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
+            float64_t energy = pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false) +
+                               pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
             stepperState_.updateLast(current_time, q, v, a, stepperState_.uLast, stepperState_.uCommandLast, energy); // uLast and uCommandLast are already up-to-date
         }
 
