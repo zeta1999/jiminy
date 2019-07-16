@@ -7,9 +7,11 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <string>
+#include <time.h>
 
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Utilities.h"
+#include "exo_simu/core/Sensor.h"
 #include "exo_simu/core/Engine.h"
 #include "exo_simu/wdc/ExoModel.h"
 #include "exo_simu/wdc/ExoController.h"
@@ -21,10 +23,10 @@ using namespace exo_simu;
 // ================= Defines the command and callback ==================
 // =====================================================================
 
-vectorN_t Kp = (vectorN_t(12) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
-                                 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
-vectorN_t Kd = (vectorN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
-                                 500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
+rowN_t Kp = (rowN_t(12) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
+                           41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
+rowN_t Kd = (rowN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
+                           500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
 
 void compute_command(float64_t const & t,
                      vectorN_t const & q,
@@ -34,7 +36,7 @@ void compute_command(float64_t const & t,
                      matrixN_t const & encoderSensorsData,
                      vectorN_t       & u)
 {
-    u = -(Kp.array() * encoderSensorsData.col(0).array() + Kd.array() * encoderSensorsData.col(1).array());
+    u = -(Kp.array() * encoderSensorsData.row(0).array() + Kd.array() * encoderSensorsData.row(1).array());
 }
 
 bool callback(float64_t const & t, 
@@ -101,31 +103,45 @@ int main(int argc, char *argv[])
     // Instantiate and configuration the exoskeleton model
     ExoModel model;
     configHolder_t mdlOptions = model.getOptions();
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logForceSensors")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logImuSensors")) = false;
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("logEncoderSensors")) = false;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableForceSensors")) = false;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableImuSensors")) = true; 
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableEncoderSensors")) = false;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
+    std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
+    configHolder_t imuSensorOptions = model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0]);
+    boost::get<bool>(imuSensorOptions.at("rawData")) = true;
+    boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    model.setSensorsOptions(ImuSensor::type_, imuSensorOptions);
+    boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    boost::get<float64_t>(imuSensorOptions.at("delay")) = 0.0e-3;
+    boost::get<uint32_t>(imuSensorOptions.at("delayInterpolationOrder")) = 0U;
+    model.setSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
 
     // Instantiate and configuration the exoskeleton controller
     ExoController controller;
     configHolder_t ctrlOptions = controller.getOptions();
-    boost::get<bool>(boost::get<configHolder_t>(ctrlOptions.at("telemetry")).at("logController")) = false;
+    boost::get<bool>(ctrlOptions.at("telemetryEnable")) = false;
     controller.setOptions(ctrlOptions);
     controller.initialize(compute_command);
 
     // Instantiate and configuration the engine
     Engine engine;
-    configHolder_t simuOptions = engine.getDefaultOptions();
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logConfiguration")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logVelocity")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logAcceleration")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logCommand")) = true;
+    configHolder_t simuOptions = engine.getOptions();
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableConfiguration")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableVelocity")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableAcceleration")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableCommand")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableEnergy")) = true;
     boost::get<vectorN_t>(boost::get<configHolder_t>(simuOptions.at("world")).at("gravity"))(2) = -9.81;
+    boost::get<std::string>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("solver")) = std::string("runge_kutta_dopri5");
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("dtMax")) = 3.0e-3;
+    boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("iterMax")) = 100000U; // -1 for infinity
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 0.0; //1.0e-3;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 0.0; //1.0e-3;
+    boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("randomSeed")) = 0U; // Use time(nullptr) for random seed.
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;

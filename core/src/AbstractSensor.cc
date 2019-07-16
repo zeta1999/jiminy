@@ -6,16 +6,17 @@ namespace exo_simu
 {
     AbstractSensorBase::AbstractSensorBase(Model       const & model,
                                            std::string const & name) :
-    sensorOptions_(nullptr),
-    name_(name),
-    fieldNames_(),
+    sensorOptions_(),
+    sensorOptionsHolder_(),
     telemetrySender_(),
     isInitialized_(false),
     isTelemetryConfigured_(false),
-    model_(&model),                 
-    sensorOptionsHolder_()
+    model_(&model),                     
+    name_(name),
+    data_(),
+    isDataUpToDate_(false)
     {
-        AbstractSensorBase::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
+        setOptions(getDefaultOptions());
     }
 
     AbstractSensorBase::~AbstractSensorBase(void)
@@ -23,28 +24,26 @@ namespace exo_simu
         // Empty.
     }
 
-    result_t AbstractSensorBase::configureTelemetry(std::vector<std::string>       const & fieldNames,
-                                                    std::shared_ptr<TelemetryData> const & telemetryData)
+    result_t AbstractSensorBase::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         result_t returnCode = result_t::SUCCESS; 
 
         if (telemetryData)
         {
-            fieldNames_ = fieldNames;
-            telemetrySender_.configureObject(telemetryData, name_);
-            (void) registerNewVectorEntry(telemetrySender_, fieldNames_, get());
+            telemetrySender_.configureObject(telemetryData, getType() + "." + name_);
+            (void) registerNewVectorEntry(telemetrySender_, getFieldNames(), data_);
             isTelemetryConfigured_ = true;
         }
         else
         {
-            std::cout << "Error - AbstractSensorTpl::configureTelemetry - Telemetry not initialized. Impossible to log sensor data." << std::endl;
+            std::cout << "Error - AbstractSensorBase::configureTelemetry - Telemetry not initialized. Impossible to log sensor data." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         return returnCode;
     }
 
-    configHolder_t AbstractSensorBase::getOptions(void) const
+    configHolder_t AbstractSensorBase::getOptions(void)
     {
         return sensorOptionsHolder_;
     }
@@ -74,7 +73,8 @@ namespace exo_simu
     {
         if(getIsTelemetryConfigured())
         {
-            updateVectorValue(telemetrySender_, fieldNames_, get());
+            get(data_); // Force update the internal buffer data_ if necessary
+            updateVectorValue(telemetrySender_, getFieldNames(), data_);
         }
     }
 }

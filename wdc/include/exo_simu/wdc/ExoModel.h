@@ -47,22 +47,22 @@ namespace exo_simu
         virtual configHolder_t getDefaultTelemetryOptions()
         {
             configHolder_t config;
-            config["logForceSensors"] = true;
-            config["logImuSensors"] = true;
-            config["logEncoderSensors"] = true;
+            config["enableForceSensors"] = true;
+            config["enableImuSensors"] = true;
+            config["enableEncoderSensors"] = true;
             return config;
         };
 
         struct exoTelemetryOptions_t
         {
-            bool const logForceSensors;
-            bool const logImuSensors;
-            bool const logEncoderSensors;
+            bool const enableForceSensors;
+            bool const enableImuSensors;
+            bool const enableEncoderSensors;
 
             exoTelemetryOptions_t(configHolder_t const & options):
-            logForceSensors(boost::get<bool>(options.at("logForceSensors"))),
-            logImuSensors(boost::get<bool>(options.at("logImuSensors"))),
-            logEncoderSensors(boost::get<bool>(options.at("logEncoderSensors")))
+            enableForceSensors(boost::get<bool>(options.at("enableForceSensors"))),
+            enableImuSensors(boost::get<bool>(options.at("enableImuSensors"))),
+            enableEncoderSensors(boost::get<bool>(options.at("enableEncoderSensors")))
             {
                 // Empty.
             }
@@ -100,6 +100,7 @@ namespace exo_simu
         result_t initialize(std::string const & urdfPath);
 
         result_t setOptions(configHolder_t const & mdlOptions);
+        std::vector<int32_t> const & getToesVelocityIdx(void) const;
 
     protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData) override;
@@ -108,6 +109,10 @@ namespace exo_simu
 
     public:
         std::unique_ptr<exoModelOptions_t const> exoMdlOptions_;
+
+    private:
+        std::vector<std::string> toesNames_;
+        std::vector<int32_t> toesVelocityIdx_; // Indices of the toes in the velocity vector representation
     };
 }
 

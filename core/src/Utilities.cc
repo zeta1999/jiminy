@@ -1,4 +1,6 @@
 #include <math.h>
+#include <climits>
+#include <stdlib.h>     /* srand, rand */
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -9,7 +11,9 @@
 
 namespace exo_simu
 {
-    Timer::Timer(void) :
+    // *********************** Timer **************************
+
+    Timer::Timer(void) : 
     t0(),
     tf(),
     dt(0)
@@ -29,16 +33,183 @@ namespace exo_simu
         dt = timeDiff.count();
     }
 
+    // **************** Random number generator *****************
+    // Based on Ziggurat generator by Marsaglia and Tsang (JSS, 2000) 
+    
+    std::mt19937 generator;
+    std::uniform_real_distribution<float32_t> distUniform(0.0,1.0);
+
+    uint32_t kn[128];
+    float32_t fn[128];
+    float32_t wn[128];
+
+    void r4_nor_setup(void)
+    {
+        float64_t const m1 = 2147483648.0;
+        float64_t const vn = 9.91256303526217E-03;
+        float64_t dn = 3.442619855899;
+        float64_t tn = 3.442619855899;
+
+        float64_t q = vn / exp (-0.5 * dn * dn);
+
+        kn[0] = (uint32_t) ((dn / q) * m1);
+        kn[1] = 0;
+
+        wn[0] = static_cast<float32_t>(q / m1);
+        wn[127] = static_cast<float32_t>(dn / m1);
+
+        fn[0] = 1.0f;
+        fn[127] = static_cast<float32_t>(exp(-0.5 * dn * dn));
+
+        for (uint8_t i=126; 1 <= i; i--)
+        {
+            dn = sqrt (-2.0 * log(vn / dn + exp(-0.5 * dn * dn)));
+            kn[i+1] = static_cast<uint32_t>((dn / tn) * m1);
+            tn = dn;
+            fn[i] = static_cast<float32_t>(exp(-0.5 * dn * dn));
+            wn[i] = static_cast<float32_t>(dn / m1);
+        }
+    }
+
+    float32_t r4_uni(void)
+    {
+        return distUniform(generator);
+    }
+
+    float32_t r4_nor(void)
+    {
+        float32_t const r = 3.442620f;
+        int32_t hz;
+        uint32_t iz;
+        float32_t x;
+        float32_t y;
+
+        hz = static_cast<int32_t>(generator());
+        iz = (hz & 127U);
+
+        if (fabs(hz) < kn[iz])
+        {
+            return static_cast<float32_t>(hz) * wn[iz];
+        }
+        else
+        {
+            while(true)
+            {
+                if (iz == 0)
+                {
+                    while(true)
+                    {
+                        x = - 0.2904764f * log(r4_uni());
+                        y = - log(r4_uni());
+                        if (x * x <= y + y)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (hz <= 0)
+                    {
+                        return - r - x;
+                    }
+                    else
+                    {
+                        return + r + x;
+                    }
+                }
+
+                x = static_cast<float32_t>(hz) * wn[iz];
+
+                if (fn[iz] + r4_uni() * (fn[iz-1] - fn[iz]) < exp (-0.5f * x * x))
+                {
+                    return x;
+                }
+
+                hz = static_cast<int32_t>(generator());
+                iz = (hz & 127);
+
+                if (fabs(hz) < kn[iz])
+                {
+                    return static_cast<float32_t>(hz) * wn[iz];
+                }
+            }
+        }
+    }
+
+    // ***************** Random number generator utilities **********************
+
+	void resetRandGenerators(uint32_t seed)
+	{
+		srand(seed); // Eigen relies on srand for genering random matrix
+        generator.seed(seed);
+        r4_nor_setup();
+	}
+
+	float64_t randUniform(float64_t const & lo, 
+	                      float64_t const & hi)
+    {
+        return lo + r4_uni() * (hi - lo);
+    }
+
+	float64_t randNormal(float64_t const & mean, 
+	                     float64_t const & std)
+    {
+        return mean + r4_nor() * std;
+    }
+
+    vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & mean,
+                               float64_t const & std)
+    {
+        if (std > 0.0)
+        {
+            return vectorN_t::NullaryExpr(size, 
+                                        [&mean, &std] (vectorN_t::Index const &) -> float64_t 
+                                        {
+                                            return randNormal(mean, std);
+                                        });
+        }
+        else
+        {
+            return vectorN_t::Constant(size, mean);
+        }
+    }
+
+    vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & std)
+    {
+        return randVectorNormal(size, 0, std);
+    }
+
+    vectorN_t randVectorNormal(vectorN_t const & mean,
+                               vectorN_t const & std)
+    {
+        return vectorN_t::NullaryExpr(std.size(), 
+                                      [&mean, &std] (vectorN_t::Index const & i) -> float64_t 
+                                      {
+                                          return randNormal(mean[i], std[i]);
+                                      });
+    }
+
+    vectorN_t randVectorNormal(vectorN_t const & std)
+    {
+        return vectorN_t::NullaryExpr(std.size(), 
+                                      [&std] (vectorN_t::Index const & i) -> float64_t 
+                                      {
+                                          return randNormal(0, std[i]);
+                                      });
+    }
+
+    // ********************** Telemetry utilities **********************
+
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,
                                 vectorN_t                const & initialValues)
     {
         std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
         std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        float64_t const * valueIt = initialValues.data();
-        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
         {
-            (void) telemetrySender.registerNewEntry<float64_t>(*fieldIt, *valueIt);
+            (void) telemetrySender.registerNewEntry<float64_t>(*fieldIt, initialValues[i]);
         }
     }
 
@@ -48,23 +219,21 @@ namespace exo_simu
     {
         std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
         std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        float64_t const * valueIt = values.data();
-        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
         {
-            telemetrySender.updateValue(*fieldIt, *valueIt);
+            telemetrySender.updateValue(*fieldIt, values[i]);
         }
     }
 
     void updateVectorValue(TelemetrySender                & telemetrySender,
                            std::vector<std::string> const & fieldNames,
-                           matrixN_t::ConstRowXpr           values)
+                           matrixN_t::ConstColXpr           values)
     {
         std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
         std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        float64_t const * valueIt = values.data();
-        for (; fieldIt != fieldEnd; ++fieldIt, ++valueIt)
+        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
         {
-            telemetrySender.updateValue(*fieldIt, *valueIt);
+            telemetrySender.updateValue(*fieldIt, values[i]);
         }
     }
 
@@ -79,6 +248,8 @@ namespace exo_simu
         }
         return fieldnames;
     }
+
+    // ********************** Math utilities *************************
 
     float64_t saturateSoft(float64_t const & in,
                            float64_t const & mi,

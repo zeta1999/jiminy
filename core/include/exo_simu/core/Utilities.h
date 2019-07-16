@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <vector>
+#include <random>
 
 #include "exo_simu/core/Types.h"
 
@@ -26,6 +27,26 @@ namespace exo_simu
 		float32_t dt;
 	};
 
+	void resetRandGenerators(uint32_t seed);
+
+	float64_t randUniform(float64_t const & lo, 
+	                      float64_t const & hi);
+
+	float64_t randNormal(float64_t const & mean, 
+	                     float64_t const & std);
+
+	vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & mean,
+                               float64_t const & std);
+
+	vectorN_t randVectorNormal(uint32_t  const & size, 
+                               float64_t const & std);
+
+	vectorN_t randVectorNormal(vectorN_t const & std);
+
+	vectorN_t randVectorNormal(vectorN_t const & mean,
+                               vectorN_t const & std);
+
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,
                                 vectorN_t                const & initialValues);
@@ -35,7 +56,7 @@ namespace exo_simu
                            vectorN_t                const & values);
     void updateVectorValue(TelemetrySender                & telemetrySender,
                            std::vector<std::string> const & fieldNames,
-                           matrixN_t::ConstRowXpr           values);
+                           matrixN_t::ConstColXpr           values);
 
     std::vector<std::string> defaultVectorFieldnames(std::string const & baseName, 
                                                      uint32_t    const & size);
@@ -50,6 +71,9 @@ namespace exo_simu
 
 	template<typename typeOut, typename typeIn>
 	std::vector<std::shared_ptr<typeOut>> staticCastSharedPtrVector(std::vector<std::shared_ptr<typeIn>> vIn);
+
+	template<class F,class dF=std::decay_t<F>>// dF optional
+	auto not_f(F&& f);
 }
 
 #include "exo_simu/core/Utilities.tcc"

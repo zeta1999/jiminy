@@ -3,6 +3,15 @@
 
 namespace exo_simu
 {
+    template<class F,class dF=std::decay_t<F>>// dF optional
+    auto not_f(F&& f){
+        return [f=std::forward<F>(f)](auto&&...args) mutable
+               ->decltype(!std::declval<std::result_of_t<dF&(decltype(args)...)>>()) // optional, adds sfinae
+               {
+                   return !f(decltype(args)(args)...);
+               };
+    }
+
 	template<typename KeyType, typename ValueType>
 	std::vector<ValueType> getMapValues(std::map<KeyType, ValueType> m)
 	{

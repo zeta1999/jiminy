@@ -18,38 +18,20 @@ namespace exo_simu
         AbstractController & operator = (AbstractController const & controller) = delete;
 
     public:
-        virtual configHolder_t getDefaultTelemetryOptions()
-        {
-            configHolder_t config;
-            config["logController"] = true;
-            return config;
-        };
-
-        struct telemetryOptions_t
-        {
-            bool const logController;
-
-            telemetryOptions_t(configHolder_t const & options):
-            logController(boost::get<bool>(options.at("logController")))
-            {
-                // Empty.
-            }
-        };
-
         virtual configHolder_t getDefaultOptions()
         {
             configHolder_t config;
-            config["telemetry"] = getDefaultTelemetryOptions();
+            config["telemetryEnable"] = false;
 
             return config;
         };
 
         struct controllerOptions_t
         {
-            telemetryOptions_t const telemetry;
+            bool const telemetryEnable;
 
             controllerOptions_t(configHolder_t const & options):
-            telemetry(boost::get<configHolder_t>(options.at("telemetry")))
+            telemetryEnable(boost::get<bool>(options.at("telemetryEnable")))
             {
                 // Empty.
             }
@@ -59,8 +41,9 @@ namespace exo_simu
         AbstractController(void);
         virtual ~AbstractController(void);
 
-        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+        virtual void reset(void);
 
+        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
         virtual void updateTelemetry(void) = 0;
 
         configHolder_t getOptions(void) const;

@@ -65,8 +65,8 @@ def _compute_command(Kp, Kd, traj_ref, t_rel, qe, v, forceSensorsData, imuSensor
     u_ref = _linear_interp(ratio, traj_ref.u[:,t_ind_inf], traj_ref.u[:,t_ind_sup])
 
     # Compute PID torques
-    q = np.expand_dims(encoderSensorsData[:,0], axis=1)
-    dq = np.expand_dims(encoderSensorsData[:,1], axis=1)
+    q = np.expand_dims(encoderSensorsData[0].transpose(), axis=1)
+    dq = np.expand_dims(encoderSensorsData[1].transpose(), axis=1)
     u_pid = - (Kp * (q - q_ref) + Kd * (dq - dq_ref))
 
     return u_ref + u_pid

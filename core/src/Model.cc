@@ -44,7 +44,7 @@ namespace exo_simu
     result_t Model::initialize(std::string              const & urdfPath,
                                std::vector<std::string> const & contactFramesNames,
                                std::vector<std::string> const & jointsNames,
-                               bool const & hasFreeflyer)
+                               bool                     const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
 
@@ -79,6 +79,18 @@ namespace exo_simu
         return returnCode;
     }
 
+    void Model::reset(void)
+    {
+        // Reset the sensors
+        for (sensorsGroupHolder_t::value_type & sensorGroup : sensorsGroupHolder_)
+        {
+            for (sensorsHolder_t::value_type & sensor : sensorGroup.second)
+            {
+                sensor.second->reset();
+            }
+        }
+    }
+
     result_t Model::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         telemetryData_ = std::shared_ptr<TelemetryData>(telemetryData);
@@ -86,48 +98,61 @@ namespace exo_simu
         return result_t::SUCCESS;
     }
 
-    result_t Model::removeSensor(std::string const & name)
+    result_t Model::removeSensor(std::string const & sensorType,
+                                 std::string const & sensorName)
     {
-        // Can be used to remove either a sensor or a sensor type
-
         result_t returnCode = result_t::SUCCESS;
 
-        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(name);
-        if (sensorGroupIt != sensorsGroupHolder_.end())
+        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+        sensorsHolder_t::iterator sensorIt;
+        if (sensorGroupIt == sensorsGroupHolder_.end())
         {
-            sensorsGroupHolder_.erase(sensorGroupIt);
-            sensorsDataHolder_.erase(name);
+            std::cout << "Error - Model::removeSensor - This type of sensor does not exist." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
         }
-        else
+
+        if (returnCode == result_t::SUCCESS)
         {
-            bool isSensorDeleted = false;
-            for (sensorsGroupHolder_t::value_type & sensorGroup : sensorsGroupHolder_)
+            sensorIt = sensorGroupIt->second.find(sensorName);
+            if (sensorIt == sensorGroupIt->second.end())
             {
-                sensorsHolder_t::iterator sensorIt = sensorGroup.second.find(name);
-                if (sensorIt != sensorGroup.second.end())
-                {
-                    // Remove the sensor from its group
-                    sensorGroup.second.erase(sensorIt);
-
-                    // Remove the sensor group if there is no more sensors left.
-                    if (sensorGroup.second.empty())
-                    {
-                        sensorsGroupHolder_.erase(sensorGroup.first);
-                        sensorsDataHolder_.erase(sensorGroup.first);
-                    }
-
-                    isSensorDeleted = true;
-                    break;
-                }
-            }
-
-            if (!isSensorDeleted)
-            {
-                std::cout << "Error - Model::removeSensor - Sensor with this name does not exist." << std::endl;
+                std::cout << "Error - Model::removeSensors - No sensor with this type and name exists." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
 
+        if (returnCode == result_t::SUCCESS)
+        {
+            // Remove the sensor from its group
+            sensorGroupIt->second.erase(sensorIt);
+            
+            // Remove the sensor group if there is no more sensors left.
+            if (sensorGroupIt->second.empty())
+            {
+                sensorsGroupHolder_.erase(sensorType);
+                sensorsDataHolder_.erase(sensorType);
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::removeSensors(std::string const & sensorType)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+        if (sensorGroupIt == sensorsGroupHolder_.end())
+        {
+            std::cout << "Error - Model::removeSensors - No sensor with this type exists." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorsGroupHolder_.erase(sensorGroupIt);
+            sensorsDataHolder_.erase(sensorType);
+        }
+        
         return returnCode;
     }
 
@@ -136,13 +161,82 @@ namespace exo_simu
         sensorsGroupHolder_.clear();
         sensorsDataHolder_.clear();
     }
+    
+    configHolder_t Model::getSensorsOptions(std::string const & sensorType) const
+    {
+        configHolder_t sensorsOptions;
+        for (sensorsHolder_t::value_type const & sensor : sensorsGroupHolder_.at(sensorType))
+        {
+            sensorsOptions[sensor.first] = sensor.second->getOptions();
+        }
+        return sensorsOptions;
+    }
 
+    configHolder_t Model::getSensorsOptions(void) const
+    {
+        configHolder_t sensorsOptions;
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        {
+            configHolder_t sensorsGroupOptions;
+            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+            {
+                sensorsGroupOptions[sensor.first] = sensor.second->getOptions();
+            }
+            sensorsOptions[sensorGroup.first] = sensorsGroupOptions;
+        }
+
+        return sensorsOptions;
+    }
+
+    configHolder_t Model::getSensorOptions(std::string const & sensorType,
+                                           std::string const & sensorName) const
+    {
+        return sensorsGroupHolder_.at(sensorType).at(sensorName)->getOptions();
+    }
+
+    void Model::setSensorOptions(std::string    const & sensorType,
+                                 std::string    const & sensorName,
+                                 configHolder_t const & sensorOptions)
+    {
+        return sensorsGroupHolder_.at(sensorType).at(sensorName)->setOptions(sensorOptions);
+    }
+
+    void Model::setSensorsOptions(std::string    const & sensorType,
+                                  configHolder_t const & sensorsOptions)
+    {
+        for (sensorsHolder_t::value_type const & sensor : sensorsGroupHolder_.at(sensorType))
+        {
+            configHolder_t::const_iterator it = sensorsOptions.find(sensor.first);
+            if (it != sensorsOptions.end())
+            {
+                sensor.second->setOptions(boost::get<configHolder_t>(it->second));
+            }
+            else
+            {
+                sensor.second->setOptionsAll(sensorsOptions);
+                break;
+            }
+        }
+    }
+
+    void Model::setSensorsOptions(configHolder_t const & sensorsOptions)
+    {
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        {
+            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+            {
+                sensor.second->setOptions(boost::get<configHolder_t>(
+                    boost::get<configHolder_t>(sensorsOptions.at(sensorGroup.first)).at(sensor.first)));
+            }
+        }
+    }
+    
     configHolder_t Model::getOptions(void) const
     {
         return mdlOptionsHolder_;
     }
 
-    result_t Model::setOptions(configHolder_t const & mdlOptions)
+    result_t Model::setOptions(configHolder_t mdlOptions)
     {
         result_t returnCode = result_t::SUCCESS;
 
@@ -193,7 +287,21 @@ namespace exo_simu
         return urdfPath_;
     }
 
-    result_t Model::setUrdfPath(std::string const & urdfPath, bool const & hasFreeflyer)
+    std::map<std::string, std::vector<std::string> > Model::getSensorsNames(void) const
+    {
+        std::map<std::string, std::vector<std::string> > sensorNames;
+        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        {
+            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+            {
+                sensorNames[sensorGroup.first].push_back(sensor.first);
+            }
+        }
+        return sensorNames;
+    }
+
+    result_t Model::setUrdfPath(std::string const & urdfPath, 
+                                bool        const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
 
@@ -234,15 +342,17 @@ namespace exo_simu
         return returnCode;
     }
 
-    matrixN_t const & Model::getSensorsData(std::string const & sensorType) const
+    result_t Model::getSensorsData(std::string const & sensorType,
+                                   matrixN_t         & data) const
     {
-        return sensorsGroupHolder_.at(sensorType).begin()->second->getAll();
+        return sensorsGroupHolder_.at(sensorType).begin()->second->getAll(data);
     }
 
-    matrixN_t::ConstRowXpr Model::getSensorData(std::string const & sensorType,
-                                                std::string const & sensorName) const
+    result_t Model::getSensorData(std::string const & sensorType,
+                                  std::string const & sensorName,
+                                  vectorN_t         & data) const
     {
-        return sensorsGroupHolder_.at(sensorType).at(sensorName)->get();
+        return sensorsGroupHolder_.at(sensorType).at(sensorName)->get(data);
     }
 
     void Model::setSensorsData(float64_t const & t,

@@ -25,6 +25,8 @@
 
 namespace exo_simu
 {
+    float64_t const MAX_TIME_STEP_MAX = 3e-3;
+
     Engine::Engine(void):
     engineOptions_(nullptr),
     isInitialized_(false),
@@ -124,23 +126,26 @@ namespace exo_simu
         stepperState_.initialize(*model_);
         telemetryData_->reset();
         telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
-        if (engineOptions_->telemetry.logConfiguration)
+        if (engineOptions_->telemetry.enableConfiguration)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
         }
-        if (engineOptions_->telemetry.logVelocity)
+        if (engineOptions_->telemetry.enableVelocity)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
         }
-        if (engineOptions_->telemetry.logAcceleration)
+        if (engineOptions_->telemetry.enableAcceleration)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
         }
-        if (engineOptions_->telemetry.logCommand)
+        if (engineOptions_->telemetry.enableCommand)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
         }
-        telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
+        if (engineOptions_->telemetry.enableEnergy)
+        {
+            telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
+        }
         model_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
@@ -160,7 +165,7 @@ namespace exo_simu
 
         if(x_init.rows() != model_->nx())
         {
-            std::cout << "Error - Engine::simulate - Size of x_init (" << x_init.size() << ") inconsistent with model size (" << model_->nx() << ")." << std::endl;
+            std::cout << "Error - Engine::simulate - Size of x_init inconsistent with model size." << std::endl;
             return result_t::ERROR_BAD_INPUT;
         }
 
@@ -175,10 +180,29 @@ namespace exo_simu
                             std::placeholders::_3,
                             std::placeholders::_1,
                             std::placeholders::_2);
-        auto stepper = make_controlled(engineOptions_->stepper.tolAbs,
-                                       engineOptions_->stepper.tolRel,
-                                       stepper_t());
+        stepper_t stepper;
+        if (engineOptions_->stepper.solver == "runge_kutta_dopri5")
+        {
+            stepper = make_controlled(engineOptions_->stepper.tolAbs, 
+                                      engineOptions_->stepper.tolRel,
+                                      runge_kutta_stepper_t());
+        }
+        else if (engineOptions_->stepper.solver == "explicit_euler")
+        {
+            stepper = explicit_euler();
+        }
+        else
+        {
+            std::cout << "Error - Engine::simulate - The requested solver is not available." << std::endl;
+            return result_t::ERROR_BAD_INPUT;
+        }
 
+
+        // initialize the random number generators
+        resetRandGenerators(engineOptions_->stepper.randomSeed);
+        model_->reset();
+        controller_->reset();
+        
         // Initialize the logger, model, and stepper internal state
         model_->pncData_ = pinocchio::Data(model_->pncModel_);
         stepperState_.initialize(*model_, x_init);
@@ -203,13 +227,13 @@ namespace exo_simu
 
         // Set the initial time step
         float64_t dt = 0.0;
-        if (updatePeriod > 0)
+        if (updatePeriod > std::numeric_limits<float64_t>::epsilon())
         {
             dt = updatePeriod; // The initial time step is the update period
         }
         else
         {
-            dt = 5e-4;
+            dt = engineOptions_->stepper.dtMax; // Use the maximum allowed time step as default
         }
 
         // Integration loop based on boost::numeric::odeint::detail::integrate_times
@@ -219,23 +243,26 @@ namespace exo_simu
         while (true)
         {
             // Log the current time, state, command, and sensors
-            if (engineOptions_->telemetry.logConfiguration)
+            if (engineOptions_->telemetry.enableConfiguration)
             {
                 updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
             }
-            if (engineOptions_->telemetry.logVelocity)
+            if (engineOptions_->telemetry.enableVelocity)
             {
                 updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
             }
-            if (engineOptions_->telemetry.logAcceleration)
+            if (engineOptions_->telemetry.enableAcceleration)
             {
                 updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
             }
-            if (engineOptions_->telemetry.logCommand)
+            if (engineOptions_->telemetry.enableCommand)
             {
                 updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
             }
-            telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
+            if (engineOptions_->telemetry.enableEnergy)
+            {
+                telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
+            }
             model_->updateSensorsTelemetry();
             telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
@@ -243,10 +270,19 @@ namespace exo_simu
                the callback returns false, or if the number of integration
                steps exceeds 1e5. */
             if (std::abs(end_time - current_time) < std::numeric_limits<float64_t>::epsilon()
-            || !callbackFct_(current_time, stepperState_.x)
-            || stepperState_.iterLast >= 1e5)
+            || !callbackFct_(current_time, stepperState_.x))
             {
                 break;
+            }
+            else if (engineOptions_->stepper.iterMax > 0 
+            && stepperState_.iterLast >= (uint32_t) engineOptions_->stepper.iterMax)
+            {
+                break;
+            }
+            else if ((stepperState_.x.array() != stepperState_.x.array()).any()) // nan is NOT equal to itself
+            {
+                std::cout << "Error - Engine::simulate - The low-level solver failed. Consider increasing accuracy." << std::endl;
+                return result_t::ERROR_GENERIC;
             }
 
             if (updatePeriod > 0)
@@ -290,7 +326,10 @@ namespace exo_simu
                             stepperState_.uCommandLast[i] = boost::algorithm::clamp(stepperState_.uCommandLast[i], -torque_max, torque_max);
                             stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
                         }
-                        systemDynamics(current_time, stepperState_.x, stepperState_.dxdt); // Update the internal stepper state dxdt since the dynamics has changed.
+                        if (engineOptions_->stepper.solver != "explicit_euler")
+                        {
+                            systemDynamics(current_time, stepperState_.x, stepperState_.dxdt); // Update the internal stepper state dxdt since the dynamics has changed.
+                        }
                     }
                 }
 
@@ -299,7 +338,10 @@ namespace exo_simu
                 {
                     // adjust stepsize to end up exactly at the next breakpoint
                     float64_t current_dt = std::min(dt, next_time - current_time);
-                    if (success == stepper.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, current_dt))
+                    if (success == boost::apply_visitor([&](auto && one)
+                                                        {
+                                                            return one.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, current_dt);
+                                                        }, stepper))
                     {
                         fail_checker.reset(); // reset the fail counter, see #173
                         dt = std::max(dt, current_dt); // continue with the original step size if dt was reduced due to the next breakpoint
@@ -309,19 +351,23 @@ namespace exo_simu
                         fail_checker();  // check for possible overflow of failed steps in step size adjustment
                         dt = current_dt;
                     }
+                    dt = std::min(dt, engineOptions_->stepper.dtMax); // Make sure it never exceeds dtMax
                 }
             }
             else
             {
                 // Compute the next step using adaptive step method
-                dt = std::min(dt, end_time - current_time); // Make sure it ends exactly at the end_time
+                dt = std::min(std::min(dt, engineOptions_->stepper.dtMax), end_time - current_time); // Make sure it ends exactly at the end_time and never exceeds dtMax
                 controlled_step_result res = fail;
                 while (res == fail)
                 {
-                    res = stepper.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, dt);
+                    res = boost::apply_visitor([&](auto && one)
+                                               {
+                                                   return one.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, dt);
+                                               }, stepper);
                     if (res == success)
                     {
-                        fail_checker.reset(); // reset the fail counter, see #173
+                        fail_checker.reset(); // reset the fail counter
                     }
                     else
                     {
@@ -336,8 +382,8 @@ namespace exo_simu
             vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
             stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a);
             // Get system energy, kinematic computation are not needed since they were already done in RNEA.
-            float64_t energy =  pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false) +
-                                pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
+            float64_t energy = pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false) +
+                               pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
             stepperState_.updateLast(current_time, q, v, a, stepperState_.uLast, stepperState_.uCommandLast, energy); // uLast and uCommandLast are already up-to-date
         }
 
@@ -538,8 +584,17 @@ namespace exo_simu
 
     void Engine::setOptions(configHolder_t const & engineOptions)
     {
+        // Update the internal options
         engineOptionsHolder_ = engineOptions;
+
+        // Make sure some parameters are in the required bounds
+        float64_t & dtMax = boost::get<float64_t>(boost::get<configHolder_t>(engineOptionsHolder_.at("stepper")).at("dtMax"));
+        dtMax = std::min(std::max(dtMax, MIN_TIME_STEP_MAX), MAX_TIME_STEP_MAX);
+
+        // Create a fast struct accessor
         engineOptions_ = std::make_unique<engineOptions_t const>(engineOptionsHolder_);
+
+        // Propagate the options at Model level
         if (isInitialized_)
         {
             model_->pncModel_.gravity = engineOptions_->world.gravity; // It is reversed (Third Newton law)

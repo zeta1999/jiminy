@@ -11,21 +11,20 @@ namespace exo_simu
         // The sensor name must be unique, even if there types are different
         result_t returnCode = result_t::SUCCESS;
 
-        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        std::string const & sensorType = TSensor::type_;
+        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+        if (sensorGroupIt != sensorsGroupHolder_.end())
         {
-            sensorsHolder_t::const_iterator it = sensorGroup.second.find(sensorName);
-            if (it != sensorGroup.second.end())
+            sensorsHolder_t::const_iterator it = sensorGroupIt->second.find(sensorName);
+            if (it != sensorGroupIt->second.end())
             {
-                std::cout << "Error - Model::addSensor - Sensor with the same name already exists." << std::endl;
+                std::cout << "Error - Model::addSensor - A sensor with the same type and name already exists." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
 
         if (returnCode == result_t::SUCCESS)
         {
-            std::string const & sensorType = TSensor::type_;
-            
-            sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorType);
             if (sensorGroupIt == sensorsGroupHolder_.end())
             {
                 // Create a new sensor data holder

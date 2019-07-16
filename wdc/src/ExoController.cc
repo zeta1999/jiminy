@@ -18,7 +18,10 @@ namespace exo_simu
                    vectorN_t       & u) -> void
                 {
                    u = vectorN_t::Zero(12);
-                })
+                }),
+    forceSensorsData_(),
+    imuSensorsData_(),
+    encoderSensorsData_()
     {
         // Empty.
     }
@@ -69,10 +72,10 @@ namespace exo_simu
                                         vectorN_t const & v,
                                         vectorN_t       & u)
     {
-        matrixN_t const & forceSensorsData = model.getSensorsData(ForceSensor::type_);
-        matrixN_t const & imuSensorsData = model.getSensorsData(ImuSensor::type_);
-        matrixN_t const & encoderSensorsData = model.getSensorsData(EncoderSensor::type_);
-        commandFct_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData, u);
+        model.getSensorsData(ForceSensor::type_, forceSensorsData_);
+        model.getSensorsData(ImuSensor::type_, imuSensorsData_);
+        model.getSensorsData(EncoderSensor::type_, encoderSensorsData_);
+        commandFct_(t, q, v, forceSensorsData_, imuSensorsData_, encoderSensorsData_, u);
     }
 
     void ExoController::internalDynamics(Model     const & model,
@@ -90,6 +93,13 @@ namespace exo_simu
             float64_t jointId = jointsVelocityIdx[i];
             u(jointId) = -exoJointOptions_.frictionViscous(i)*v(jointId) - exoJointOptions_.frictionDry(i) * \
                 saturateSoft(v(jointId) / exoJointOptions_.dryFrictionVelEps,-1.0,1.0,0.7);
+        }
+
+        // Add friction to the toes to avoid numerical instabilities
+        float64_t const frictionViscous = 1e-4;
+        for (uint32_t const & jointId : exoModel.getToesVelocityIdx())
+        {
+            u(jointId) = -frictionViscous * v(jointId);
         }
     }
 }
