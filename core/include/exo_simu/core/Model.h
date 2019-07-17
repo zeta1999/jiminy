@@ -120,7 +120,7 @@ namespace exo_simu
                             vectorN_t const & v,
                             vectorN_t const & a,
                             vectorN_t const & u);
-        void updateSensorsTelemetry(void);
+        void updateTelemetry(void);
         std::vector<int32_t> const & getContactFramesIdx(void) const;
         std::vector<std::string> const & getJointsName(void) const;
         std::vector<int32_t> const & getJointsPositionIdx(void) const;

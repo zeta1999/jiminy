@@ -31,8 +31,6 @@ namespace exo_simu
                             commandFct_t         commandFct);
         result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
 
-        virtual void updateTelemetry(void) override;
-
         result_t fetchSensors(void);
 
         result_t computeCommand(float64_t const & t,

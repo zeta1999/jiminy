@@ -119,6 +119,7 @@ namespace exo_simu
             telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
         }
         model_->configureTelemetry(telemetryData_);
+        controller_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
         return returnCode;
@@ -235,7 +236,8 @@ namespace exo_simu
             {
                 telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
             }
-            model_->updateSensorsTelemetry();
+            model_->updateTelemetry();
+            controller_->updateTelemetry();
             telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
             /* Stop the simulation if the end time has been reached, if

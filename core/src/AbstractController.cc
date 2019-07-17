@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/Model.h"
 #include "exo_simu/core/AbstractController.h"
 
@@ -12,7 +13,8 @@ namespace exo_simu
     isInitialized_(false),
     isTelemetryConfigured_(false),
     ctrlOptionsHolder_(),
-    telemetrySender_()
+    telemetrySender_(),
+    registeredInfo_()
     {
         AbstractController::setOptions(getDefaultOptions()); // Clarify that the base implementation is called
     }
@@ -103,6 +105,10 @@ namespace exo_simu
                 if (ctrlOptions_->telemetryEnable)
                 {
                     telemetrySender_.configureObject(telemetryData, CONTROLLER_OBJECT_NAME);
+                    for (std::pair<std::vector<std::string>, vectorN_t const &> const & registeredVariable : registeredInfo_)
+                    {
+                        (void) exo_simu::registerNewVectorEntry(telemetrySender_, registeredVariable.first, registeredVariable.second);
+                    }
                     isTelemetryConfigured_ = true;
                 }
             }
@@ -115,6 +121,26 @@ namespace exo_simu
 
         return returnCode;
     }
+
+    void AbstractController::registerNewVectorEntry(std::vector<std::string> const & fieldNames,
+                                                    vectorN_t                const & values)
+    {
+        // Delayed variable registration (Taken into account by 'configureTelemetry')
+
+        registeredInfo_.emplace_back(fieldNames, values);
+    }
+
+    void AbstractController::updateTelemetry(void)
+    {
+        if (getIsTelemetryConfigured())
+        {
+            for (std::pair<std::vector<std::string>, vectorN_t const &> const & registeredVariable : registeredInfo_)
+            {
+                updateVectorValue(telemetrySender_, registeredVariable.first, registeredVariable.second);
+            }
+        }
+    }
+
     configHolder_t AbstractController::getOptions(void) const
     {
         return ctrlOptionsHolder_;

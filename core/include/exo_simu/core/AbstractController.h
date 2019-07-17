@@ -6,7 +6,7 @@
 
 namespace exo_simu
 {
-    std::string const CONTROLLER_OBJECT_NAME("Controller");
+    std::string const CONTROLLER_OBJECT_NAME("HighLevelController");
 
     class Model;
 
@@ -44,8 +44,10 @@ namespace exo_simu
         virtual result_t initialize(Model const & model);
         virtual void reset(void);
 
-        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
-        virtual void updateTelemetry(void) = 0;
+        result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+        void registerNewVectorEntry(std::vector<std::string> const & fieldNames,
+                                    vectorN_t                const & value);
+        void updateTelemetry(void);
 
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & ctrlOptions);
@@ -71,6 +73,7 @@ namespace exo_simu
         bool isTelemetryConfigured_;
         configHolder_t ctrlOptionsHolder_;
         TelemetrySender telemetrySender_;
+        std::vector<std::pair<std::vector<std::string>, vectorN_t const &> > registeredInfo_;
     };
 }
 

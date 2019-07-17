@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     // Instantiate and configuration the exoskeleton controller
     ExoController controller;
     configHolder_t ctrlOptions = controller.getOptions();
-    boost::get<bool>(ctrlOptions.at("telemetryEnable")) = false;
+    boost::get<bool>(ctrlOptions.at("telemetryEnable")) = true;
     controller.setOptions(ctrlOptions);
     controller.initialize(model, compute_command);
 

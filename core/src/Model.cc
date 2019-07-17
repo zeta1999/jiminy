@@ -370,7 +370,7 @@ namespace exo_simu
         }
     }
 
-    void Model::updateSensorsTelemetry(void)
+    void Model::updateTelemetry(void)
     {
         for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
         {
