@@ -41,6 +41,7 @@ namespace exo_simu
         AbstractController(void);
         virtual ~AbstractController(void);
 
+        virtual result_t initialize(Model const & model);
         virtual void reset(void);
 
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
@@ -52,22 +53,20 @@ namespace exo_simu
         bool getIsTelemetryConfigured(void) const;
 
         // It assumes that the model internal state is consistent with other input arguments
-        virtual void compute_command(Model     const & model,
-                                     float64_t const & t,
-                                     vectorN_t const & q,
-                                     vectorN_t const & v,
-                                     vectorN_t       & u) = 0;
-
-        virtual void internalDynamics(Model     const & model,
-                                      float64_t const & t,
-                                      vectorN_t const & q,
-                                      vectorN_t const & v,
-                                      vectorN_t       & u) = 0;
+        virtual result_t computeCommand(float64_t const & t,
+                                        vectorN_t const & q,
+                                        vectorN_t const & v,
+                                        vectorN_t       & u) = 0;
+        virtual result_t internalDynamics(float64_t const & t,
+                                          vectorN_t const & q,
+                                          vectorN_t const & v,
+                                          vectorN_t       & u) = 0;
 
     public:
         std::unique_ptr<controllerOptions_t const> ctrlOptions_;
 
     protected:
+        Model const * model_; // Raw pointer to avoid managing its deletion
         bool isInitialized_;
         bool isTelemetryConfigured_;
         configHolder_t ctrlOptionsHolder_;

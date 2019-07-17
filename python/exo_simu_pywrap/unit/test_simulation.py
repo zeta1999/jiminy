@@ -14,10 +14,7 @@ from logviewer.logfile import LogFile
 import exo_simu
 from exo_simu_py import *
 
-# %load_ext autoreload
-# %autoreload 2
-
-################################## User variables #######################################
+################################## User parameters #######################################
 
 urdf_path = "/home/builder/.simulation/atalante_with_patient/atalante_with_patient.urdf"
 urdf_mesh_path = "/home/builder/.simulation"
@@ -26,7 +23,7 @@ traj_features = {"steplength":  16,
                  "duration":    0.95,
                  "stairheight": 0.0}
 
-############# Compute the reference trajectory using the neural network #################
+############### Compute the reference trajectory using a neural network #################
 
 # Get the patient information
 patient_info = get_patient_info(urdf_path)
@@ -39,7 +36,7 @@ pred = np.ravel(np.asarray(network.eval(x)))
 # Compute the trajectory data from the prediction vector
 trajectory_data = extract_state_from_neural_network_prediction(urdf_path, pred)
   
-################################ Simulate the system ####################################
+########################### Configuration the simulation ################################
 
 simulator = exo_simu.simulator()
 simulator.init(urdf_path)
@@ -89,18 +86,23 @@ simulator.set_sensors_options(sensors_options)
 simulator.set_simulation_options(simu_options)
 simulator.set_controller_options(ctrl_options)
 
-def callback(t, x):
-    return bool(x[2] > 0) 
-
-x0 = get_initial_state_simulation(trajectory_data)
-tf = 3.0
+################################ Run the simulation #####################################
 
 Kp = np.array([[20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
                 20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0]]).T
 Kd = np.array([[250.0, 150.0, 100.0, 100.0, 150.0, 100.0, 
                 250.0, 150.0, 100.0, 100.0, 150.0, 100.0]]).T
 controller = pid_feedforward(trajectory_data, Kp, Kd)
+
+def callback(t, x):
+    return bool(x[2] > 0)
+
+x0 = get_initial_state_simulation(trajectory_data)
+tf = 3.0
+
+controller.reset()
 simulator.simulate(x0, 5e-2, controller.compute_command, callback) # Force compile Python controller for a fair benchmark
+
 controller.reset()
 start = time.time()
 simulator.simulate(x0, tf, controller.compute_command, callback)
@@ -138,5 +140,5 @@ trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 # log = LogFile("/tmp/blackbox/log.data")
 
 # Plot some data using logviewer
-# plt.plot(log.parser.get_data("Global.Time"), log.parser.get_data("ImuSensor.LeftPelvisIMU.w_y"))
+# plt.plot(log.parser.get_data("Global.Time"), log.parser.get_data("ImuSensor.PelvisIMU.w_y"))
 # plt.show()

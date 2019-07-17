@@ -122,6 +122,7 @@ namespace exo_simu
                             vectorN_t const & u);
         void updateSensorsTelemetry(void);
         std::vector<int32_t> const & getContactFramesIdx(void) const;
+        std::vector<std::string> const & getJointsName(void) const;
         std::vector<int32_t> const & getJointsPositionIdx(void) const;
         std::vector<int32_t> const & getJointsVelocityIdx(void) const;
         uint32_t nq(void) const; // no get keyword for consistency with pinocchio C++ API

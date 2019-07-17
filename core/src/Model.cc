@@ -386,6 +386,11 @@ namespace exo_simu
         return contactFramesIdx_;
     }
 
+    std::vector<std::string> const & Model::getJointsName(void) const
+    {
+        return jointsNames_;
+    }
+
     std::vector<int32_t> const & Model::getJointsPositionIdx(void) const
     {
         return jointsPositionIdx_;

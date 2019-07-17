@@ -64,7 +64,7 @@ namespace python
         {
             result_t returnCode = result_t::SUCCESS;
 
-            returnCode = controller_.initialize(commandFct);
+            returnCode = controller_.initialize(model_, commandFct);
 
             if (returnCode == result_t::SUCCESS)
             {
@@ -113,9 +113,9 @@ namespace python
                          matrixN_t const & forceSensorsData,
                          matrixN_t const & imuSensorsData,
                          matrixN_t const & encoderSensorsData,
-                         vectorN_t       & u)
+                         vectorN_t       & uCommand)
         {
-            u = bp::extract<vectorN_t>(funcPyPtr_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData));
+            uCommand = bp::extract<vectorN_t>(funcPyPtr_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData));
         }
     private:
         bp::object funcPyPtr_;
@@ -124,7 +124,8 @@ namespace python
     struct callbackPyWrapper {
     public:
         callbackPyWrapper(bp::object const& objPy) : funcPyPtr_(objPy) {}
-        bool operator() (const float64_t & t, const vectorN_t & x)
+        bool operator() (float64_t const & t, 
+                         vectorN_t const & x)
         {
             return bp::extract<bool>(funcPyPtr_(t, x));
         }

@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
     boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
     model.setSensorsOptions(ImuSensor::type_, imuSensorOptions);
     boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
-    boost::get<float64_t>(imuSensorOptions.at("delay")) = 0.0e-3;
+    boost::get<float64_t>(imuSensorOptions.at("delay")) = 2.0e-3;
     boost::get<uint32_t>(imuSensorOptions.at("delayInterpolationOrder")) = 0U;
     model.setSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
 
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     configHolder_t ctrlOptions = controller.getOptions();
     boost::get<bool>(ctrlOptions.at("telemetryEnable")) = false;
     controller.setOptions(ctrlOptions);
-    controller.initialize(compute_command);
+    controller.initialize(model, compute_command);
 
     // Instantiate and configuration the engine
     Engine engine;

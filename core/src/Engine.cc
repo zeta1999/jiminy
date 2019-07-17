@@ -79,34 +79,6 @@ namespace exo_simu
         }
         if (returnCode == result_t::SUCCESS)
         {
-            try
-            {
-                float64_t t = 0;
-                vectorN_t q = vectorN_t::Zero(model_->nq());
-                vectorN_t v = vectorN_t::Zero(model_->nv());
-                vectorN_t uCommand = vectorN_t::Zero(model_->getJointsVelocityIdx().size());
-                vectorN_t uInternal = vectorN_t::Zero(model_->nv());
-                controller.compute_command(*model_, t, q, v, uCommand);
-                if(uCommand.size() != (int32_t) model_->getJointsVelocityIdx().size())
-                {
-                    std::cout << "Error - Engine::initialize - The controller's method 'compute_command' returns command with wrong size." << std::endl;
-                    returnCode = result_t::ERROR_BAD_INPUT;
-                }
-                controller.internalDynamics(*model_, t, q, v, uInternal);
-                if(uInternal.size() != model_->nv())
-                {
-                    std::cout << "Error - Engine::initialize - The controller's method 'internalDynamics' returns command with wrong size." << std::endl;
-                    returnCode = result_t::ERROR_BAD_INPUT;
-                }
-            }
-            catch (std::exception& e)
-            {
-                std::cout << "Error - Engine::initialize - Something is wrong with the Controller. Impossible to compute command." << std::endl;
-                returnCode = result_t::ERROR_GENERIC;
-            }
-        }
-        if (returnCode == result_t::SUCCESS)
-        {
             controller_ = &controller;
         }
 
@@ -313,12 +285,11 @@ namespace exo_simu
                         engineOptions_->stepper.controllerUpdatePeriod;
                     if (std::abs(current_time - next_time_update_controller) < 1e-8)
                     {
-                        controller_->compute_command(*model_,
-                                                     stepperState_.tLast,
-                                                     stepperState_.qLast,
-                                                     stepperState_.vLast,
-                                                     stepperState_.uCommandLast);
-                        std::vector<int32_t> jointsVelocityIdx = model_->getJointsVelocityIdx();
+                        controller_->computeCommand(stepperState_.tLast,
+                                                    stepperState_.qLast,
+                                                    stepperState_.vLast,
+                                                    stepperState_.uCommandLast);
+                        std::vector<int32_t> const & jointsVelocityIdx = model_->getJointsVelocityIdx();
                         for (uint32_t i=0; i < jointsVelocityIdx.size(); i++)
                         {
                             uint32_t jointId = jointsVelocityIdx[i];
@@ -426,8 +397,8 @@ namespace exo_simu
         // Update the controller command if necessary (only for infinite update frequency)
         if (engineOptions_->stepper.controllerUpdatePeriod < std::numeric_limits<float64_t>::epsilon())
         {
-            controller_->compute_command(*model_, t, q, v, stepperState_.uCommandLast); // Be careful, in this particular case uCommandLast is not guarantee to be the last command
-            std::vector<int32_t> jointsVelocityIdx = model_->getJointsVelocityIdx();
+            controller_->computeCommand(t, q, v, stepperState_.uCommandLast); // Be careful, in this particular case uCommandLast is not guarantee to be the last command
+            std::vector<int32_t> const & jointsVelocityIdx = model_->getJointsVelocityIdx();
             for (uint32_t i=0; i < jointsVelocityIdx.size(); i++)
             {
                 uint32_t jointId = jointsVelocityIdx[i];
@@ -438,7 +409,7 @@ namespace exo_simu
         }
 
         // Compute command and internal dynamics
-        controller_->internalDynamics(*model_, t, q, v, stepperState_.uInternal); // TODO: Send the values at previous iteration instead
+        controller_->internalDynamics(t, q, v, stepperState_.uInternal); // TODO: Send the values at previous iteration instead
         boundsDynamics(q, v, stepperState_.uBounds);
         vectorN_t u = stepperState_.uBounds + stepperState_.uInternal + stepperState_.uControl;
 
@@ -545,8 +516,8 @@ namespace exo_simu
         Model::jointOptions_t const & mdlJointOptions_ = model_->mdlOptions_->joints;
         Engine::jointOptions_t const & engineJointOptions_ = engineOptions_->joints;
 
-        std::vector<int32_t> jointsPositionIdx = model_->getJointsPositionIdx();
-        std::vector<int32_t> jointsVelocityIdx = model_->getJointsVelocityIdx();
+        std::vector<int32_t> const & jointsPositionIdx = model_->getJointsPositionIdx();
+        std::vector<int32_t> const & jointsVelocityIdx = model_->getJointsVelocityIdx();
         for (uint32_t i = 0; i < jointsPositionIdx.size(); i++)
         {
             float64_t const qJoint = q(jointsPositionIdx[i]);

@@ -137,47 +137,48 @@ namespace exo_simu
 
             /* Determine the position of the closest right element. 
                Bisection method can be used since times are sorted. */
-             auto bisectLeft = [&](void) -> int32_t
-                               {
-                                   int32_t left = 0;
-                                   int32_t right = dataHolder_->time_.size() - 1;
-                                   int32_t mid = 0;
+            auto bisectLeft = 
+                [&](void) -> int32_t
+                {
+                    int32_t left = 0;
+                    int32_t right = dataHolder_->time_.size() - 1;
+                    int32_t mid = 0;
 
-                                   if (timeDesired >= dataHolder_->time_.back())
-                                   {
-                                       return right;
-                                   }
-                                   else if (timeDesired < dataHolder_->time_.front())
-                                   {
-                                       return -1;
-                                   }
+                    if (timeDesired >= dataHolder_->time_.back())
+                    {
+                        return right;
+                    }
+                    else if (timeDesired < dataHolder_->time_.front())
+                    {
+                        return -1;
+                    }
 
-                                   while(left < right)
-                                   {
-                                       mid = (left + right) / 2;
-                                       if (timeDesired < dataHolder_->time_[mid])
-                                       {
-                                           right = mid;
-                                       }
-                                       else if (timeDesired > dataHolder_->time_[mid])
-                                       {
-                                           left = mid + 1;
-                                       }
-                                       else
-                                       {
-                                           return mid;
-                                       }
-                                   }
+                    while(left < right)
+                    {
+                        mid = (left + right) / 2;
+                        if (timeDesired < dataHolder_->time_[mid])
+                        {
+                            right = mid;
+                        }
+                        else if (timeDesired > dataHolder_->time_[mid])
+                        {
+                            left = mid + 1;
+                        }
+                        else
+                        {
+                            return mid;
+                        }
+                    }
 
-                                   if (timeDesired < dataHolder_->time_[mid])
-                                   {
-                                       return mid - 1;
-                                   }
-                                   else
-                                   {
-                                       return mid;
-                                   }
-                               };
+                    if (timeDesired < dataHolder_->time_[mid])
+                    {
+                        return mid - 1;
+                    }
+                    else
+                    {
+                        return mid;
+                    }
+                };
             int32_t const inputIndexLeft = bisectLeft();
 
             if (timeDesired >= 0.0 && uint32_t(inputIndexLeft + 1) < dataHolder_->time_.size())

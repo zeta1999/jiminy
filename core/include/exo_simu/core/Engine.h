@@ -16,7 +16,7 @@
 
 namespace exo_simu
 {
-    std::string const ENGINE_OBJECT_NAME("Global");
+    std::string const ENGINE_OBJECT_NAME("HighLevelController");
     float64_t const MIN_TIME_STEP_MAX(1e-5);
     extern float64_t const MAX_TIME_STEP_MAX; // Must be external to be accessible by multiple .cpp
 
@@ -277,6 +277,7 @@ namespace exo_simu
 
                 if (returnCode == result_t::SUCCESS)
                 {
+                    // Initialize the odestepper state buffers
                     iterLast = 0;
                     tLast = 0;
                     qLast = x_init.head(model.nq());
@@ -285,20 +286,63 @@ namespace exo_simu
                     uLast = vectorN_t::Zero(model.nv());
                     uCommandLast = vectorN_t::Zero(model.getJointsVelocityIdx().size());
 
-                    qNames = defaultVectorFieldnames("q", qLast.size());
-                    vNames = defaultVectorFieldnames("v", vLast.size());
-                    aNames = defaultVectorFieldnames("a", aLast.size());
-                    uCommandNames = defaultVectorFieldnames("uCommand", uCommandLast.size());
+                    // Generate the list of names
+                    std::string const jointPrefixBase = "current";
+                    std::string const freeFlyerPrefixBase = jointPrefixBase + "Freeflyer";
+                    std::vector<std::string> const & jointNames = model.getJointsName();
+                    auto getVectorFieldnames = 
+                        [&](std::vector<std::string>         names, 
+                            std::string              const & infoPrefix) -> std::vector<std::string>
+                        {
+                            std::string const freeFlyerPrefix = freeFlyerPrefixBase + infoPrefix;
+                            std::string const jointPrefix = jointPrefixBase + infoPrefix;
+                            std::vector<int32_t> jointsIdx;
+                            if (infoPrefix == "Position")
+                            {
+                                jointsIdx = model.getJointsPositionIdx();
+                            }
+                            else
+                            {
+                                jointsIdx = model.getJointsVelocityIdx();
+                            }
 
+                            std::vector<std::string> positionFreeFlyerNames({freeFlyerPrefix + std::string("TransX"),
+                                                                             freeFlyerPrefix + std::string("TransY"),
+                                                                             freeFlyerPrefix + std::string("TransZ"),
+                                                                             freeFlyerPrefix + std::string("TransZ"),
+                                                                             freeFlyerPrefix + std::string("QuatX"),
+                                                                             freeFlyerPrefix + std::string("QuatY"),
+                                                                             freeFlyerPrefix + std::string("QuatZ"),
+                                                                             freeFlyerPrefix + std::string("QuatW")});
+                            std::copy(positionFreeFlyerNames.begin(), positionFreeFlyerNames.end(), names.begin());
+                            for (uint8_t i=0; i<jointNames.size(); ++i)
+                            {
+                                names[jointsIdx[i]] = jointPrefix + jointNames[i];
+                            }
+
+                            return names;
+                        };
+
+                    qNames = getVectorFieldnames(defaultVectorFieldnames("q", qLast.size()), "Position");
+                    vNames = getVectorFieldnames(defaultVectorFieldnames("v", vLast.size()), "Velocity");
+                    aNames = getVectorFieldnames(defaultVectorFieldnames("a", aLast.size()), "Acceleration");
+                    uCommandNames = defaultVectorFieldnames("uCommand", uCommandLast.size());
+                    std::string const jointPrefixTorque = jointPrefixBase + "Torque";
+                    for (uint8_t i=0; i<jointNames.size(); ++i)
+                    {
+                        uCommandNames[i] = jointPrefixTorque + jointNames[i];
+                    }
+
+                    // Initialize the internal systemDynamics buffers
                     x = x_init;
                     dxdt = vectorN_t::Zero(model.nx());
                     uControl = vectorN_t::Zero(model.nv());
-
                     fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(),
                                                                                   pinocchio::Force::Zero());
                     uBounds = vectorN_t::Zero(model.nv());
                     uInternal = vectorN_t::Zero(model.nv());
 
+                    // Set the initialization flag
                     isInitialized = true;
                 }
 

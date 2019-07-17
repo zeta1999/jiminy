@@ -8,6 +8,7 @@ namespace exo_simu
 {
     AbstractController::AbstractController(void) :
     ctrlOptions_(nullptr),
+    model_(nullptr),
     isInitialized_(false),
     isTelemetryConfigured_(false),
     ctrlOptionsHolder_(),
@@ -21,6 +22,65 @@ namespace exo_simu
         // Empty.
     }
 
+
+    result_t AbstractController::initialize(Model const & model)
+    {
+        result_t returnCode = result_t::SUCCESS; 
+
+        if (!model.getIsInitialized())
+        {
+            std::cout << "Error - AbstractController::initialize - The model is not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            model_ = &model;
+
+            try
+            {
+                // isInitialized_ must be true to run 'computeCommand' and 'internalDynamics'
+                isInitialized_ = true;
+                float64_t t = 0;
+                vectorN_t q = vectorN_t::Zero(model_->nq());
+                vectorN_t v = vectorN_t::Zero(model_->nv());
+                vectorN_t uCommand = vectorN_t::Zero(model_->getJointsVelocityIdx().size());
+                vectorN_t uInternal = vectorN_t::Zero(model_->nv());
+                returnCode = computeCommand(t, q, v, uCommand);
+                if (returnCode == result_t::SUCCESS)
+                {
+                    if(uCommand.size() != (int32_t) model_->getJointsVelocityIdx().size())
+                    {
+                        std::cout << "Error - AbstractController::initialize - 'computeCommand' returns command with wrong size." << std::endl;
+                        returnCode = result_t::ERROR_BAD_INPUT;
+                    }
+                }
+                internalDynamics(t, q, v, uInternal); // It cannot fail at this point
+                if (returnCode == result_t::SUCCESS)
+                {
+                    if(uInternal.size() != model_->nv())
+                    {
+                        std::cout << "Error - AbstractController::initialize - 'internalDynamics' returns command with wrong size." << std::endl;
+                        returnCode = result_t::ERROR_BAD_INPUT;
+                    }
+                }
+            }
+            catch (std::exception& e)
+            {
+                std::cout << "Error - AbstractController::initialize - Something is wrong, probably because of 'commandFct'." << std::endl;
+                returnCode = result_t::ERROR_GENERIC;
+            }
+            isInitialized_ = false;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            isInitialized_ = true;
+        }
+
+        return returnCode;
+    }
+
     void AbstractController::reset(void)
     {
         // Empty.
@@ -30,18 +90,27 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS; 
 
-        if (telemetryData)
+        if (!getIsInitialized())
         {
-            if (ctrlOptions_->telemetryEnable)
-            {
-                telemetrySender_.configureObject(telemetryData, CONTROLLER_OBJECT_NAME);
-                isTelemetryConfigured_ = true;
-            }
-        }
-        else
-        {
-            std::cout << "Error - AbstractController::configureTelemetry - Telemetry not initialized. Impossible to log controller data." << std::endl;
+            std::cout << "Error - AbstractController::configureTelemetry - The controller is not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            if (telemetryData)
+            {
+                if (ctrlOptions_->telemetryEnable)
+                {
+                    telemetrySender_.configureObject(telemetryData, CONTROLLER_OBJECT_NAME);
+                    isTelemetryConfigured_ = true;
+                }
+            }
+            else
+            {
+                std::cout << "Error - AbstractController::configureTelemetry - Telemetry not initialized. Impossible to log controller data." << std::endl;
+                returnCode = result_t::ERROR_INIT_FAILED;
+            }
         }
 
         return returnCode;

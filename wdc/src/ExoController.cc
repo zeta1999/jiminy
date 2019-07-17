@@ -9,6 +9,7 @@ namespace exo_simu
 {
     ExoController::ExoController(void) :
     AbstractController(),
+    exoModel_(nullptr),
     commandFct_([](float64_t const & t,
                    vectorN_t const & q,
                    vectorN_t const & v,
@@ -31,15 +32,14 @@ namespace exo_simu
         // Empty.
     }
 
-    result_t ExoController::initialize(commandFct_t commandFct)
+    result_t ExoController::initialize(Model        const & model,
+                                       commandFct_t         commandFct)
     {
-        result_t returnCode = result_t::SUCCESS;
+        result_t returnCode = result_t::SUCCESS; 
 
-        /* TODO: Check that the command function is working as expected,
-           but to do so it requires a way to provide mock sensor data. */
         commandFct_ = commandFct;
-        
-        isInitialized_ = true;
+        exoModel_ = static_cast<ExoModel const *>(&model);
+        AbstractController::initialize(model);
 
         return returnCode;
     }
@@ -52,7 +52,7 @@ namespace exo_simu
 
         if (getIsTelemetryConfigured())
         {
-            // (void) registerNewVectorEntry(telemetrySender_, fieldNames_, get());
+            // (void) registerNewVectorEntry(telemetrySender_, model->getJointsName(), uCommand_);
         }
 
         return returnCode;
@@ -62,44 +62,86 @@ namespace exo_simu
     {
         if(getIsTelemetryConfigured())
         {
-            // updateVectorValue(telemetrySender_, fieldNames_, get());
+            // updateVectorValue(telemetrySender_, model->getJointsName(), uCommand_);
         }
     }
 
-    void ExoController::compute_command(Model     const & model,
-                                        float64_t const & t,
-                                        vectorN_t const & q,
-                                        vectorN_t const & v,
-                                        vectorN_t       & u)
+    result_t ExoController::fetchSensors(void)
     {
-        model.getSensorsData(ForceSensor::type_, forceSensorsData_);
-        model.getSensorsData(ImuSensor::type_, imuSensorsData_);
-        model.getSensorsData(EncoderSensor::type_, encoderSensorsData_);
-        commandFct_(t, q, v, forceSensorsData_, imuSensorsData_, encoderSensorsData_, u);
+        result_t returnCode = result_t::SUCCESS; 
+
+        returnCode = model_->getSensorsData(ForceSensor::type_, forceSensorsData_);
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = model_->getSensorsData(ImuSensor::type_, imuSensorsData_);
+        }
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = model_->getSensorsData(EncoderSensor::type_, encoderSensorsData_);
+        }
+
+        return returnCode;
     }
 
-    void ExoController::internalDynamics(Model     const & model,
-                                         float64_t const & t,
-                                         vectorN_t const & q,
-                                         vectorN_t const & v,
-                                         vectorN_t       & u)
+    result_t ExoController::computeCommand(float64_t const & t,
+                                           vectorN_t const & q,
+                                           vectorN_t const & v,
+                                           vectorN_t       & u)
     {
-        ExoModel const & exoModel = static_cast<ExoModel const &>(model);
-        ExoModel::exoJointOptions_t const & exoJointOptions_ = exoModel.exoMdlOptions_->joints;
+        result_t returnCode = result_t::SUCCESS; 
 
-        std::vector<int32_t> jointsVelocityIdx = exoModel.getJointsVelocityIdx();
-        for (uint32_t i = 0; i < jointsVelocityIdx.size(); i++)
+        if (!getIsInitialized())
         {
-            float64_t jointId = jointsVelocityIdx[i];
-            u(jointId) = -exoJointOptions_.frictionViscous(i)*v(jointId) - exoJointOptions_.frictionDry(i) * \
-                saturateSoft(v(jointId) / exoJointOptions_.dryFrictionVelEps,-1.0,1.0,0.7);
+            std::cout << "Error - ExoController::computeCommand - The model is not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
-        // Add friction to the toes to avoid numerical instabilities
-        float64_t const frictionViscous = 1e-4;
-        for (uint32_t const & jointId : exoModel.getToesVelocityIdx())
+        if (returnCode == result_t::SUCCESS)
         {
-            u(jointId) = -frictionViscous * v(jointId);
+            returnCode = fetchSensors();
         }
+        if (returnCode == result_t::SUCCESS)
+        {
+            commandFct_(t, q, v, forceSensorsData_, imuSensorsData_, encoderSensorsData_, u);
+        }
+
+        return returnCode;
+    }
+
+    result_t ExoController::internalDynamics(float64_t const & t,
+                                             vectorN_t const & q,
+                                             vectorN_t const & v,
+                                             vectorN_t       & u)
+    {
+        result_t returnCode = result_t::SUCCESS; 
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - ExoController::internalDynamics - The model is not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            ExoModel::exoJointOptions_t const & exoJointOptions_ = exoModel_->exoMdlOptions_->joints;
+
+            // Add viscous friction to the joints
+            std::vector<int32_t> const & jointsVelocityIdx = exoModel_->getJointsVelocityIdx();
+            for (uint32_t i = 0; i < jointsVelocityIdx.size(); i++)
+            {
+                float64_t jointId = jointsVelocityIdx[i];
+                u(jointId) = -exoJointOptions_.frictionViscous(i)*v(jointId) - exoJointOptions_.frictionDry(i) * \
+                    saturateSoft(v(jointId) / exoJointOptions_.dryFrictionVelEps,-1.0,1.0,0.7);
+            }
+
+            // Add viscous friction to the toes to avoid numerical instabilities
+            float64_t const frictionViscous = 1e-4;
+            for (int32_t const & jointId : exoModel_->getToesVelocityIdx())
+            {
+                u(jointId) = -frictionViscous * v(jointId);
+            }
+        }
+
+        return returnCode;
     }
 }
