@@ -118,8 +118,8 @@ namespace exo_simu
         {
             telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
         }
-        model_->configureTelemetry(telemetryData_);
         controller_->configureTelemetry(telemetryData_);
+        model_->configureTelemetry(telemetryData_);
         telemetryRecorder_->initialize();
 
         return returnCode;
@@ -148,15 +148,19 @@ namespace exo_simu
             return result_t::ERROR_BAD_INPUT;
         }
 
-        // Define the stepper iterators
-        auto rhsBind = bind(&Engine::systemDynamics, this,
-                            std::placeholders::_3,
-                            std::placeholders::_1,
-                            std::placeholders::_2);
+        // Define the stepper iterators. (Do NOT use bind since it passes the arguments by value)
+        auto rhsBind =
+            [this](vectorN_t const & x,
+                   vectorN_t       & dxdt,
+                   float64_t const & t)
+            {
+                this->systemDynamics(t, x, dxdt);
+            };
+
         stepper_t stepper;
         if (engineOptions_->stepper.solver == "runge_kutta_dopri5")
         {
-            stepper = make_controlled(engineOptions_->stepper.tolAbs, 
+            stepper = make_controlled(engineOptions_->stepper.tolAbs,
                                       engineOptions_->stepper.tolRel,
                                       runge_kutta_stepper_t());
         }
@@ -175,7 +179,7 @@ namespace exo_simu
         resetRandGenerators(engineOptions_->stepper.randomSeed);
         model_->reset();
         controller_->reset();
-        
+
         // Initialize the logger, model, and stepper internal state
         model_->pncData_ = pinocchio::Data(model_->pncModel_);
         stepperState_.initialize(*model_, x_init);
@@ -236,8 +240,8 @@ namespace exo_simu
             {
                 telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
             }
-            model_->updateTelemetry();
             controller_->updateTelemetry();
+            model_->updateTelemetry();
             telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
 
             /* Stop the simulation if the end time has been reached, if
@@ -248,7 +252,7 @@ namespace exo_simu
             {
                 break;
             }
-            else if (engineOptions_->stepper.iterMax > 0 
+            else if (engineOptions_->stepper.iterMax > 0
             && stepperState_.iterLast >= (uint32_t) engineOptions_->stepper.iterMax)
             {
                 break;

@@ -146,7 +146,7 @@ namespace exo_simu
             int32_t const iterMax;
             float64_t const sensorsUpdatePeriod;
             float64_t const controllerUpdatePeriod;
-            
+
             stepperOptions_t(configHolder_t const & options):
             randomSeed(boost::get<int32_t>(options.at("randomSeed"))),
             solver(boost::get<std::string>(options.at("solver"))),
@@ -288,10 +288,10 @@ namespace exo_simu
 
                     // Generate the list of names
                     std::string const jointPrefixBase = "current";
-                    std::string const freeFlyerPrefixBase = jointPrefixBase + "Freeflyer";
-                    std::vector<std::string> const & jointNames = model.getJointsName();
-                    auto getVectorFieldnames = 
-                        [&](std::vector<std::string>         names, 
+                    std::string const freeFlyerPrefixBase = jointPrefixBase + "FreeFlyer";
+                    std::vector<std::string> const & jointNames = removeFieldnamesSuffix(model.getJointsName(), "Joint");
+                    auto getVectorFieldnames =
+                        [&](std::vector<std::string>         names,
                             std::string              const & infoPrefix) -> std::vector<std::string>
                         {
                             std::string const freeFlyerPrefix = freeFlyerPrefixBase + infoPrefix;
@@ -309,7 +309,6 @@ namespace exo_simu
                             std::vector<std::string> positionFreeFlyerNames({freeFlyerPrefix + std::string("TransX"),
                                                                              freeFlyerPrefix + std::string("TransY"),
                                                                              freeFlyerPrefix + std::string("TransZ"),
-                                                                             freeFlyerPrefix + std::string("TransZ"),
                                                                              freeFlyerPrefix + std::string("QuatX"),
                                                                              freeFlyerPrefix + std::string("QuatY"),
                                                                              freeFlyerPrefix + std::string("QuatZ"),
@@ -326,11 +325,11 @@ namespace exo_simu
                     qNames = getVectorFieldnames(defaultVectorFieldnames("q", qLast.size()), "Position");
                     vNames = getVectorFieldnames(defaultVectorFieldnames("v", vLast.size()), "Velocity");
                     aNames = getVectorFieldnames(defaultVectorFieldnames("a", aLast.size()), "Acceleration");
-                    uCommandNames = defaultVectorFieldnames("uCommand", uCommandLast.size());
+                    uCommandNames.clear();
                     std::string const jointPrefixTorque = jointPrefixBase + "Torque";
-                    for (uint8_t i=0; i<jointNames.size(); ++i)
+                    for (std::string const & jointName : jointNames)
                     {
-                        uCommandNames[i] = jointPrefixTorque + jointNames[i];
+                        uCommandNames.emplace_back(jointPrefixTorque + jointName);
                     }
 
                     // Initialize the internal systemDynamics buffers
@@ -461,10 +460,10 @@ namespace exo_simu
         }
 
         template<class System>
-        controlled_step_result try_step(System       system, 
-                                        state_type & x, 
-                                        deriv_type & dxdt, 
-                                        time_type  & t, 
+        controlled_step_result try_step(System       system,
+                                        state_type & x,
+                                        deriv_type & dxdt,
+                                        time_type  & t,
                                         time_type  & dt) const
         {
             t += dt;

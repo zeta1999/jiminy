@@ -29,17 +29,17 @@ namespace exo_simu
 
 	void resetRandGenerators(uint32_t seed);
 
-	float64_t randUniform(float64_t const & lo, 
+	float64_t randUniform(float64_t const & lo,
 	                      float64_t const & hi);
 
-	float64_t randNormal(float64_t const & mean, 
+	float64_t randNormal(float64_t const & mean,
 	                     float64_t const & std);
 
-	vectorN_t randVectorNormal(uint32_t  const & size, 
+	vectorN_t randVectorNormal(uint32_t  const & size,
                                float64_t const & mean,
                                float64_t const & std);
 
-	vectorN_t randVectorNormal(uint32_t  const & size, 
+	vectorN_t randVectorNormal(uint32_t  const & size,
                                float64_t const & std);
 
 	vectorN_t randVectorNormal(vectorN_t const & std);
@@ -58,8 +58,11 @@ namespace exo_simu
                            std::vector<std::string> const & fieldNames,
                            matrixN_t::ConstColXpr           values);
 
-    std::vector<std::string> defaultVectorFieldnames(std::string const & baseName, 
+    std::vector<std::string> defaultVectorFieldnames(std::string const & baseName,
                                                      uint32_t    const & size);
+
+	std::vector<std::string> removeFieldnamesSuffix(std::vector<std::string>         fieldnames, // Make a copy
+                                                       std::string              const & suffix);
 
     float64_t saturateSoft(float64_t const & in,
                            float64_t const & mi,

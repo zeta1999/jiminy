@@ -19,7 +19,7 @@ from exo_simu_py import *
 urdf_path = "/home/builder/.simulation/atalante_with_patient/atalante_with_patient.urdf"
 urdf_mesh_path = "/home/builder/.simulation"
 neural_network_path = "/home/builder/wdc_workspace/src/wandercode/test_data/data/trajectories/generic_walk_network_v5-4.json"
-traj_features = {"steplength":  16, 
+traj_features = {"steplength":  16,
                  "duration":    0.95,
                  "stairheight": 0.0}
 
@@ -35,7 +35,7 @@ pred = np.ravel(np.asarray(network.eval(x)))
 
 # Compute the trajectory data from the prediction vector
 trajectory_data = extract_state_from_neural_network_prediction(urdf_path, pred)
-  
+
 ########################### Configuration the simulation ################################
 
 simulator = exo_simu.simulator()
@@ -46,7 +46,7 @@ sensors_options = simulator.get_sensors_options()
 simu_options = simulator.get_simulation_options()
 ctrl_options = simulator.get_controller_options()
 
-ctrl_options["telemetryEnable"] = False
+ctrl_options["telemetryEnable"] = True
 model_options["telemetry"]["enableForceSensors"] = False
 model_options["telemetry"]["enableImuSensors"] = True
 model_options["telemetry"]["enableEncoderSensors"] = False
@@ -58,10 +58,10 @@ simu_options["telemetry"]["enableEnergy"] = True
 
 # simu_options["world"]["gravity"][2] = 0
 
-simu_options["stepper"]["solver"] = "explicit_euler" # ["runge_kutta_dopri5", "explicit_euler"]
+simu_options["stepper"]["solver"] = "runge_kutta_dopri5" # ["runge_kutta_dopri5", "explicit_euler"]
 simu_options["stepper"]["tolRel"] = 1.0e-5
 simu_options["stepper"]["tolAbs"] = 1.0e-4
-simu_options["stepper"]["dtMax"] = 2.0e-4
+simu_options["stepper"]["dtMax"] = 3.0e-3 # 2.0e-4 for "explicit_euler", 3.0e-3 for "runge_kutta_dopri5"
 simu_options["stepper"]["iterMax"] = 100000
 simu_options["stepper"]["sensorsUpdatePeriod"] = 0.0
 simu_options["stepper"]["controllerUpdatePeriod"] = 0.0
@@ -88,14 +88,14 @@ simulator.set_controller_options(ctrl_options)
 
 ################################ Run the simulation #####################################
 
-Kp = np.array([[20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
-                20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0]]).T
-Kd = np.array([[250.0, 150.0, 100.0, 100.0, 150.0, 100.0, 
-                250.0, 150.0, 100.0, 100.0, 150.0, 100.0]]).T
-controller = pid_feedforward(trajectory_data, Kp, Kd)
+Kp = np.array([[41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
+                41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0]]).T
+Kd = np.array([[500.0, 160.0, 120.0, 270.0, 15.0, 20.0,
+                500.0, 160.0, 120.0, 270.0, 15.0, 20.0]]).T
+controller = pid_feedforward(simulator, trajectory_data, Kp, Kd)
 
-def callback(t, x):
-    return bool(x[2] > 0)
+def callback(t, x, out):
+    out[0] = x[2] > 0 # [0] is needed to avoid assignment (here it copies the left value into the right reference instead)
 
 x0 = get_initial_state_simulation(trajectory_data)
 tf = 3.0
@@ -109,7 +109,7 @@ simulator.simulate(x0, tf, controller.compute_command, callback)
 end = time.time()
 print("Simulation time: %03.0fms" %((end - start)*1.0e3))
 
-################################## Display the results ##################################
+############################### Extract the results #####################################
 
 log_info, log_data = simulator.get_log()
 log_info = list(log_info)
@@ -117,17 +117,19 @@ log_data = np.asarray(log_data)
 log_constants = log_info[1:log_info.index('StartColumns')]
 log_header = log_info[(log_info.index('StartColumns')+1):-1]
 
-# Plot some data using standard tools only
-# plt.plot(log_data[:,["Global.Time" in field for field in log_header]],
-#          log_data[:,[sensors_options['ImuSensor'].keys()[0] in field for field in log_header]])
-# plt.show()
-
 print('%i log points' % log_data.shape[0])
 print(log_constants)
 trajectory_data_log = extract_state_from_simulation_log(urdf_path, log_header, log_data)
 
 nb_steps = int(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evolution_robot'][-1].t)
 trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
+
+############################## Display the results ######################################
+
+# Plot some data using standard tools only
+# plt.plot(log_data[:,["Global.Time" in field for field in log_header]],
+#          log_data[:,[sensors_options['ImuSensor'].keys()[0] in field for field in log_header]])
+# plt.show()
 
 # Display the simulation trajectory and the reference
 # play_trajectories([trajectory_data_ref, trajectory_data_log], xyz_offset=[None, None], urdf_rgba=[(1.0,0.0,0.0,0.5), None], speed_ratio=0.5)

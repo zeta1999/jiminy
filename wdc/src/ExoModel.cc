@@ -10,7 +10,7 @@ namespace exo_simu
     toesNames_(),
     toesVelocityIdx_()
     {
-        /* Model constructor calls the base implementations of the virtual methods since the derived 
+        /* Model constructor calls the base implementations of the virtual methods since the derived
            class is not available at this point. Thus it must be called explicitly in the constructor. */
         setOptions(getDefaultOptions());
     }
@@ -50,19 +50,18 @@ namespace exo_simu
             jointsNames_.assign(pncModel_.names.begin() + 2, pncModel_.names.end());
             toesNames_ = jointsNames_;
 
+            // Separate the toes froms the other joints since they are not actuated nor physically meaningful
             auto detectToeFct = [](std::string const & joint) -> bool
                                 {
                                     return joint.find("Toe") != std::string::npos;
                                 };
-
-            // Separate the toes froms the other joints since they are not actuated nor physically meaningful
-            jointsNames_.erase(std::remove_if(jointsNames_.begin(), 
+            jointsNames_.erase(std::remove_if(jointsNames_.begin(),
                                               jointsNames_.end(),
-                                              detectToeFct), 
+                                              detectToeFct),
                                jointsNames_.end());
-            toesNames_.erase(std::remove_if(toesNames_.begin(), 
+            toesNames_.erase(std::remove_if(toesNames_.begin(),
                                             toesNames_.end(),
-                                            not_f(detectToeFct)), 
+                                            not_f(detectToeFct)),
                              toesNames_.end());
 
             /* Update the joint names manually to avoid calling back Model::initialize
@@ -94,14 +93,14 @@ namespace exo_simu
                 // Create a new IMU sensor
                 returnCode = addSensor(imuName, imuSensor);
             }
-            
+
             if (returnCode == result_t::SUCCESS)
             {
                 // Configure the sensor
                 imuSensor->initialize(imuFramesIdx[i]);
             }
         }
-        
+
         // ********** Add the force sensors **********
         for (uint32_t i = 0; i<contactFramesNames_.size(); i++)
         {
@@ -132,7 +131,7 @@ namespace exo_simu
                 // Create a new encoder sensor
                 returnCode = addSensor(encoderName, encoderSensor);
             }
-            
+
             if (returnCode == result_t::SUCCESS)
             {
                 // Configure the sensor

@@ -8,6 +8,7 @@
 #define WDC_EXO_SIMULATOR_PYTHON_H
 
 #include <boost/weak_ptr.hpp>
+
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/dict.hpp>
@@ -17,7 +18,6 @@
 #include "exo_simu/wdc/ExoModel.h"
 #include "exo_simu/wdc/ExoController.h"
 #include "exo_simu/python/Utilities.h"
-
 
 namespace exo_simu
 {
@@ -58,7 +58,7 @@ namespace python
         }
 
         result_t simulate(vectorN_t     const & x_init,
-                          float64_t     const & end_time, 
+                          float64_t     const & end_time,
                           commandFct_t          commandFct,
                           callbackFct_t         callbackFct)
         {
@@ -83,9 +83,9 @@ namespace python
         {
             if (pyEnginePtr_.use_count())
             {
-                return pyEnginePtr_.lock(); 
-            } 
-            else 
+                return pyEnginePtr_.lock();
+            }
+            else
             {
                 boost::shared_ptr<PyEngine> strong = boost::shared_ptr<PyEngine>(new PyEngine());
                 pyEnginePtr_ = strong;
@@ -115,7 +115,14 @@ namespace python
                          matrixN_t const & encoderSensorsData,
                          vectorN_t       & uCommand)
         {
-            uCommand = bp::extract<vectorN_t>(funcPyPtr_(t, q, v, forceSensorsData, imuSensorsData, encoderSensorsData));
+            // Pass the arguments by reference (be careful const qualifiers are lost)
+            bp::handle<> qPy(getPyReferenceFromVector(q));
+            bp::handle<> vPy(getPyReferenceFromVector(v));
+            bp::handle<> forceSensorsDataPy(getPyReferenceFromMatrix(forceSensorsData));
+            bp::handle<> imuSensorsDataPy(getPyReferenceFromMatrix(imuSensorsData));
+            bp::handle<> encoderSensorsDataPy(getPyReferenceFromMatrix(encoderSensorsData));
+            bp::handle<> uCommandPy(getPyReferenceFromVector(uCommand, pyVector_t::matrixCol));
+            funcPyPtr_(t, qPy, vPy, forceSensorsDataPy, imuSensorsDataPy, encoderSensorsDataPy, uCommandPy);
         }
     private:
         bp::object funcPyPtr_;
@@ -124,10 +131,17 @@ namespace python
     struct callbackPyWrapper {
     public:
         callbackPyWrapper(bp::object const& objPy) : funcPyPtr_(objPy) {}
-        bool operator() (float64_t const & t, 
+        bool operator() (float64_t const & t,
                          vectorN_t const & x)
         {
-            return bp::extract<bool>(funcPyPtr_(t, x));
+            bool out;
+
+            // Pass the arguments by reference (be careful const qualifiers are lost)
+            bp::handle<> xPy(getPyReferenceFromVector(x));
+            bp::handle<> outPy(getPyReferenceFromScalar(out));
+            funcPyPtr_(t, xPy, outPy);
+
+            return out;
         }
     private:
         bp::object funcPyPtr_;
@@ -145,27 +159,30 @@ namespace python
         {
             cl
                 .def("__init__", bp::make_constructor(&PyEngine::pyEngineFactory))
-                .def("init", &PyEngineVisitor::init, 
+                .def("init", &PyEngineVisitor::init,
                              (bp::arg("self"), "urdf_path"))
-                .def("simulate", &PyEngineVisitor::simulate, 
+                .def("simulate", &PyEngineVisitor::simulate,
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle"))
-                .def("simulate", &PyEngineVisitor::simulate_with_callback, 
+                .def("simulate", &PyEngineVisitor::simulate_with_callback,
                                  (bp::arg("self"), "x_init", "end_time", "controller_handle", "callback_handle"))
                 .def("get_log", &PyEngineVisitor::getLog)
-                .def("write_log", &PyEngineVisitor::writeLog, 
+                .def("write_log", &PyEngineVisitor::writeLog,
                                  (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
-                .def("get_urdf_path", &PyEngineVisitor::getUrdfPath, 
+                .def("register_new_variable", &PyEngineVisitor::registerNewVectorEntry)
+                .def("get_urdf_path", &PyEngineVisitor::getUrdfPath,
                                       bp::return_value_policy<bp::return_by_value>())
-                .def("get_model_options", &PyEngineVisitor::getModelOptions, 
+                .def("get_joint_names", &PyEngineVisitor::getJointsName,
+                                        bp::return_value_policy<bp::return_by_value>())
+                .def("get_model_options", &PyEngineVisitor::getModelOptions,
                                           bp::return_value_policy<bp::return_by_value>())
                 .def("set_model_options", &PyEngineVisitor::setModelOptions)
-                .def("get_sensors_options", &PyEngineVisitor::getSensorsOptions, 
+                .def("get_sensors_options", &PyEngineVisitor::getSensorsOptions,
                                           bp::return_value_policy<bp::return_by_value>())
                 .def("set_sensors_options", &PyEngineVisitor::setSensorsOptions)
-                .def("get_controller_options", &PyEngineVisitor::getControllerOptions, 
+                .def("get_controller_options", &PyEngineVisitor::getControllerOptions,
                                                bp::return_value_policy<bp::return_by_value>())
                 .def("set_controller_options", &PyEngineVisitor::setControllerOptions)
-                .def("get_simulation_options", &PyEngineVisitor::getSimulationOptions, 
+                .def("get_simulation_options", &PyEngineVisitor::getSimulationOptions,
                                                bp::return_value_policy<bp::return_by_value>())
                 .def("set_simulation_options", &PyEngineVisitor::setSimulationOptions)
                 ;
@@ -189,7 +206,7 @@ namespace python
                              bp::object const & controllerPy)
         {
             controllerPyWrapper controllerFct = controllerPyWrapper(controllerPy);
-            callbackFct_t callbackFct = [](float64_t const & t, 
+            callbackFct_t callbackFct = [](float64_t const & t,
                                            vectorN_t const & x) -> bool
             {
                 return true;
@@ -208,7 +225,7 @@ namespace python
             self.simulate(x_init, end_time, controllerFct, callbackFct);
         }
 
-        static void writeLog(PyEngine          & self, 
+        static void writeLog(PyEngine          & self,
                              std::string const & filename,
                              bool        const & isModeBinary)
         {
@@ -220,6 +237,15 @@ namespace python
             {
                 self.simulator_.writeLogTxt(filename);
             }
+        }
+
+        static void registerNewVectorEntry(PyEngine       & self,
+                                           bp::list const & fieldNamesPy,
+                                           PyObject       * data)
+        {
+            std::vector<std::string> fieldNames = toStdVector<std::string>(fieldNamesPy);
+            Eigen::Map<vectorN_t> dataEigen((double *) PyArray_DATA(reinterpret_cast<PyArrayObject *>(data)), fieldNames.size());
+            self.controller_.registerNewVectorEntry(fieldNames, dataEigen); // OK: dataEigen.data() share the same pointer as the input numpy array
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -239,6 +265,11 @@ namespace python
             return self.model_.getUrdfPath();
         }
 
+        static std::vector<std::string> getJointsName(PyEngine & self)
+        {
+            return self.model_.getJointsName();
+        }
+
         static bp::dict getModelOptions(PyEngine & self)
         {
             bp::dict configPy;
@@ -246,7 +277,7 @@ namespace python
             return configPy;
         }
 
-        static void setModelOptions(PyEngine       & self, 
+        static void setModelOptions(PyEngine       & self,
                                     bp::dict const & configPy)
         {
             configHolder_t config = self.model_.getOptions();
@@ -261,7 +292,7 @@ namespace python
             return configPy;
         }
 
-        static void setSensorsOptions(PyEngine       & self, 
+        static void setSensorsOptions(PyEngine       & self,
                                     bp::dict const & configPy)
         {
             configHolder_t config = self.model_.getSensorsOptions();
@@ -277,7 +308,7 @@ namespace python
             return configPy;
         }
 
-        static void setControllerOptions(PyEngine       & self, 
+        static void setControllerOptions(PyEngine       & self,
                                          bp::dict const & configPy)
         {
             configHolder_t config = self.controller_.getOptions();
@@ -292,7 +323,7 @@ namespace python
             return configPy;
         }
 
-        static void setSimulationOptions(PyEngine       & self, 
+        static void setSimulationOptions(PyEngine       & self,
                                          bp::dict const & configPy)
         {
             configHolder_t config = self.simulator_.getOptions();
@@ -305,13 +336,14 @@ namespace python
         ///////////////////////////////////////////////////////////////////////////////
         static void expose()
         {
+            import_array(); // Required to create Py arrays
             bp::to_python_converter<std::vector<float64_t>, VecToList<float64_t> >();
             bp::to_python_converter<std::vector<vectorN_t>, VecToList<vectorN_t> >();
             bp::to_python_converter<std::vector<matrixN_t>, VecToList<matrixN_t> >();
             bp::to_python_converter<std::vector<std::vector<float64_t> >, VecToList<std::vector<float64_t> > >();
             bp::class_<PyEngine, boost::shared_ptr<PyEngine>, boost::noncopyable>("simulator").def(PyEngineVisitor());
         }
-        
+
     };
 }  // End of namespace python.
 }  // End of namespace exo_simu.

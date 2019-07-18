@@ -27,7 +27,7 @@ namespace exo_simu
 
     result_t AbstractController::initialize(Model const & model)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         if (!model.getIsInitialized())
         {
@@ -90,7 +90,7 @@ namespace exo_simu
 
     result_t AbstractController::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         if (!getIsInitialized())
         {
@@ -105,9 +105,9 @@ namespace exo_simu
                 if (ctrlOptions_->telemetryEnable)
                 {
                     telemetrySender_.configureObject(telemetryData, CONTROLLER_OBJECT_NAME);
-                    for (std::pair<std::vector<std::string>, vectorN_t const &> const & registeredVariable : registeredInfo_)
+                    for (std::pair<std::string, float64_t const *> const & registeredVariable : registeredInfo_)
                     {
-                        (void) exo_simu::registerNewVectorEntry(telemetrySender_, registeredVariable.first, registeredVariable.second);
+                        (void) telemetrySender_.registerNewEntry<float64_t>(registeredVariable.first, *registeredVariable.second);
                     }
                     isTelemetryConfigured_ = true;
                 }
@@ -122,21 +122,38 @@ namespace exo_simu
         return returnCode;
     }
 
-    void AbstractController::registerNewVectorEntry(std::vector<std::string> const & fieldNames,
-                                                    vectorN_t                const & values)
+    result_t AbstractController::registerNewVectorEntry(std::vector<std::string> const & fieldNames,
+                                                        Eigen::Ref<vectorN_t>    const & values)
     {
         // Delayed variable registration (Taken into account by 'configureTelemetry')
 
-        registeredInfo_.emplace_back(fieldNames, values);
+        result_t returnCode = result_t::SUCCESS;
+
+        if (getIsTelemetryConfigured())
+        {
+            std::cout << "Error - AbstractController::registerNewVectorEntry - Telemetry already initialized. Impossible to register new variables." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
+            for (uint32_t i=0; fieldIt != fieldNames.end(); ++fieldIt, ++i)
+            {
+                registeredInfo_.emplace_back(*fieldIt, values.data() + i);
+            }
+        }
+
+        return returnCode;
     }
 
     void AbstractController::updateTelemetry(void)
     {
         if (getIsTelemetryConfigured())
         {
-            for (std::pair<std::vector<std::string>, vectorN_t const &> const & registeredVariable : registeredInfo_)
+            for (std::pair<std::string, float64_t const *> const & registeredVariable : registeredInfo_)
             {
-                updateVectorValue(telemetrySender_, registeredVariable.first, registeredVariable.second);
+                telemetrySender_.updateValue(registeredVariable.first, *registeredVariable.second);
             }
         }
     }
