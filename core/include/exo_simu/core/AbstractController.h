@@ -42,7 +42,7 @@ namespace exo_simu
         virtual ~AbstractController(void);
 
         virtual result_t initialize(Model const & model);
-        virtual void reset(void);
+        virtual void reset(bool const & resetTelemetry = false);
 
         result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
         result_t registerNewVectorEntry(std::vector<std::string> const & fieldNames,

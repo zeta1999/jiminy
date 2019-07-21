@@ -131,6 +131,10 @@ class pid_feedforward:
         self.time_offset = 0
         self.current_state = self.state_machine.keys()[0]
         self.traj_ref = self.get_traj_ref()
+        self.q_ref = self.traj_ref.q[:, [0]]
+        self.dq_ref = self.traj_ref.dq[:, [0]]
+        self.u_ref = self.traj_ref.u[:, [0]]
+
 
     def get_traj_ref(self, state=None):
         if state is None:

@@ -403,6 +403,10 @@ namespace exo_simu
         result_t initialize(Model              & model,
                             AbstractController & controller,
                             callbackFct_t        callbackFct);
+        void reset(bool const & resetTelemetry = false);
+
+        result_t configureTelemetry(void);
+        void updateTelemetry(void);
 
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
@@ -410,6 +414,7 @@ namespace exo_simu
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & engineOptions);
         bool getIsInitialized(void) const;
+        bool getIsTelemetryConfigured(void) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
         void getLogData(std::vector<std::string> & header,

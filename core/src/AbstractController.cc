@@ -41,7 +41,7 @@ namespace exo_simu
 
             try
             {
-                // isInitialized_ must be true to run 'computeCommand' and 'internalDynamics'
+                // isInitialized_ must be true to execute the 'computeCommand' and 'internalDynamics' methods
                 isInitialized_ = true;
                 float64_t t = 0;
                 vectorN_t q = vectorN_t::Zero(model_->nq());
@@ -83,9 +83,14 @@ namespace exo_simu
         return returnCode;
     }
 
-    void AbstractController::reset(void)
+    void AbstractController::reset(bool const & resetTelemetry)
     {
-        // Empty.
+        // Reset the telemetry state
+        if (resetTelemetry)
+        {
+            registeredInfo_.clear();
+            isTelemetryConfigured_ = false;
+        }
     }
 
     result_t AbstractController::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)

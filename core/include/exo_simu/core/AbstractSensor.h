@@ -7,7 +7,7 @@
 #include "exo_simu/core/Model.h"
 
 namespace exo_simu
-{    
+{
     static uint8_t const MIN_DELAY_BUFFER_RESERVE(20);
     static uint8_t const MAX_DELAY_BUFFER_EXCEED(20);
 
@@ -60,7 +60,7 @@ namespace exo_simu
                            std::string const & name);
         virtual ~AbstractSensorBase(void);
 
-        virtual void reset(void) = 0;
+        virtual void reset(bool const & resetTelemetry = false) = 0;
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
 
         configHolder_t getOptions(void);
@@ -92,7 +92,7 @@ namespace exo_simu
 
     public:
         std::unique_ptr<abstractSensorOptions_t const> sensorOptions_;
-        
+
     protected:
         configHolder_t sensorOptionsHolder_;
         TelemetrySender telemetrySender_;
@@ -120,7 +120,7 @@ namespace exo_simu
                           std::string                         const & name);
         virtual ~AbstractSensorTpl(void);
 
-        virtual void reset(void) override;
+        virtual void reset(bool const & resetTelemetry = false) override;
 
         virtual void setOptions(configHolder_t const & sensorOptions) override;
         virtual void setOptionsAll(configHolder_t const & sensorOptions) override;

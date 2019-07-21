@@ -5,16 +5,16 @@
 
 namespace exo_simu
 {
-    MemoryDevice::MemoryDevice(int64_t size) : 
-    buffer_(static_cast<size_t>(size)), 
+    MemoryDevice::MemoryDevice(int64_t size) :
+    buffer_(static_cast<size_t>(size)),
     currentPos_(0)
     {
         supportedModes_ = OpenMode::READ_ONLY | OpenMode::WRITE_ONLY | OpenMode::READ_WRITE | OpenMode::NON_BLOCKING | OpenMode::APPEND;
     }
 
 
-    MemoryDevice::MemoryDevice(MemoryDevice const& other) : 
-    buffer_(other.buffer_), 
+    MemoryDevice::MemoryDevice(MemoryDevice const& other) :
+    buffer_(other.buffer_),
     currentPos_(other.currentPos_)
     {
         supportedModes_ = other.supportedModes_;
@@ -22,8 +22,8 @@ namespace exo_simu
     }
 
 
-    MemoryDevice::MemoryDevice(MemoryDevice&& other) : 
-    buffer_(std::move(other.buffer_)), 
+    MemoryDevice::MemoryDevice(MemoryDevice&& other) :
+    buffer_(std::move(other.buffer_)),
     currentPos_(other.currentPos_)
     {
         supportedModes_ = other.supportedModes_;
@@ -31,13 +31,13 @@ namespace exo_simu
         other.close();
     }
 
-    MemoryDevice::MemoryDevice(std::vector<uint8_t>&& initBuffer) : 
-    buffer_(std::move(initBuffer)), 
+    MemoryDevice::MemoryDevice(std::vector<uint8_t>&& initBuffer) :
+    buffer_(std::move(initBuffer)),
     currentPos_(0)
     {
         supportedModes_ = OpenMode::READ_ONLY | OpenMode::WRITE_ONLY | OpenMode::READ_WRITE | OpenMode::NON_BLOCKING | OpenMode::APPEND;
     }
-        
+
     MemoryDevice::~MemoryDevice(void)
     {
         close();

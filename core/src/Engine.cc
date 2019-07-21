@@ -43,10 +43,18 @@ namespace exo_simu
     telemetryRecorder_(nullptr),
     stepperState_()
     {
+        // Initialize the configuration options to the default.
+        setOptions(getDefaultOptions());
+
+        // Initialize the global telemetry data holder
         telemetryData_ = std::make_shared<TelemetryData>();
+        telemetryData_->reset();
+
+        // Initialize the global telemetry recorder
         telemetryRecorder_ = std::make_unique<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
 
-        setOptions(getDefaultOptions());
+        // Initialize the engine-specific telemetry sender
+        telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
     }
 
     Engine::~Engine(void)
@@ -82,22 +90,55 @@ namespace exo_simu
             controller_ = &controller;
         }
 
+        // TODO: Check that the callback function is working as expected
         if (returnCode == result_t::SUCCESS)
         {
-            // TODO: Check that the callback function is working as expected
             callbackFct_ = callbackFct;
+        }
+
+        // Make sure the gravity is properly set at model level
+        if (returnCode == result_t::SUCCESS)
+        {
+            setOptions(engineOptionsHolder_);
+        }
+
+        /* Preconfigure the telemetry with quantities known at compile time.
+           Note that registration is only locked at the beginning of the
+           simulation to enable dynamic registration until then. */
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = configureTelemetry();
         }
 
         if (returnCode == result_t::SUCCESS)
         {
             isInitialized_ = true;
-            setOptions(engineOptionsHolder_); // Make sure the gravity is properly set at model level
         }
 
-        // Initialize the logger
-        stepperState_.initialize(*model_);
-        telemetryData_->reset();
-        telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
+        return returnCode;
+    }
+
+    void Engine::reset(bool const & resetTelemetry)
+    {
+        // Initialize the random number generators
+        resetRandGenerators(engineOptions_->stepper.randomSeed);
+
+        // Reset the internal state of the model and controller
+        model_->reset(resetTelemetry);
+        controller_->reset(resetTelemetry);
+
+        if (resetTelemetry)
+        {
+            // Reset the telemetry
+            telemetryData_->reset();
+        }
+    }
+
+    result_t Engine::configureTelemetry(void)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        // Register variables to the telemetry senders
         if (engineOptions_->telemetry.enableConfiguration)
         {
             (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
@@ -116,13 +157,46 @@ namespace exo_simu
         }
         if (engineOptions_->telemetry.enableEnergy)
         {
-            telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
+            telemetrySender_.registerNewEntry<float64_t>("energy", stepperState_.energyLast);
         }
-        controller_->configureTelemetry(telemetryData_);
-        model_->configureTelemetry(telemetryData_);
-        telemetryRecorder_->initialize();
+
+        returnCode = controller_->configureTelemetry(telemetryData_);
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = model_->configureTelemetry(telemetryData_);
+        }
 
         return returnCode;
+    }
+
+    void Engine::updateTelemetry(void)
+    {
+        // Update the telemetry internal state
+        if (engineOptions_->telemetry.enableConfiguration)
+        {
+            updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+        }
+        if (engineOptions_->telemetry.enableVelocity)
+        {
+            updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+        }
+        if (engineOptions_->telemetry.enableAcceleration)
+        {
+            updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+        }
+        if (engineOptions_->telemetry.enableCommand)
+        {
+            updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+        }
+        if (engineOptions_->telemetry.enableEnergy)
+        {
+            telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
+        }
+        controller_->updateTelemetry();
+        model_->updateTelemetry();
+
+        // Flush the telemetry internal state
+        telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
     }
 
     result_t Engine::simulate(vectorN_t const & x_init,
@@ -174,16 +248,12 @@ namespace exo_simu
             return result_t::ERROR_BAD_INPUT;
         }
 
-
-        // initialize the random number generators
-        resetRandGenerators(engineOptions_->stepper.randomSeed);
-        model_->reset();
-        controller_->reset();
-
-        // Initialize the logger, model, and stepper internal state
-        model_->pncData_ = pinocchio::Data(model_->pncModel_);
+        // Reset the model, controller, engine (soft reset), and stepper internal state
+        reset(false);
         stepperState_.initialize(*model_, x_init);
         systemDynamics(0, stepperState_.x, stepperState_.dxdt);
+
+        // Reset the telemetry recorder, write the header, and lock the registration of new variables
         telemetryRecorder_->initialize();
 
         // Compute the breakpoints' period (for command or observation) during the integration loop
@@ -220,29 +290,7 @@ namespace exo_simu
         while (true)
         {
             // Log the current time, state, command, and sensors
-            if (engineOptions_->telemetry.enableConfiguration)
-            {
-                updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
-            }
-            if (engineOptions_->telemetry.enableVelocity)
-            {
-                updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
-            }
-            if (engineOptions_->telemetry.enableAcceleration)
-            {
-                updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
-            }
-            if (engineOptions_->telemetry.enableCommand)
-            {
-                updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
-            }
-            if (engineOptions_->telemetry.enableEnergy)
-            {
-                telemetrySender_.updateValue<float64_t>("energy", stepperState_.energyLast);
-            }
-            controller_->updateTelemetry();
-            model_->updateTelemetry();
-            telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
+            updateTelemetry();
 
             /* Stop the simulation if the end time has been reached, if
                the callback returns false, or if the number of integration

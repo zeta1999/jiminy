@@ -83,7 +83,9 @@ namespace python
         {
             if (pyEnginePtr_.use_count())
             {
-                return pyEnginePtr_.lock();
+                boost::shared_ptr<PyEngine> pyEnginePtrStrong = pyEnginePtr_.lock();
+                pyEnginePtrStrong->simulator_.reset(true);
+                return pyEnginePtrStrong;
             }
             else
             {

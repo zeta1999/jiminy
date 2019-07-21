@@ -52,7 +52,8 @@ namespace exo_simu
         removeSensors();
         contactFramesNames_ = contactFramesNames;
         jointsNames_ = jointsNames;
-        returnCode = setUrdfPath(urdfPath, hasFreeflyer);
+        returnCode = loadUrdfModel(urdfPath, hasFreeflyer);
+        pncData_ = pinocchio::Data(pncModel_);
 
         // Update the bounds if necessary
         if (returnCode == result_t::SUCCESS)
@@ -79,15 +80,21 @@ namespace exo_simu
         return returnCode;
     }
 
-    void Model::reset(void)
+    void Model::reset(bool const & resetTelemetry)
     {
         // Reset the sensors
         for (sensorsGroupHolder_t::value_type & sensorGroup : sensorsGroupHolder_)
         {
             for (sensorsHolder_t::value_type & sensor : sensorGroup.second)
             {
-                sensor.second->reset();
+                sensor.second->reset(resetTelemetry);
             }
+        }
+
+        // Reset the telemetry state if needed
+        if (resetTelemetry)
+        {
+            isTelemetryConfigured_ = false;
         }
     }
 
@@ -125,7 +132,7 @@ namespace exo_simu
         {
             // Remove the sensor from its group
             sensorGroupIt->second.erase(sensorIt);
-            
+
             // Remove the sensor group if there is no more sensors left.
             if (sensorGroupIt->second.empty())
             {
@@ -152,7 +159,7 @@ namespace exo_simu
             sensorsGroupHolder_.erase(sensorGroupIt);
             sensorsDataHolder_.erase(sensorType);
         }
-        
+
         return returnCode;
     }
 
@@ -161,7 +168,7 @@ namespace exo_simu
         sensorsGroupHolder_.clear();
         sensorsDataHolder_.clear();
     }
-    
+
     configHolder_t Model::getSensorsOptions(std::string const & sensorType) const
     {
         configHolder_t sensorsOptions;
@@ -230,7 +237,7 @@ namespace exo_simu
             }
         }
     }
-    
+
     configHolder_t Model::getOptions(void) const
     {
         return mdlOptionsHolder_;
@@ -300,14 +307,14 @@ namespace exo_simu
         return sensorNames;
     }
 
-    result_t Model::setUrdfPath(std::string const & urdfPath, 
-                                bool        const & hasFreeflyer)
+    result_t Model::loadUrdfModel(std::string const & urdfPath,
+                                  bool        const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
 
         if (!std::ifstream(urdfPath.c_str()).good())
         {
-            std::cout << "Error - Model::setUrdfPath - The URDF file does not exist. Impossible to load it." << std::endl;
+            std::cout << "Error - Model::loadUrdfModel - The URDF file does not exist. Impossible to load it." << std::endl;
             returnCode = result_t::ERROR_BAD_INPUT;
         }
         urdfPath_ = urdfPath;
@@ -329,7 +336,7 @@ namespace exo_simu
             }
             catch (std::exception& e)
             {
-                std::cout << "Error - Model::setUrdfPath - Something is wrong with the URDF. Impossible to build a model from it." << std::endl;
+                std::cout << "Error - Model::loadUrdfModel - Something is wrong with the URDF. Impossible to build a model from it." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }

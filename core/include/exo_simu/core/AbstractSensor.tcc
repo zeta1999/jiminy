@@ -21,7 +21,7 @@ namespace exo_simu
         dataHolder_->counters_.push_back(1);
 
         // Reset the sensors' internal state
-        AbstractSensorTpl<T>::reset();
+        AbstractSensorTpl<T>::reset(true);
     }
 
     template <typename T>
@@ -35,7 +35,7 @@ namespace exo_simu
             {
                 for (matrixN_t & data : dataHolder_->data_)
                 {
-                    data.block(0, sensorId_, getSize(), dataHolder_->num_ - sensorId_ - 1) = 
+                    data.block(0, sensorId_, getSize(), dataHolder_->num_ - sensorId_ - 1) =
                         data.block(0, sensorId_ + 1, getSize(), dataHolder_->num_ - sensorId_ - 1).eval(); // eval to avoid aliasing
                 }
             }
@@ -60,11 +60,11 @@ namespace exo_simu
         }
 
         // Reset the sensors' internal state
-        reset();
+        reset(false);
     }
 
     template <typename T>
-    void AbstractSensorTpl<T>::reset(void)
+    void AbstractSensorTpl<T>::reset(bool const & resetTelemetry)
     {
         dataHolder_->time_.resize(2);
         std::fill(dataHolder_->time_.begin(), dataHolder_->time_.end(), -1);
@@ -92,7 +92,7 @@ namespace exo_simu
             sensor->setOptions(sensorOptions);
         }
     }
-    
+
     template <typename T>
     std::string AbstractSensorTpl<T>::getType(void) const
     {
@@ -128,16 +128,16 @@ namespace exo_simu
     template <typename T>
     result_t AbstractSensorTpl<T>::get(Eigen::Ref<vectorN_t> data)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         if (!isDataUpToDate_)
         {
             // Add 1e-9 to timeDesired to avoid float comparison issues (std::numeric_limits<float64_t>::epsilon() is not enough)
             float64_t const timeDesired = dataHolder_->time_.back() - sensorOptions_->delay + 1e-9;
 
-            /* Determine the position of the closest right element. 
+            /* Determine the position of the closest right element.
                Bisection method can be used since times are sorted. */
-            auto bisectLeft = 
+            auto bisectLeft =
                 [&](void) -> int32_t
                 {
                     int32_t left = 0;
@@ -194,8 +194,8 @@ namespace exo_simu
                 }
                 else if (sensorOptions_->delayInterpolationOrder == 1)
                 {
-                    data_ = 1 / (dataHolder_->time_[inputIndexLeft + 1] - dataHolder_->time_[inputIndexLeft]) * 
-                        ((timeDesired - dataHolder_->time_[inputIndexLeft]) * dataHolder_->data_[inputIndexLeft + 1].col(sensorId_) + 
+                    data_ = 1 / (dataHolder_->time_[inputIndexLeft + 1] - dataHolder_->time_[inputIndexLeft]) *
+                        ((timeDesired - dataHolder_->time_[inputIndexLeft]) * dataHolder_->data_[inputIndexLeft + 1].col(sensorId_) +
                         (dataHolder_->time_[inputIndexLeft + 1] - timeDesired) * dataHolder_->data_[inputIndexLeft].col(sensorId_));
                 }
                 else
@@ -241,7 +241,7 @@ namespace exo_simu
     template <typename T>
     result_t AbstractSensorTpl<T>::getAll(matrixN_t & data)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         data.resize(dataHolder_->data_[0].rows(), dataHolder_->num_);
         for (AbstractSensorBase * sensor : dataHolder_->sensors_)
@@ -252,7 +252,7 @@ namespace exo_simu
                 returnCode = sensor->get(data.col(sensorId));
             }
         }
-        
+
         return returnCode;
     }
 
@@ -263,7 +263,7 @@ namespace exo_simu
                                           vectorN_t const & a,
                                           vectorN_t const & u)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         /* Make sure at least the requested delay plus the maximum time step
            is available to handle the case where the solver goes back in time */
@@ -275,7 +275,7 @@ namespace exo_simu
             if (dataHolder_->time_[0] < 0 || timeMin > dataHolder_->time_[1])
             {
                 // Remove some unecessary extra elements if appropriate
-                if (dataHolder_->time_.size() > 2 + MAX_DELAY_BUFFER_EXCEED 
+                if (dataHolder_->time_.size() > 2 + MAX_DELAY_BUFFER_EXCEED
                 && timeMin > dataHolder_->time_[2 + MAX_DELAY_BUFFER_EXCEED])
                 {
                     for (uint8_t i=0; i < 1 + MAX_DELAY_BUFFER_EXCEED; i ++)
@@ -300,7 +300,7 @@ namespace exo_simu
                     dataHolder_->time_.rset_capacity(dataHolder_->time_.size() + 1 + MIN_DELAY_BUFFER_RESERVE);
                     dataHolder_->data_.rset_capacity(dataHolder_->data_.size() + 1 + MIN_DELAY_BUFFER_RESERVE);
                 }
-                
+
                 // Push back new empty buffer (Do NOT initialize it for efficiency)
                 dataHolder_->time_.push_back();
                 dataHolder_->data_.push_back();

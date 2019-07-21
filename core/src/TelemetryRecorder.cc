@@ -18,10 +18,10 @@ namespace exo_simu
     recordedBytesLimits_(0),
     recordedBytesDataLine_(0),
     recordedBytes_(0),
-    headerSize_(0), 
-    integersAddress_(), 
-    integerSectionSize_(0), 
-    floatsAddress_(), 
+    headerSize_(0),
+    integersAddress_(),
+    integerSectionSize_(0),
+    floatsAddress_(),
     floatSectionSize_(0)
     {
         // Empty.
@@ -38,8 +38,8 @@ namespace exo_simu
 
         // Get telemetry data infos.
         telemetryData_->getData(integersAddress_,
-                                integerSectionSize_, 
-                                floatsAddress_, 
+                                integerSectionSize_,
+                                floatsAddress_,
                                 floatSectionSize_);
         recordedBytesDataLine_ = integerSectionSize_ + floatSectionSize_ + static_cast<int64_t>(START_LINE_TOKEN.size() + sizeof(uint32_t));
 
@@ -47,6 +47,12 @@ namespace exo_simu
         std::vector<char_t> header;
         telemetryData_->formatHeader(header);
         headerSize_ = header.size();
+
+        // Close the current MemoryDevice, if any and if it was opened.
+        if (!flows_.empty())
+        {
+            flows_.back().close();
+        }
 
         // Create a new MemoryDevice and open it.
         flows_.clear();
@@ -57,10 +63,6 @@ namespace exo_simu
         {
             returnCode = flows_[0].write(header);
             recordedBytes_ = headerSize_;
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
         }
 
         return returnCode;
@@ -75,7 +77,7 @@ namespace exo_simu
         {
             flows_.back().close();
         }
-        
+
         // Create a new one.
         uint32_t isHeaderThere = flows_.empty();
         uint32_t maxRecordedDataLines = ((MAX_BUFFER_SIZE - isHeaderThere*headerSize_) / recordedBytesDataLine_);
@@ -92,7 +94,7 @@ namespace exo_simu
             std::cout << "Error - TelemetryRecorder::createNewChunk - Impossible to create a new chunk of memory buffer." << std::endl;
             returnCode = result_t::ERROR_GENERIC;
         }
-        
+
         return returnCode;
     }
 
@@ -128,9 +130,9 @@ namespace exo_simu
 
     void TelemetryRecorder::writeDataBinary(std::string const & filename)
     {
-        std::ofstream myfile = std::ofstream(filename, 
-                                             std::ios::out | 
-                                             std::ios::binary | 
+        std::ofstream myfile = std::ofstream(filename,
+                                             std::ios::out |
+                                             std::ios::binary |
                                              std::ofstream::trunc);
 
         for (uint32_t i=0; i<flows_.size(); i++)
@@ -152,9 +154,9 @@ namespace exo_simu
         myfile.close();
     }
 
-    void TelemetryRecorder::getData(std::vector<std::string>             & header, 
-                                    std::vector<float32_t>               & timestamps, 
-                                    std::vector<std::vector<int32_t> >   & intData, 
+    void TelemetryRecorder::getData(std::vector<std::string>             & header,
+                                    std::vector<float32_t>               & timestamps,
+                                    std::vector<std::vector<int32_t> >   & intData,
                                     std::vector<std::vector<float32_t> > & floatData)
     {
         header.clear();
@@ -167,7 +169,7 @@ namespace exo_simu
         intDataLine.resize(integerSectionSize_ / sizeof(int32_t));
         std::vector<float32_t> floatDataLine;
         floatDataLine.resize(floatSectionSize_ / sizeof(float32_t));
-        
+
         for (uint32_t i=0; i<flows_.size(); i++)
         {
             int64_t pos_old = flows_[i].pos();

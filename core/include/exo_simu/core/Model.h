@@ -84,7 +84,7 @@ namespace exo_simu
                             std::vector<std::string> const & contactFramesNames,
                             std::vector<std::string> const & jointsNames,
                             bool                     const & hasFreeflyer = true);
-        void reset(void);
+        virtual void reset(bool const & resetTelemetry = false);
 
         template<typename TSensor>
         result_t addSensor(std::string              const & sensorName,
@@ -129,15 +129,14 @@ namespace exo_simu
         uint32_t nv(void) const;
         uint32_t nx(void) const;
 
-    protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
-        
+
         template<typename TSensor>
         std::shared_ptr<TSensor> getSensor(std::string const & sensorType,
                                            std::string const & sensorName);
 
-        result_t setUrdfPath(std::string const & urdfPath, 
-                             bool        const & hasFreeflyer);
+        result_t loadUrdfModel(std::string const & urdfPath,
+                               bool        const & hasFreeflyer);
         result_t getFrameIdx(std::string const & frameName,
                              int32_t           & frameIdx) const;
         result_t getFramesIdx(std::vector<std::string> const & framesNames,
@@ -192,7 +191,7 @@ namespace exo_simu
         ~SensorDataHolder_t(void)
         {
             // Empty.
-        }; 
+        };
 
         boost::circular_buffer_space_optimized<float64_t> time_;
         boost::circular_buffer_space_optimized<matrixN_t> data_;

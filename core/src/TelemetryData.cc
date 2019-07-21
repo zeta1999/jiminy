@@ -12,12 +12,12 @@
 namespace exo_simu
 {
     TelemetryData::TelemetryData() :
-    constantsMem_("telemetryConstants", CONSTANTS_MEM_SIZE), 
-    constantsHeader_(), 
-    integersMem_("telemetryIntegers", INTEGERS_MEM_SIZE), 
-    integersHeader_(), 
-    floatsMem_("telemetryFloats", FLOATS_MEM_SIZE), 
-    floatsHeader_(), 
+    constantsMem_("telemetryConstants", CONSTANTS_MEM_SIZE),
+    constantsHeader_(),
+    integersMem_("telemetryIntegers", INTEGERS_MEM_SIZE),
+    integersHeader_(),
+    floatsMem_("telemetryFloats", FLOATS_MEM_SIZE),
+    floatsHeader_(),
     entriesMap_()
     {
         constantsMem_.create();
@@ -83,16 +83,16 @@ namespace exo_simu
         struct memHeader * const header = constantsHeader_;
         char_t * const memAddress = reinterpret_cast<char_t *>(header);
 
-        if (not header->isRegisteringAvailable)
+        if (!header->isRegisteringAvailable)
         {
-            std::cout << "result_t - TelemetryData::registerConstant - TODO" << std::endl; //TODO: write appropriate error message
+            std::cout << "result_t - TelemetryData::registerConstant - Registration is locked." << std::endl;
             return result_t::ERROR_GENERIC;
         }
 
         std::string const fullConstant = variableNameIn + "=" + constantValueIn;
         if ((header->nextFreeNameOffset + static_cast<int64_t>(fullConstant.size()) + 1) >= header->startDataSection)
         {
-            std::cout << "result_t - TelemetryData::registerConstant - TODO" << std::endl; //TODO: write appropriate error message
+            std::cout << "result_t - TelemetryData::registerConstant - Maximum number of registration exceeded." << std::endl;
             return result_t::ERROR_GENERIC;
         }
 
@@ -110,7 +110,7 @@ namespace exo_simu
         return result_t::SUCCESS;;
     }
 
-    int32_t TelemetryData::findEntry(struct memHeader        * header, 
+    int32_t TelemetryData::findEntry(struct memHeader        * header,
                                      std::string       const & name)
     {
         char_t * const memAddress = reinterpret_cast<char_t *>(header);
@@ -165,7 +165,7 @@ namespace exo_simu
                                          static_cast<int64_t>(sizeof(int32_t)) + 1); // +1 because we add Global.Time
         entriesNumbers += '\0';
         entriesNumbers += NUM_FLOATS;
-        entriesNumbers += std::to_string((floatsHeader_->nextFreeDataOffset - floatsHeader_->startDataSection) / 
+        entriesNumbers += std::to_string((floatsHeader_->nextFreeDataOffset - floatsHeader_->startDataSection) /
                                          static_cast<int64_t>(sizeof(float32_t)));
         entriesNumbers += '\0';
         header.insert(header.end(), entriesNumbers.data(), entriesNumbers.data() + entriesNumbers.size());
@@ -189,9 +189,9 @@ namespace exo_simu
         header.insert(header.end(), START_DATA.data(), START_DATA.data() + START_DATA.size());
     }
 
-    void TelemetryData::getData(char_t  const * & intAddrOut,   
+    void TelemetryData::getData(char_t  const * & intAddrOut,
                                 int64_t         & intSizeOut,
-                                char_t  const * & floatAddrOut, 
+                                char_t  const * & floatAddrOut,
                                 int64_t         & floatSizeOut) const
     {
         char_t * const integermemAddress = reinterpret_cast<char_t *>(integersHeader_);

@@ -95,7 +95,7 @@ namespace exo_simu
         ExoModel(void);
         ~ExoModel(void);
 
-        result_t initialize(std::string          const & urdfPath, 
+        result_t initialize(std::string          const & urdfPath,
                             std::vector<int32_t> const & contactFramesIdx) = delete;
         result_t initialize(std::string const & urdfPath);
 
@@ -105,7 +105,7 @@ namespace exo_simu
     protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData) override;
 
-        result_t setUrdfPath(std::string const & urdfPath);
+        result_t loadUrdfModel(std::string const & urdfPath); // Discourage the use of the method
 
     public:
         std::unique_ptr<exoModelOptions_t const> exoMdlOptions_;
