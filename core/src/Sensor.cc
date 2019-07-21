@@ -15,9 +15,11 @@ namespace exo_simu
     template<>
     std::string const AbstractSensorTpl<ImuSensor>::type_("ImuSensor");
     template<>
-    std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPreProcess_({"w_x", "w_y", "w_z", "a_x", "a_y", "a_z"});
+    bool const AbstractSensorTpl<ImuSensor>::areFieldNamesGrouped_(false);
     template<>
-    std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPostProcess_({"quat_x", "quat_y", "quat_z", "quat_w", "w_x", "w_y", "w_z"});
+    std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPreProcess_({"Gyrox", "Gyroy", "Gyroz", "Accelx", "Accely", "Accelz"});
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<ImuSensor>::fieldNamesPostProcess_({"Quatx", "Quaty", "Quatz", "Quatw", "Gyrox", "Gyroy", "Gyroz"});
 
     ImuSensor::ImuSensor(Model                               const & model,
                          std::shared_ptr<SensorDataHolder_t> const & dataHolder,
@@ -88,9 +90,11 @@ namespace exo_simu
     template<>
     std::string const AbstractSensorTpl<ForceSensor>::type_("ForceSensor");
     template<>
-    std::vector<std::string> const AbstractSensorTpl<ForceSensor>::fieldNamesPreProcess_({"F_x", "F_y", "F_z"});
+    bool const AbstractSensorTpl<ForceSensor>::areFieldNamesGrouped_(false);
     template<>
-    std::vector<std::string> const AbstractSensorTpl<ForceSensor>::fieldNamesPostProcess_({"F_x", "F_y", "F_z"});
+    std::vector<std::string> const AbstractSensorTpl<ForceSensor>::fieldNamesPreProcess_({"FX", "FY", "FZ"});
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<ForceSensor>::fieldNamesPostProcess_({"FX", "FY", "FZ"});
 
     ForceSensor::ForceSensor(Model                               const & model,
                              std::shared_ptr<SensorDataHolder_t> const & dataHolder,
@@ -146,9 +150,11 @@ namespace exo_simu
     template<>
     std::string const AbstractSensorTpl<EncoderSensor>::type_("EncoderSensor");
     template<>
-    std::vector<std::string> const AbstractSensorTpl<EncoderSensor>::fieldNamesPreProcess_({"q"});
+    bool const AbstractSensorTpl<EncoderSensor>::areFieldNamesGrouped_(true);
     template<>
-    std::vector<std::string> const AbstractSensorTpl<EncoderSensor>::fieldNamesPostProcess_({"q", "v"});
+    std::vector<std::string> const AbstractSensorTpl<EncoderSensor>::fieldNamesPreProcess_({"Q"});
+    template<>
+    std::vector<std::string> const AbstractSensorTpl<EncoderSensor>::fieldNamesPostProcess_({"Q", "V"});
 
     EncoderSensor::EncoderSensor(Model                               const & model,
                                  std::shared_ptr<SensorDataHolder_t> const & dataHolder,

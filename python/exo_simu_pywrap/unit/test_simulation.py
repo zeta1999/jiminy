@@ -47,7 +47,7 @@ simu_options = simulator.get_simulation_options()
 ctrl_options = simulator.get_controller_options()
 
 ctrl_options["telemetryEnable"] = True
-model_options["telemetry"]["enableForceSensors"] = False
+model_options["telemetry"]["enableForceSensors"] = True
 model_options["telemetry"]["enableImuSensors"] = True
 model_options["telemetry"]["enableEncoderSensors"] = False
 simu_options["telemetry"]["enableConfiguration"] = True
@@ -74,12 +74,12 @@ simu_options['contacts']['frictionDry'] = 5.0
 simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
 
-for sensorOptions in sensors_options['ImuSensor'].values():
-    sensorOptions['rawData'] = True
-    sensorOptions['noiseStd'] = [5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0]
-sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['bias'] = [-8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0]
-sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['delay'] =  2.0e-3
-sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['delayInterpolationOrder'] = 0
+# for sensorOptions in sensors_options['ImuSensor'].values():
+#     # sensorOptions['rawData'] = True
+#     sensorOptions['noiseStd'] = [5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0]
+# sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['bias'] = [-8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0]
+# sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['delay'] =  2.0e-3
+# sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['delayInterpolationOrder'] = 0
 
 simulator.set_model_options(model_options)
 simulator.set_sensors_options(sensors_options)
@@ -88,10 +88,10 @@ simulator.set_controller_options(ctrl_options)
 
 ################################ Run the simulation #####################################
 
-Kp = np.array([[20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
-                20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0]]).T
-Kd = np.array([[250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
-                250.0, 150.0, 100.0, 100.0, 150.0, 100.0]]).T
+Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0,
+               20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0])
+Kd = np.array([250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
+               250.0, 150.0, 100.0, 100.0, 150.0, 100.0])
 controller = pid_feedforward(simulator, trajectory_data, Kp, Kd)
 
 def callback(t, x, out):
@@ -142,5 +142,5 @@ trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 # log = LogFile("/tmp/blackbox/log.data")
 
 # Plot some data using logviewer
-# plt.plot(log.parser.get_data("Global.Time"), log.parser.get_data("ImuSensor.PelvisIMU.w_y"))
+# plt.plot(log.parser.get_data("Global.Time"), log.parser.get_data("PelvisIMU.Gyroy"))
 # plt.show()

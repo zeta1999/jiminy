@@ -11,7 +11,7 @@ namespace exo_simu
     telemetrySender_(),
     isInitialized_(false),
     isTelemetryConfigured_(false),
-    model_(&model),                     
+    model_(&model),
     name_(name),
     data_(),
     isDataUpToDate_(false)
@@ -26,11 +26,11 @@ namespace exo_simu
 
     result_t AbstractSensorBase::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         if (telemetryData)
         {
-            telemetrySender_.configureObject(telemetryData, getType() + "." + name_);
+            telemetrySender_.configureObject(telemetryData, getTelemetryName());
             (void) registerNewVectorEntry(telemetrySender_, getFieldNames(), data_);
             isTelemetryConfigured_ = true;
         }

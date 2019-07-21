@@ -50,7 +50,8 @@ JOINT_ORDER_NN = ["RightFrontalHipJoint",
                   "LeftSagittalAnkleJoint",
                   "LeftHenkeAnkleJoint"]
 SUPPORT_FOOT_NN = 'RightSole'
-SUPPORT_FOOT_ENUM = ['RightSole', 'LeftSole']
+SUPPORT_FOOT_ENUM = ['LeftSole', 'RightSole']
+HZD_STATE_ENUM = [2, 3]
 INPUT_ORDER_NN = {"steplength": 1, "duration": 2, "stairheight": 3}
 JOINT_MASK_POSITION = np.concatenate((np.arange(7,13),np.arange(14,20)))
 JOINT_MASK_VELOCITY = np.concatenate((np.arange(6,12),np.arange(13,19)))
@@ -178,7 +179,7 @@ def extract_state_from_neural_network_prediction(urdf_path, pred):
     # Create state sequence
     evolution_robot = []
     for i in range(len(t)):
-        evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], support_foot=SUPPORT_FOOT_NN))
+        evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], HZD_STATE_ENUM[1], SUPPORT_FOOT_ENUM[1]))
 
     trajectory_data = {"evolution_robot": evolution_robot, "urdf": urdf_path}
 
@@ -195,17 +196,19 @@ def extract_state_from_simulation_log(urdf_path, log_header, log_data):
     # Note that the quaternion angular velocity vectors are expressed
     # it body frame rather than world frame.
     t = log_data[:,log_header.index('Global.Time')]
-    qe = log_data[:,np.array(['q_' in field or 'currentFreeFlyerPosition' in field
+    qe = log_data[:,np.array(['HighLevelController.Q' in field or 'currentFreeFlyerPosition' in field
                               or 'currentPosition' in field for field in log_header])].T
-    dqe = log_data[:,np.array(['v_' in field or 'currentFreeFlyerVelocity' in field
+    dqe = log_data[:,np.array(['HighLevelController.V' in field or 'currentFreeFlyerVelocity' in field
                                or 'currentVelocity' in field for field in log_header])].T
-    ddqe = log_data[:,np.array(['a_' in field or 'currentFreeFlyerAcceleration' in field
+    ddqe = log_data[:,np.array(['HighLevelController.A' in field or 'currentFreeFlyerAcceleration' in field
                                 or 'currentAcceleration' in field for field in log_header])].T
+    hzd_state = log_data[:,log_header.index('HighLevelController.HzdState')].T
 
     # Create state sequence
     evolution_robot = []
     for i in range(len(t)):
-        evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], support_foot=SUPPORT_FOOT_NN))
+        evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], hzd_state[i],
+                               SUPPORT_FOOT_ENUM[np.round(hzd_state[i]) == HZD_STATE_ENUM[1]]))
 
     return {"evolution_robot": evolution_robot, "urdf": urdf_path}
 
@@ -242,7 +245,8 @@ def get_n_steps(trajectory_data, n):
     state_dict_sym['a'][JOINT_MASK_VELOCITY] = \
         RELABELING_JOINT_MATRIX.dot(state_dict_sym['a'][JOINT_MASK_VELOCITY])
     state_dict_sym['t'] = copy(state_dict['t'])
-    state_dict_sym['hzd_state'] = [None for i in range(len(state_dict['hzd_state']))]
+    state_dict_sym['hzd_state'] = [HZD_STATE_ENUM[state_dict['hzd_state'][0] != HZD_STATE_ENUM[1]]
+                                   for i in range(len(state_dict['hzd_state']))]
     state_dict_sym['support_foot'] = [support_foot for i in range(len(state_dict['support_foot']))]
     state_dict_sym['f'] = [None for i in range(len(state_dict['f']))]
     state_dict_sym['tau'] = copy(state_dict['tau'])

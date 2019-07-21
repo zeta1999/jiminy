@@ -109,8 +109,9 @@ int main(int argc, char *argv[])
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
     std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
-    configHolder_t imuSensorOptions = model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0]);
-    boost::get<bool>(imuSensorOptions.at("rawData")) = true;
+    configHolder_t imuSensorOptions;
+    model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
+    // boost::get<bool>(imuSensorOptions.at("rawData")) = true;
     boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
     model.setSensorsOptions(ImuSensor::type_, imuSensorOptions);
     boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
@@ -127,6 +128,7 @@ int main(int argc, char *argv[])
 
     vectorN_t qRef = vectorN_t::Zero(model.getJointsName().size());
     vectorN_t dqRef = vectorN_t::Zero(qRef.size());
+    float64_t hzdState = 2.0; // Right leg support
     std::vector<std::string> qRefNames;
     std::vector<std::string> dqRefNames;
     for (std::string const & jointName : removeFieldnamesSuffix(model.getJointsName(), "Joint"))
@@ -136,6 +138,7 @@ int main(int argc, char *argv[])
     }
     controller.registerNewVectorEntry(qRefNames, qRef);
     controller.registerNewVectorEntry(dqRefNames, dqRef);
+    controller.registerNewEntry("HzdState", hzdState);
 
     // Instantiate and configuration the engine
     Engine engine;

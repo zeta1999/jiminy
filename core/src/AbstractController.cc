@@ -152,6 +152,27 @@ namespace exo_simu
         return returnCode;
     }
 
+    result_t AbstractController::registerNewEntry(std::string const & fieldName,
+                                                  float64_t   const & value)
+    {
+        // Delayed variable registration (Taken into account by 'configureTelemetry')
+
+        result_t returnCode = result_t::SUCCESS;
+
+        if (getIsTelemetryConfigured())
+        {
+            std::cout << "Error - AbstractController::registerNewEntry - Telemetry already initialized. Impossible to register new variables." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            registeredInfo_.emplace_back(fieldName, &value);
+        }
+
+        return returnCode;
+    }
+
     void AbstractController::updateTelemetry(void)
     {
         if (getIsTelemetryConfigured())

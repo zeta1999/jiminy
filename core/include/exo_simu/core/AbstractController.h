@@ -46,7 +46,9 @@ namespace exo_simu
 
         result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
         result_t registerNewVectorEntry(std::vector<std::string> const & fieldNames,
-                                        Eigen::Ref<vectorN_t>    const & value);
+                                        Eigen::Ref<vectorN_t>    const & values);
+        result_t registerNewEntry(std::string const & fieldName,
+                                  float64_t   const & value);
         void updateTelemetry(void);
 
         configHolder_t getOptions(void) const;

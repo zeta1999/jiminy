@@ -170,7 +170,10 @@ namespace python
                 .def("get_log", &PyEngineVisitor::getLog)
                 .def("write_log", &PyEngineVisitor::writeLog,
                                  (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
-                .def("register_new_variable", &PyEngineVisitor::registerNewVectorEntry)
+                .def("register_new_entry", &PyEngineVisitor::registerNewEntry,
+                                 (bp::arg("self"), "fieldname", "value"))
+                .def("register_new_vector_entry", &PyEngineVisitor::registerNewVectorEntry,
+                                 (bp::arg("self"), "fieldnames", "values"))
                 .def("get_urdf_path", &PyEngineVisitor::getUrdfPath,
                                       bp::return_value_policy<bp::return_by_value>())
                 .def("get_joint_names", &PyEngineVisitor::getJointsName,
@@ -241,13 +244,21 @@ namespace python
             }
         }
 
+        static void registerNewEntry(PyEngine          & self,
+                                     std::string const & fieldName,
+                                     PyObject          * dataPy)
+        {
+            float64_t const * data = (float64_t *) PyArray_DATA(reinterpret_cast<PyArrayObject *>(dataPy));
+            self.controller_.registerNewEntry(fieldName, *data);
+        }
+
         static void registerNewVectorEntry(PyEngine       & self,
                                            bp::list const & fieldNamesPy,
-                                           PyObject       * data)
+                                           PyObject       * dataPy) // Const qualifier is not supported by PyArray_DATA
         {
             std::vector<std::string> fieldNames = toStdVector<std::string>(fieldNamesPy);
-            Eigen::Map<vectorN_t> dataEigen((double *) PyArray_DATA(reinterpret_cast<PyArrayObject *>(data)), fieldNames.size());
-            self.controller_.registerNewVectorEntry(fieldNames, dataEigen); // OK: dataEigen.data() share the same pointer as the input numpy array
+            Eigen::Map<vectorN_t> data((float64_t *) PyArray_DATA(reinterpret_cast<PyArrayObject *>(dataPy)), fieldNames.size());
+            self.controller_.registerNewVectorEntry(fieldNames, data);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -289,15 +300,19 @@ namespace python
 
         static bp::dict getSensorsOptions(PyEngine & self)
         {
+            configHolder_t config;
             bp::dict configPy;
-            convertConfigHolderPy(self.model_.getSensorsOptions(), configPy);
+            self.model_.getSensorsOptions(config);
+            convertConfigHolderPy(config, configPy);
+
             return configPy;
         }
 
         static void setSensorsOptions(PyEngine       & self,
-                                    bp::dict const & configPy)
+                                      bp::dict const & configPy)
         {
-            configHolder_t config = self.model_.getSensorsOptions();
+            configHolder_t config;
+            self.model_.getSensorsOptions(config);
             loadConfigHolder(configPy, config);
             self.model_.setSensorsOptions(config);
         }

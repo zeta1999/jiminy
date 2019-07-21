@@ -42,10 +42,11 @@ namespace exo_simu
         jointConfig = jointConfigOld;
         isInitialized_ = false; // ExoModel is not initialized so far
 
-        std::vector<int32_t> imuFramesIdx;
-        std::vector<std::string> imuFramesNames;
         if (returnCode == result_t::SUCCESS)
         {
+            // isInitialized_ must be true to be able to add sensors
+            isInitialized_ = true;
+
             // The joint names are obtained by removing the universe and root joint from the joint list
             jointsNames_.assign(pncModel_.names.begin() + 2, pncModel_.names.end());
             toesNames_ = jointsNames_;
@@ -71,6 +72,7 @@ namespace exo_simu
             getJointsIdx(toesNames_, toesPositionIdx, toesVelocityIdx_);
 
             // The names of the frames of the IMUs end with IMU
+            std::vector<std::string> imuFramesNames;
             for (int32_t i = 0; i < pncModel_.nframes; i++)
             {
                 std::string frameNameCurrent = pncModel_.frames[i].name;
@@ -79,64 +81,67 @@ namespace exo_simu
                     imuFramesNames.push_back(frameNameCurrent);
                 }
             }
+            std::vector<int32_t> imuFramesIdx;
             getFramesIdx(imuFramesNames, imuFramesIdx); // It cannot throw an error
-        }
 
-        // ********** Add the IMU sensors **********
-        for(uint32_t i = 0; i < imuFramesNames.size(); i++)
-        {
-            std::shared_ptr<ImuSensor> imuSensor;
-            std::string imuName = imuFramesNames[i];
-
-            if (returnCode == result_t::SUCCESS)
+            // ********** Add the IMU sensors **********
+            for(uint32_t i = 0; i < imuFramesNames.size(); i++)
             {
-                // Create a new IMU sensor
-                returnCode = addSensor(imuName, imuSensor);
+                std::shared_ptr<ImuSensor> imuSensor;
+                std::string imuName = imuFramesNames[i];
+
+                if (returnCode == result_t::SUCCESS)
+                {
+                    // Create a new IMU sensor
+                    returnCode = addSensor(imuName, imuSensor);
+                }
+
+                if (returnCode == result_t::SUCCESS)
+                {
+                    // Configure the sensor
+                    imuSensor->initialize(imuFramesIdx[i]);
+                }
             }
 
-            if (returnCode == result_t::SUCCESS)
+            // ********** Add the force sensors **********
+            for (uint32_t i = 0; i<contactFramesNames_.size(); i++)
             {
-                // Configure the sensor
-                imuSensor->initialize(imuFramesIdx[i]);
-            }
-        }
+                std::shared_ptr<ForceSensor> forceSensor;
+                std::string forceName = contactFramesNames_[i];
 
-        // ********** Add the force sensors **********
-        for (uint32_t i = 0; i<contactFramesNames_.size(); i++)
-        {
-            std::shared_ptr<ForceSensor> forceSensor;
-            std::string forceName = contactFramesNames_[i];
+                if (returnCode == result_t::SUCCESS)
+                {
+                    // Create a new force sensor
+                    returnCode = addSensor(forceName, forceSensor);
+                }
 
-            if (returnCode == result_t::SUCCESS)
-            {
-                // Create a new force sensor
-                returnCode = addSensor(forceName, forceSensor);
-            }
-
-            if (returnCode == result_t::SUCCESS)
-            {
-                // Configure the sensor
-                forceSensor->initialize(contactFramesIdx_[i]);
-            }
-        }
-
-        // ********** Add the encoder sensors **********
-        for (uint32_t i = 0; i<jointsNames_.size(); i++)
-        {
-            std::shared_ptr<EncoderSensor> encoderSensor;
-            std::string encoderName = jointsNames_[i];
-
-            if (returnCode == result_t::SUCCESS)
-            {
-                // Create a new encoder sensor
-                returnCode = addSensor(encoderName, encoderSensor);
+                if (returnCode == result_t::SUCCESS)
+                {
+                    // Configure the sensor
+                    forceSensor->initialize(contactFramesIdx_[i]);
+                }
             }
 
-            if (returnCode == result_t::SUCCESS)
+            // ********** Add the encoder sensors **********
+            for (uint32_t i = 0; i<jointsNames_.size(); i++)
             {
-                // Configure the sensor
-                encoderSensor->initialize(jointsPositionIdx_[i], jointsVelocityIdx_[i]);
+                std::shared_ptr<EncoderSensor> encoderSensor;
+                std::string encoderName = jointsNames_[i];
+
+                if (returnCode == result_t::SUCCESS)
+                {
+                    // Create a new encoder sensor
+                    returnCode = addSensor(encoderName, encoderSensor);
+                }
+
+                if (returnCode == result_t::SUCCESS)
+                {
+                    // Configure the sensor
+                    encoderSensor->initialize(jointsPositionIdx_[i], jointsVelocityIdx_[i]);
+                }
             }
+
+            isInitialized_ = false;
         }
 
          // Update the bounds if necessary and set the initialization flag

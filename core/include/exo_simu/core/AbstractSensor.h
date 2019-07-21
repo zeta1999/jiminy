@@ -70,6 +70,7 @@ namespace exo_simu
         bool getIsTelemetryConfigured(void) const;
         virtual std::string getName(void) const;
         virtual std::string getType(void) const = 0;
+        virtual std::string getTelemetryName(void) const = 0;
         virtual std::vector<std::string> const & getFieldNames(void) const = 0;
 
         virtual result_t get(Eigen::Ref<vectorN_t> data) = 0;
@@ -138,10 +139,13 @@ namespace exo_simu
         void updateTelemetryAll(void) override;
 
     protected:
+        virtual std::string getTelemetryName(void) const override;
+
         virtual matrixN_t::ColXpr data(void) override;
 
     public:
         static std::string const type_;
+        static bool const areFieldNamesGrouped_;
         static std::vector<std::string> const fieldNamesPostProcess_;
         static std::vector<std::string> const fieldNamesPreProcess_;
         static float64_t delayMax_;

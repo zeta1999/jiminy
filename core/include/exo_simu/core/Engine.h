@@ -306,14 +306,17 @@ namespace exo_simu
                                 jointsIdx = model.getJointsVelocityIdx();
                             }
 
-                            std::vector<std::string> positionFreeFlyerNames({freeFlyerPrefix + std::string("TransX"),
-                                                                             freeFlyerPrefix + std::string("TransY"),
-                                                                             freeFlyerPrefix + std::string("TransZ"),
-                                                                             freeFlyerPrefix + std::string("QuatX"),
-                                                                             freeFlyerPrefix + std::string("QuatY"),
-                                                                             freeFlyerPrefix + std::string("QuatZ"),
-                                                                             freeFlyerPrefix + std::string("QuatW")});
-                            std::copy(positionFreeFlyerNames.begin(), positionFreeFlyerNames.end(), names.begin());
+                            if (model.getHasFreeFlyer())
+                            {
+                                std::vector<std::string> positionFreeFlyerNames({freeFlyerPrefix + std::string("TransX"),
+                                                                                 freeFlyerPrefix + std::string("TransY"),
+                                                                                 freeFlyerPrefix + std::string("TransZ"),
+                                                                                 freeFlyerPrefix + std::string("QuatX"),
+                                                                                 freeFlyerPrefix + std::string("QuatY"),
+                                                                                 freeFlyerPrefix + std::string("QuatZ"),
+                                                                                 freeFlyerPrefix + std::string("QuatW")});
+                                std::copy(positionFreeFlyerNames.begin(), positionFreeFlyerNames.end(), names.begin());
+                            }
                             for (uint8_t i=0; i<jointNames.size(); ++i)
                             {
                                 names[jointsIdx[i]] = jointPrefix + jointNames[i];
@@ -322,9 +325,9 @@ namespace exo_simu
                             return names;
                         };
 
-                    qNames = getVectorFieldnames(defaultVectorFieldnames("q", qLast.size()), "Position");
-                    vNames = getVectorFieldnames(defaultVectorFieldnames("v", vLast.size()), "Velocity");
-                    aNames = getVectorFieldnames(defaultVectorFieldnames("a", aLast.size()), "Acceleration");
+                    qNames = getVectorFieldnames(defaultVectorFieldnames("Q", qLast.size()), "Position");
+                    vNames = getVectorFieldnames(defaultVectorFieldnames("V", vLast.size()), "Velocity");
+                    aNames = getVectorFieldnames(defaultVectorFieldnames("A", aLast.size()), "Acceleration");
                     uCommandNames.clear();
                     std::string const jointPrefixTorque = jointPrefixBase + "Torque";
                     for (std::string const & jointName : jointNames)

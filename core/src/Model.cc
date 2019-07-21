@@ -20,6 +20,7 @@ namespace exo_simu
     isInitialized_(false),
     isTelemetryConfigured_(false),
     urdfPath_(),
+    hasFreeflyer_(false),
     mdlOptionsHolder_(),
     telemetryData_(nullptr),
     sensorsGroupHolder_(),
@@ -48,8 +49,11 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
+        // Remove all sensors, if any
+        sensorsGroupHolder_.clear();
+        sensorsDataHolder_.clear();
+
         // Initialize the URDF model
-        removeSensors();
         contactFramesNames_ = contactFramesNames;
         jointsNames_ = jointsNames;
         returnCode = loadUrdfModel(urdfPath, hasFreeflyer);
@@ -110,14 +114,24 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorType);
-        sensorsHolder_t::iterator sensorIt;
-        if (sensorGroupIt == sensorsGroupHolder_.end())
+        if (!getIsInitialized())
         {
-            std::cout << "Error - Model::removeSensor - This type of sensor does not exist." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
+            std::cout << "Error - Model::removeSensor - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
         }
 
+        sensorsGroupHolder_t::iterator sensorGroupIt;
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+            if (sensorGroupIt == sensorsGroupHolder_.end())
+            {
+                std::cout << "Error - Model::removeSensor - This type of sensor does not exist." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        sensorsHolder_t::iterator sensorIt;
         if (returnCode == result_t::SUCCESS)
         {
             sensorIt = sensorGroupIt->second.find(sensorName);
@@ -148,12 +162,23 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        sensorsGroupHolder_t::iterator sensorGroupIt = sensorsGroupHolder_.find(sensorType);
-        if (sensorGroupIt == sensorsGroupHolder_.end())
+        if (!getIsInitialized())
         {
-            std::cout << "Error - Model::removeSensors - No sensor with this type exists." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
+            std::cout << "Error - Model::removeSensors - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
         }
+
+        sensorsGroupHolder_t::iterator sensorGroupIt;
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+            if (sensorGroupIt == sensorsGroupHolder_.end())
+            {
+                std::cout << "Error - Model::removeSensors - No sensor with this type exists." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
         if (returnCode == result_t::SUCCESS)
         {
             sensorsGroupHolder_.erase(sensorGroupIt);
@@ -163,79 +188,216 @@ namespace exo_simu
         return returnCode;
     }
 
-    void Model::removeSensors(void)
+    result_t Model::getSensorsOptions(std::string    const & sensorType,
+                                      configHolder_t       & sensorsOptions) const
     {
-        sensorsGroupHolder_.clear();
-        sensorsDataHolder_.clear();
-    }
+        result_t returnCode = result_t::SUCCESS;
 
-    configHolder_t Model::getSensorsOptions(std::string const & sensorType) const
-    {
-        configHolder_t sensorsOptions;
-        for (sensorsHolder_t::value_type const & sensor : sensorsGroupHolder_.at(sensorType))
+        if (!getIsInitialized())
         {
-            sensorsOptions[sensor.first] = sensor.second->getOptions();
-        }
-        return sensorsOptions;
-    }
-
-    configHolder_t Model::getSensorsOptions(void) const
-    {
-        configHolder_t sensorsOptions;
-        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
-        {
-            configHolder_t sensorsGroupOptions;
-            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
-            {
-                sensorsGroupOptions[sensor.first] = sensor.second->getOptions();
-            }
-            sensorsOptions[sensorGroup.first] = sensorsGroupOptions;
+            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
         }
 
-        return sensorsOptions;
-    }
-
-    configHolder_t Model::getSensorOptions(std::string const & sensorType,
-                                           std::string const & sensorName) const
-    {
-        return sensorsGroupHolder_.at(sensorType).at(sensorName)->getOptions();
-    }
-
-    void Model::setSensorOptions(std::string    const & sensorType,
-                                 std::string    const & sensorName,
-                                 configHolder_t const & sensorOptions)
-    {
-        return sensorsGroupHolder_.at(sensorType).at(sensorName)->setOptions(sensorOptions);
-    }
-
-    void Model::setSensorsOptions(std::string    const & sensorType,
-                                  configHolder_t const & sensorsOptions)
-    {
-        for (sensorsHolder_t::value_type const & sensor : sensorsGroupHolder_.at(sensorType))
+        sensorsGroupHolder_t::const_iterator sensorGroupIt;
+        if (returnCode == result_t::SUCCESS)
         {
-            configHolder_t::const_iterator it = sensorsOptions.find(sensor.first);
-            if (it != sensorsOptions.end())
+            sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+            if (sensorGroupIt == sensorsGroupHolder_.end())
             {
-                sensor.second->setOptions(boost::get<configHolder_t>(it->second));
-            }
-            else
-            {
-                sensor.second->setOptionsAll(sensorsOptions);
-                break;
+                std::cout << "Error - Model::getSensorOptions - This type of sensor does not exist." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
-    }
 
-    void Model::setSensorsOptions(configHolder_t const & sensorsOptions)
-    {
-        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        if (returnCode == result_t::SUCCESS)
         {
-            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+            sensorsOptions = configHolder_t();
+            for (sensorsHolder_t::value_type const & sensor : sensorGroupIt->second)
             {
-                sensor.second->setOptions(boost::get<configHolder_t>(
-                    boost::get<configHolder_t>(sensorsOptions.at(sensorGroup.first)).at(sensor.first)));
+                sensorsOptions[sensor.first] = sensor.second->getOptions();
             }
         }
+
+        return returnCode;
+    }
+
+    result_t Model::getSensorsOptions(configHolder_t & sensorsOptions) const
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::getSensorsOptions - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorsOptions = configHolder_t();
+            for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+            {
+                configHolder_t sensorsGroupOptions;
+                for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+                {
+                    sensorsGroupOptions[sensor.first] = sensor.second->getOptions();
+                }
+                sensorsOptions[sensorGroup.first] = sensorsGroupOptions;
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::getSensorOptions(std::string    const & sensorType,
+                                     std::string    const & sensorName,
+                                     configHolder_t       & sensorOptions) const
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
+        }
+
+        sensorsGroupHolder_t::const_iterator sensorGroupIt;
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+            if (sensorGroupIt == sensorsGroupHolder_.end())
+            {
+                std::cout << "Error - Model::getSensorOptions - This type of sensor does not exist." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        sensorsHolder_t::const_iterator sensorIt;
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorIt = sensorGroupIt->second.find(sensorName);
+            if (sensorIt == sensorGroupIt->second.end())
+            {
+                std::cout << "Error - Model::getSensorOptions - No sensor with this type and name exists." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorOptions = sensorIt->second->getOptions();
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::setSensorOptions(std::string    const & sensorType,
+                                     std::string    const & sensorName,
+                                     configHolder_t const & sensorOptions)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
+        }
+
+        sensorsGroupHolder_t::iterator sensorGroupIt;
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+            if (sensorGroupIt == sensorsGroupHolder_.end())
+            {
+                std::cout << "Error - Model::getSensorOptions - This type of sensor does not exist." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        sensorsHolder_t::iterator sensorIt;
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorIt = sensorGroupIt->second.find(sensorName);
+            if (sensorIt == sensorGroupIt->second.end())
+            {
+                std::cout << "Error - Model::getSensorOptions - No sensor with this type and name exists." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorIt->second->setOptions(sensorOptions);
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::setSensorsOptions(std::string    const & sensorType,
+                                      configHolder_t const & sensorsOptions)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
+        }
+
+        sensorsGroupHolder_t::iterator sensorGroupIt;
+        if (returnCode == result_t::SUCCESS)
+        {
+            sensorGroupIt = sensorsGroupHolder_.find(sensorType);
+            if (sensorGroupIt == sensorsGroupHolder_.end())
+            {
+                std::cout << "Error - Model::getSensorOptions - This type of sensor does not exist." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            for (sensorsHolder_t::value_type const & sensor : sensorGroupIt->second)
+            {
+                configHolder_t::const_iterator it = sensorsOptions.find(sensor.first);
+                if (it != sensorsOptions.end())
+                {
+                    sensor.second->setOptions(boost::get<configHolder_t>(it->second));
+                }
+                else
+                {
+                    sensor.second->setOptionsAll(sensorsOptions);
+                    break;
+                }
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::setSensorsOptions(configHolder_t const & sensorsOptions)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+            {
+                for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+                {
+                    sensor.second->setOptions(boost::get<configHolder_t>(
+                        boost::get<configHolder_t>(sensorsOptions.at(sensorGroup.first)).at(sensor.first))); // TODO: missing check for sensor type and name availability
+                }
+            }
+        }
+
+        return returnCode;
     }
 
     configHolder_t Model::getOptions(void) const
@@ -294,6 +456,11 @@ namespace exo_simu
         return urdfPath_;
     }
 
+    bool Model::getHasFreeFlyer(void) const
+    {
+        return hasFreeflyer_;
+    }
+
     std::map<std::string, std::vector<std::string> > Model::getSensorsNames(void) const
     {
         std::map<std::string, std::vector<std::string> > sensorNames;
@@ -318,6 +485,7 @@ namespace exo_simu
             returnCode = result_t::ERROR_BAD_INPUT;
         }
         urdfPath_ = urdfPath;
+        hasFreeflyer_ = hasFreeflyer;
 
         if (returnCode == result_t::SUCCESS)
         {

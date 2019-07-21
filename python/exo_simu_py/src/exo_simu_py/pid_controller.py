@@ -49,7 +49,7 @@ def bisect_left(arr, target):
 
 @nb.jit(nopython=True, nogil=True)
 def _linear_interp(ratio, value_min, value_max):
-    return np.atleast_2d((1 - ratio) * value_min + ratio * value_max).T
+    return (1 - ratio) * value_min + ratio * value_max
 
 @nb.jit(nopython=True, nogil=True)
 def _compute_command(Kp, Kd, traj_ref, t_rel, qe, v,
@@ -67,23 +67,23 @@ def _compute_command(Kp, Kd, traj_ref, t_rel, qe, v,
     u_ref[:] = _linear_interp(ratio, traj_ref.u[:,t_ind_inf], traj_ref.u[:,t_ind_sup])
 
     # Compute PID torques
-    q = np.expand_dims(encoderSensorsData[0].transpose(), axis=1)
-    dq = np.expand_dims(encoderSensorsData[1].transpose(), axis=1)
+    q = encoderSensorsData[0]
+    dq = encoderSensorsData[1]
     u_pid = - (Kp * (q - q_ref) + Kd * (dq - dq_ref))
 
     # Update the output reference
-    uCommand[:] = u_ref + u_pid
+    uCommand[:,0] = u_ref + u_pid
 
 class pid_feedforward:
     def __init__(self, simulator, trajectory_data_ref, Kp=None, Kd=None):
         # Set the PID controller gains
         if Kp is None:
-            Kp = np.array([[20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
-                            20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0]]).T
+            Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0,
+                           20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0])
         self.Kp = Kp
         if Kd is None:
-            Kd = np.array([[250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
-                            250.0, 150.0, 100.0, 100.0, 150.0, 100.0]]).T
+            Kd = np.array([250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
+                           250.0, 150.0, 100.0, 100.0, 150.0, 100.0])
         self.Kd = Kd
 
         # Generate the reference trajectory
@@ -91,6 +91,7 @@ class pid_feedforward:
         evolution_robot = trajectory_data_ref['evolution_robot']
         support_foot_ref = evolution_robot[0].support_foot
         state_ref = self.state_machine[support_foot_ref] = dict()
+        state_ref['HzdState'] = evolution_robot[0].hzd_state  # Right sole = 3
         state_ref['t'] = np.array([s.t for s in evolution_robot])
         state_ref['q'] = np.asarray(np.concatenate(
             [s.q[JOINT_MASK_POSITION] for s in evolution_robot], axis=1))
@@ -103,37 +104,49 @@ class pid_feedforward:
         support_foot_next = [elem for elem in SUPPORT_FOOT_ENUM if support_foot_ref not in elem][0]
         state_next = self.state_machine[support_foot_next] = dict()
         state_next['t'] = state_ref['t']
+        state_next['HzdState'] = HZD_STATE_ENUM[evolution_robot[0].hzd_state != HZD_STATE_ENUM[1]] # Right sole = 2
         state_next['q'] = RELABELING_JOINT_MATRIX.dot(state_ref['q'])
         state_next['dq'] = RELABELING_JOINT_MATRIX.dot(state_ref['dq'])
         state_next['ddq'] = RELABELING_JOINT_MATRIX.dot(state_ref['ddq'])
         state_next['u'] = RELABELING_JOINT_MATRIX.dot(state_ref['u'])
 
-        # Set the internal state
-        self.simulator = simulator
-        self.time_offset = 0
-        self.current_state = support_foot_ref
-        self.traj_ref = self.get_traj_ref()
-        self.q_ref = self.traj_ref.q[:, [0]]
-        self.dq_ref = self.traj_ref.dq[:, [0]]
-        self.u_ref = self.traj_ref.u[:, [0]]
+        # Initialize the internal state
+        self.q_ref = None
+        self.dq_ref = None
+        self.u_ref = None
+        self.reset()
 
-        # Add the target position and velocity to the telemetry
+        # Add the target position and velocity to the telemetry.
+        # Note that the built-in Python types are immutable, and getting the reference of numpy scalar is not working.
+        # Be careful, only float64 dtype is supported by the Python binding so far.
+        self.simulator = simulator
         qRefNames = []
         dqRefNames = []
         q_ref_names = ["targetPosition" + (joint_name[:-5] if joint_name.endswith('Joint') else joint_name)
                        for joint_name in list(simulator.get_joint_names())]
         dq_ref_names = ["targetVelocity" + (joint_name[:-5] if joint_name.endswith('Joint') else joint_name)
                         for joint_name in list(simulator.get_joint_names())]
-        simulator.register_new_variable(q_ref_names, self.q_ref)
-        simulator.register_new_variable(dq_ref_names, self.dq_ref)
+        simulator.register_new_vector_entry(q_ref_names, self.q_ref)
+        simulator.register_new_vector_entry(dq_ref_names, self.dq_ref)
+        simulator.register_new_entry("HzdState", self.hzd_state)
 
     def reset(self):
         self.time_offset = 0
         self.current_state = self.state_machine.keys()[0]
+        self.hzd_state = np.array(self.state_machine[self.current_state]['HzdState'], dtype='float64')
         self.traj_ref = self.get_traj_ref()
-        self.q_ref = self.traj_ref.q[:, [0]]
-        self.dq_ref = self.traj_ref.dq[:, [0]]
-        self.u_ref = self.traj_ref.u[:, [0]]
+        if self.q_ref is None:
+            self.q_ref = self.traj_ref.q[:, 0].copy()
+        else:
+            self.q_ref[:] = self.traj_ref.q[:, 0].copy()
+        if self.dq_ref is None:
+            self.dq_ref = self.traj_ref.dq[:, 0].copy()
+        else:
+            self.dq_ref[:] = self.traj_ref.dq[:, 0].copy()
+        if self.u_ref is None:
+            self.u_ref = self.traj_ref.u[:, 0].copy()
+        else:
+            self.u_ref[:] = self.traj_ref.u[:, 0].copy()
 
 
     def get_traj_ref(self, state=None):
@@ -150,24 +163,27 @@ class pid_feedforward:
         self.current_state = [elem for elem in SUPPORT_FOOT_ENUM
                               if self.current_state not in elem][0]
         self.traj_ref = self.get_traj_ref()
-        # print("switching to next state: %s" % self.current_state)
+        # print("Switching to next state: %s" % self.current_state)
 
     def state_machine_switch_prev(self):
         self.current_state = [elem for elem in SUPPORT_FOOT_ENUM
                               if self.current_state not in elem][0]
         self.traj_ref = self.get_traj_ref()
         self.time_offset -= self.traj_ref.t[-1]
-        # print("switching to previous state: %s" % self.current_state)
+        # print("Switching to previous state: %s" % self.current_state)
 
     def compute_command(self, t_cur, qe, v, forceSensorsData, imuSensorsData, encoderSensorsData, uCommand):
-        # Change of state if necessary, and get information about the current state
+        # Change of state if necessary, and get information about the current state.
+        # Be careful, the adaptive odeint steppers can go back in time if necessary.
         t_rel = t_cur - self.time_offset
         if t_rel > self.traj_ref.t[-1]:
             self.state_machine_switch_next()
             t_rel = t_cur - self.time_offset
+            self.hzd_state[()] = self.state_machine[self.current_state]['HzdState'] # [()] for direct assignment of numpy scalar
         elif t_rel < 0:
             self.state_machine_switch_prev()
             t_rel = t_cur - self.time_offset
+            self.hzd_state[()] = self.state_machine[self.current_state]['HzdState'] # [()] for direct assignment of numpy scalar
 
         _compute_command(self.Kp, self.Kd, self.traj_ref, t_rel, qe, v,
                 forceSensorsData, imuSensorsData, encoderSensorsData, uCommand,

@@ -233,6 +233,19 @@ namespace exo_simu
     }
 
     template <typename T>
+    std::string AbstractSensorTpl<T>::getTelemetryName(void) const
+    {
+        if (areFieldNamesGrouped_)
+        {
+            return getType() + "." + name_;
+        }
+        else
+        {
+            return name_;
+        }
+    }
+
+    template <typename T>
     matrixN_t::ColXpr AbstractSensorTpl<T>::data(void)
     {
         return dataHolder_->data_.back().col(sensorId_);
