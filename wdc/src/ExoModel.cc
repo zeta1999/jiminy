@@ -38,7 +38,7 @@ namespace exo_simu
         configHolder_t & jointConfig = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
         configHolder_t jointConfigOld = jointConfig;
         boost::get<bool>(jointConfig.at("boundsFromUrdf")) = true;
-        returnCode = Model::initialize(urdfPath, contactFramesNames_, jointsNames_); // The joint names are unknown at this point
+        returnCode = Model::initialize(urdfPath, contactFramesNames_, motorsNames_); // The joint names are unknown at this point
         jointConfig = jointConfigOld;
         isInitialized_ = false; // ExoModel is not initialized so far
 
@@ -48,18 +48,25 @@ namespace exo_simu
             isInitialized_ = true;
 
             // The joint names are obtained by removing the universe and root joint from the joint list
-            jointsNames_.assign(pncModel_.names.begin() + 2, pncModel_.names.end());
-            toesNames_ = jointsNames_;
+            motorsNames_.assign(pncModel_.names.begin() + 2, pncModel_.names.end());
+            toesNames_ = motorsNames_;
+
+            // Initialize the command fieldnames, since the motor names were omitted previously in Model::initialize.
+            motorTorqueFieldNames_.clear();
+            for (std::string const & jointName : motorsNames_)
+            {
+                motorTorqueFieldNames_.emplace_back(JOINT_PREFIX_BASE + "Torque" + jointName);
+            }
 
             // Separate the toes froms the other joints since they are not actuated nor physically meaningful
             auto detectToeFct = [](std::string const & joint) -> bool
                                 {
                                     return joint.find("Toe") != std::string::npos;
                                 };
-            jointsNames_.erase(std::remove_if(jointsNames_.begin(),
-                                              jointsNames_.end(),
+            motorsNames_.erase(std::remove_if(motorsNames_.begin(),
+                                              motorsNames_.end(),
                                               detectToeFct),
-                               jointsNames_.end());
+                               motorsNames_.end());
             toesNames_.erase(std::remove_if(toesNames_.begin(),
                                             toesNames_.end(),
                                             not_f(detectToeFct)),
@@ -67,7 +74,7 @@ namespace exo_simu
 
             /* Update the joint names manually to avoid calling back Model::initialize
                (It cannot throw an error since the names are extracted dynamically from the model) */
-            getJointsIdx(jointsNames_, jointsPositionIdx_, jointsVelocityIdx_);
+            getJointsIdx(motorsNames_, motorsPositionIdx_, motorsVelocityIdx_);
             std::vector<int32_t> toesPositionIdx;
             getJointsIdx(toesNames_, toesPositionIdx, toesVelocityIdx_);
 
@@ -123,10 +130,10 @@ namespace exo_simu
             }
 
             // ********** Add the encoder sensors **********
-            for (uint32_t i = 0; i<jointsNames_.size(); i++)
+            for (uint32_t i = 0; i<motorsNames_.size(); i++)
             {
                 std::shared_ptr<EncoderSensor> encoderSensor;
-                std::string encoderName = jointsNames_[i];
+                std::string encoderName = motorsNames_[i];
 
                 if (returnCode == result_t::SUCCESS)
                 {
@@ -137,7 +144,7 @@ namespace exo_simu
                 if (returnCode == result_t::SUCCESS)
                 {
                     // Configure the sensor
-                    encoderSensor->initialize(jointsPositionIdx_[i], jointsVelocityIdx_[i]);
+                    encoderSensor->initialize(motorsPositionIdx_[i], motorsVelocityIdx_[i]);
                 }
             }
 

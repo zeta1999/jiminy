@@ -43,7 +43,7 @@ simulator.init(urdf_path)
 
 model_options = simulator.get_model_options()
 sensors_options = simulator.get_sensors_options()
-simu_options = simulator.get_simulation_options()
+simu_options = simulator.get_engine_options()
 ctrl_options = simulator.get_controller_options()
 
 ctrl_options["telemetryEnable"] = True
@@ -75,7 +75,7 @@ simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
 
 # for sensorOptions in sensors_options['ImuSensor'].values():
-#     # sensorOptions['rawData'] = True
+#     sensorOptions['rawData'] = True
 #     sensorOptions['noiseStd'] = [5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0]
 # sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['bias'] = [-8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0]
 # sensors_options['ImuSensor'][sensors_options['ImuSensor'].keys()[0]]['delay'] =  2.0e-3
@@ -83,7 +83,7 @@ simu_options['contacts']['transitionEps'] = 0.001
 
 simulator.set_model_options(model_options)
 simulator.set_sensors_options(sensors_options)
-simulator.set_simulation_options(simu_options)
+simulator.set_engine_options(simu_options)
 simulator.set_controller_options(ctrl_options)
 
 ################################ Run the simulation #####################################
@@ -101,11 +101,11 @@ x0 = get_initial_state_simulation(trajectory_data)
 tf = 3.0
 
 controller.reset()
-simulator.simulate(x0, 5e-2, controller.compute_command, callback) # Force compile Python controller for a fair benchmark
+simulator.run(x0, 5e-2, controller.compute_command, callback) # Force compile Python controller for a fair benchmark
 
 controller.reset()
 start = time.time()
-simulator.simulate(x0, tf, controller.compute_command, callback)
+simulator.run(x0, tf, controller.compute_command, callback)
 end = time.time()
 print("Simulation time: %03.0fms" %((end - start)*1.0e3))
 

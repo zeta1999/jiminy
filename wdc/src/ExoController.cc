@@ -35,7 +35,7 @@ namespace exo_simu
     result_t ExoController::initialize(Model        const & model,
                                        commandFct_t         commandFct)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         commandFct_ = commandFct;
         exoModel_ = static_cast<ExoModel const *>(&model);
@@ -46,7 +46,7 @@ namespace exo_simu
 
     result_t ExoController::fetchSensors(void)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         returnCode = model_->getSensorsData(ForceSensor::type_, forceSensorsData_);
         if (returnCode == result_t::SUCCESS)
@@ -66,7 +66,7 @@ namespace exo_simu
                                            vectorN_t const & v,
                                            vectorN_t       & u)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         if (!getIsInitialized())
         {
@@ -91,7 +91,7 @@ namespace exo_simu
                                              vectorN_t const & v,
                                              vectorN_t       & u)
     {
-        result_t returnCode = result_t::SUCCESS; 
+        result_t returnCode = result_t::SUCCESS;
 
         if (!getIsInitialized())
         {
@@ -104,10 +104,10 @@ namespace exo_simu
             ExoModel::exoJointOptions_t const & exoJointOptions_ = exoModel_->exoMdlOptions_->joints;
 
             // Add viscous friction to the joints
-            std::vector<int32_t> const & jointsVelocityIdx = exoModel_->getJointsVelocityIdx();
-            for (uint32_t i = 0; i < jointsVelocityIdx.size(); i++)
+            std::vector<int32_t> const & motorsVelocityIdx = exoModel_->getMotorsVelocityIdx();
+            for (uint32_t i = 0; i < motorsVelocityIdx.size(); i++)
             {
-                float64_t jointId = jointsVelocityIdx[i];
+                float64_t jointId = motorsVelocityIdx[i];
                 u(jointId) = -exoJointOptions_.frictionViscous(i)*v(jointId) - exoJointOptions_.frictionDry(i) * \
                     saturateSoft(v(jointId) / exoJointOptions_.dryFrictionVelEps,-1.0,1.0,0.7);
             }

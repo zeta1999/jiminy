@@ -141,19 +141,27 @@ namespace exo_simu
         // Register variables to the telemetry senders
         if (engineOptions_->telemetry.enableConfiguration)
         {
-            (void) registerNewVectorEntry(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+            (void) registerNewVectorEntry(telemetrySender_,
+                                          model_->getPositionFieldNames(),
+                                          stepperState_.qLast);
         }
         if (engineOptions_->telemetry.enableVelocity)
         {
-            (void) registerNewVectorEntry(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+            (void) registerNewVectorEntry(telemetrySender_,
+                                          model_->getVelocityFieldNames(),
+                                          stepperState_.vLast);
         }
         if (engineOptions_->telemetry.enableAcceleration)
         {
-            (void) registerNewVectorEntry(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+            (void) registerNewVectorEntry(telemetrySender_,
+                                          model_->getAccelerationFieldNames(),
+                                          stepperState_.aLast);
         }
         if (engineOptions_->telemetry.enableCommand)
         {
-            (void) registerNewVectorEntry(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+            (void) registerNewVectorEntry(telemetrySender_,
+                                          model_->getMotorTorqueFieldNames(),
+                                          stepperState_.uCommandLast);
         }
         if (engineOptions_->telemetry.enableEnergy)
         {
@@ -174,19 +182,27 @@ namespace exo_simu
         // Update the telemetry internal state
         if (engineOptions_->telemetry.enableConfiguration)
         {
-            updateVectorValue(telemetrySender_, stepperState_.qNames, stepperState_.qLast);
+            updateVectorValue(telemetrySender_,
+                              model_->getPositionFieldNames(),
+                              stepperState_.qLast);
         }
         if (engineOptions_->telemetry.enableVelocity)
         {
-            updateVectorValue(telemetrySender_, stepperState_.vNames, stepperState_.vLast);
+            updateVectorValue(telemetrySender_,
+                              model_->getVelocityFieldNames(),
+                              stepperState_.vLast);
         }
         if (engineOptions_->telemetry.enableAcceleration)
         {
-            updateVectorValue(telemetrySender_, stepperState_.aNames, stepperState_.aLast);
+            updateVectorValue(telemetrySender_,
+                              model_->getAccelerationFieldNames(),
+                              stepperState_.aLast);
         }
         if (engineOptions_->telemetry.enableCommand)
         {
-            updateVectorValue(telemetrySender_, stepperState_.uCommandNames, stepperState_.uCommandLast);
+            updateVectorValue(telemetrySender_,
+                              model_->getMotorTorqueFieldNames(),
+                              stepperState_.uCommandLast);
         }
         if (engineOptions_->telemetry.enableEnergy)
         {
@@ -343,10 +359,10 @@ namespace exo_simu
                                                     stepperState_.qLast,
                                                     stepperState_.vLast,
                                                     stepperState_.uCommandLast);
-                        std::vector<int32_t> const & jointsVelocityIdx = model_->getJointsVelocityIdx();
-                        for (uint32_t i=0; i < jointsVelocityIdx.size(); i++)
+                        std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
+                        for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
                         {
-                            uint32_t jointId = jointsVelocityIdx[i];
+                            uint32_t jointId = motorsVelocityIdx[i];
                             float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
                             stepperState_.uCommandLast[i] = boost::algorithm::clamp(stepperState_.uCommandLast[i], -torque_max, torque_max);
                             stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
@@ -452,10 +468,10 @@ namespace exo_simu
         if (engineOptions_->stepper.controllerUpdatePeriod < std::numeric_limits<float64_t>::epsilon())
         {
             controller_->computeCommand(t, q, v, stepperState_.uCommandLast); // Be careful, in this particular case uCommandLast is not guarantee to be the last command
-            std::vector<int32_t> const & jointsVelocityIdx = model_->getJointsVelocityIdx();
-            for (uint32_t i=0; i < jointsVelocityIdx.size(); i++)
+            std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
+            for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
             {
-                uint32_t jointId = jointsVelocityIdx[i];
+                uint32_t jointId = motorsVelocityIdx[i];
                 float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
                 stepperState_.uCommandLast[i] = boost::algorithm::clamp(stepperState_.uCommandLast[i], -torque_max, torque_max);
                 stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
@@ -570,12 +586,12 @@ namespace exo_simu
         Model::jointOptions_t const & mdlJointOptions_ = model_->mdlOptions_->joints;
         Engine::jointOptions_t const & engineJointOptions_ = engineOptions_->joints;
 
-        std::vector<int32_t> const & jointsPositionIdx = model_->getJointsPositionIdx();
-        std::vector<int32_t> const & jointsVelocityIdx = model_->getJointsVelocityIdx();
-        for (uint32_t i = 0; i < jointsPositionIdx.size(); i++)
+        std::vector<int32_t> const & motorsPositionIdx = model_->getMotorsPositionIdx();
+        std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
+        for (uint32_t i = 0; i < motorsPositionIdx.size(); i++)
         {
-            float64_t const qJoint = q(jointsPositionIdx[i]);
-            float64_t const vJoint = v(jointsVelocityIdx[i]);
+            float64_t const qJoint = q(motorsPositionIdx[i]);
+            float64_t const vJoint = v(motorsVelocityIdx[i]);
             float64_t const qJointMin = mdlJointOptions_.boundsMin(i);
             float64_t const qJointMax = mdlJointOptions_.boundsMax(i);
 
@@ -598,7 +614,7 @@ namespace exo_simu
             float64_t blendingLaw = std::tanh(2 * blendingFactor);
             forceJoint *= blendingLaw;
 
-            u(jointsVelocityIdx[i]) += forceJoint;
+            u(motorsVelocityIdx[i]) += forceJoint;
         }
     }
 

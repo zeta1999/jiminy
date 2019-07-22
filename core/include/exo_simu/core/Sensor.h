@@ -44,7 +44,7 @@ namespace exo_simu
         void initialize(int32_t const & frameIdx);
 
         int32_t getFrameIdx(void) const;
-        
+
     protected:
         result_t set(float64_t const & t,
                      vectorN_t const & q,
@@ -64,12 +64,12 @@ namespace exo_simu
                       std::string                         const & name);
         ~EncoderSensor(void);
 
-        void initialize(int32_t const & jointPositionIdx,
-                        int32_t const & jointVelocityIdx);
+        void initialize(int32_t const & motorPositionIdx,
+                        int32_t const & motorVelocityIdx);
 
-        int32_t getJointPositionIdx(void) const;
-        int32_t getJointVelocityIdx(void) const;
-        
+        int32_t getMotorPositionIdx(void) const;
+        int32_t getMotorVelocityIdx(void) const;
+
     protected:
         result_t set(float64_t const & t,
                      vectorN_t const & q,
@@ -78,8 +78,8 @@ namespace exo_simu
                      vectorN_t const & u);
 
     private:
-        int32_t jointPositionIdx_;
-        int32_t jointVelocityIdx_;
+        int32_t motorPositionIdx_;
+        int32_t motorVelocityIdx_;
     };
 }
 

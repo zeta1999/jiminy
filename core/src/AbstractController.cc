@@ -46,12 +46,12 @@ namespace exo_simu
                 float64_t t = 0;
                 vectorN_t q = vectorN_t::Zero(model_->nq());
                 vectorN_t v = vectorN_t::Zero(model_->nv());
-                vectorN_t uCommand = vectorN_t::Zero(model_->getJointsVelocityIdx().size());
+                vectorN_t uCommand = vectorN_t::Zero(model_->getMotorsVelocityIdx().size());
                 vectorN_t uInternal = vectorN_t::Zero(model_->nv());
                 returnCode = computeCommand(t, q, v, uCommand);
                 if (returnCode == result_t::SUCCESS)
                 {
-                    if(uCommand.size() != (int32_t) model_->getJointsVelocityIdx().size())
+                    if(uCommand.size() != (int32_t) model_->getMotorsVelocityIdx().size())
                     {
                         std::cout << "Error - AbstractController::initialize - 'computeCommand' returns command with wrong size." << std::endl;
                         returnCode = result_t::ERROR_BAD_INPUT;

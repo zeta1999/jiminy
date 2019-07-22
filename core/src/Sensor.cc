@@ -160,8 +160,8 @@ namespace exo_simu
                                  std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                                  std::string                         const & name) :
     AbstractSensorTpl(model, dataHolder, name),
-    jointPositionIdx_(),
-    jointVelocityIdx_()
+    motorPositionIdx_(),
+    motorVelocityIdx_()
     {
         // Empty.
     }
@@ -171,22 +171,22 @@ namespace exo_simu
         // Empty.
     }
 
-    void EncoderSensor::initialize(int32_t const & jointPositionIdx,
-                                   int32_t const & jointVelocityIdx)
+    void EncoderSensor::initialize(int32_t const & motorPositionIdx,
+                                   int32_t const & motorVelocityIdx)
     {
-        jointPositionIdx_ = jointPositionIdx;
-        jointVelocityIdx_ = jointVelocityIdx;
+        motorPositionIdx_ = motorPositionIdx;
+        motorVelocityIdx_ = motorVelocityIdx;
         isInitialized_ = true;
     }
 
-    int32_t EncoderSensor::getJointPositionIdx(void) const
+    int32_t EncoderSensor::getMotorPositionIdx(void) const
     {
-        return jointPositionIdx_;
+        return motorPositionIdx_;
     }
 
-    int32_t EncoderSensor::getJointVelocityIdx(void) const
+    int32_t EncoderSensor::getMotorVelocityIdx(void) const
     {
-        return jointVelocityIdx_;
+        return motorVelocityIdx_;
     }
 
     result_t EncoderSensor::set(float64_t const & t,
@@ -207,12 +207,12 @@ namespace exo_simu
         {
             if(sensorOptions_->rawData)
             {
-                data() = q.segment<1>(jointPositionIdx_);
+                data() = q.segment<1>(motorPositionIdx_);
             }
             else
             {
-                data().head(1) = q.segment<1>(jointPositionIdx_);
-                data().tail(1) = v.segment<1>(jointVelocityIdx_);
+                data().head(1) = q.segment<1>(motorPositionIdx_);
+                data().tail(1) = v.segment<1>(motorVelocityIdx_);
             }
         }
 

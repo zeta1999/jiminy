@@ -196,11 +196,11 @@ def extract_state_from_simulation_log(urdf_path, log_header, log_data):
     # Note that the quaternion angular velocity vectors are expressed
     # it body frame rather than world frame.
     t = log_data[:,log_header.index('Global.Time')]
-    qe = log_data[:,np.array(['HighLevelController.Q' in field or 'currentFreeFlyerPosition' in field
+    qe = log_data[:,np.array(['currentFreeFlyerPosition' in field
                               or 'currentPosition' in field for field in log_header])].T
-    dqe = log_data[:,np.array(['HighLevelController.V' in field or 'currentFreeFlyerVelocity' in field
+    dqe = log_data[:,np.array(['currentFreeFlyerVelocity' in field
                                or 'currentVelocity' in field for field in log_header])].T
-    ddqe = log_data[:,np.array(['HighLevelController.A' in field or 'currentFreeFlyerAcceleration' in field
+    ddqe = log_data[:,np.array(['currentFreeFlyerAcceleration' in field
                                 or 'currentAcceleration' in field for field in log_header])].T
     hzd_state = log_data[:,log_header.index('HighLevelController.HzdState')].T
 

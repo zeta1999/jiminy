@@ -237,10 +237,6 @@ namespace exo_simu
             uLast(),
             uCommandLast(),
             energyLast(0.0),
-            qNames(),
-            vNames(),
-            aNames(),
-            uCommandNames(),
             x(),
             dxdt(),
             uControl(),
@@ -284,56 +280,7 @@ namespace exo_simu
                     vLast = x_init.tail(model.nv());
                     aLast = vectorN_t::Zero(model.nv());
                     uLast = vectorN_t::Zero(model.nv());
-                    uCommandLast = vectorN_t::Zero(model.getJointsVelocityIdx().size());
-
-                    // Generate the list of names
-                    std::string const jointPrefixBase = "current";
-                    std::string const freeFlyerPrefixBase = jointPrefixBase + "FreeFlyer";
-                    std::vector<std::string> const & jointNames = removeFieldnamesSuffix(model.getJointsName(), "Joint");
-                    auto getVectorFieldnames =
-                        [&](std::vector<std::string>         names,
-                            std::string              const & infoPrefix) -> std::vector<std::string>
-                        {
-                            std::string const freeFlyerPrefix = freeFlyerPrefixBase + infoPrefix;
-                            std::string const jointPrefix = jointPrefixBase + infoPrefix;
-                            std::vector<int32_t> jointsIdx;
-                            if (infoPrefix == "Position")
-                            {
-                                jointsIdx = model.getJointsPositionIdx();
-                            }
-                            else
-                            {
-                                jointsIdx = model.getJointsVelocityIdx();
-                            }
-
-                            if (model.getHasFreeFlyer())
-                            {
-                                std::vector<std::string> positionFreeFlyerNames({freeFlyerPrefix + std::string("TransX"),
-                                                                                 freeFlyerPrefix + std::string("TransY"),
-                                                                                 freeFlyerPrefix + std::string("TransZ"),
-                                                                                 freeFlyerPrefix + std::string("QuatX"),
-                                                                                 freeFlyerPrefix + std::string("QuatY"),
-                                                                                 freeFlyerPrefix + std::string("QuatZ"),
-                                                                                 freeFlyerPrefix + std::string("QuatW")});
-                                std::copy(positionFreeFlyerNames.begin(), positionFreeFlyerNames.end(), names.begin());
-                            }
-                            for (uint8_t i=0; i<jointNames.size(); ++i)
-                            {
-                                names[jointsIdx[i]] = jointPrefix + jointNames[i];
-                            }
-
-                            return names;
-                        };
-
-                    qNames = getVectorFieldnames(defaultVectorFieldnames("Q", qLast.size()), "Position");
-                    vNames = getVectorFieldnames(defaultVectorFieldnames("V", vLast.size()), "Velocity");
-                    aNames = getVectorFieldnames(defaultVectorFieldnames("A", aLast.size()), "Acceleration");
-                    uCommandNames.clear();
-                    std::string const jointPrefixTorque = jointPrefixBase + "Torque";
-                    for (std::string const & jointName : jointNames)
-                    {
-                        uCommandNames.emplace_back(jointPrefixTorque + jointName);
-                    }
+                    uCommandLast = vectorN_t::Zero(model.getMotorsVelocityIdx().size());
 
                     // Initialize the internal systemDynamics buffers
                     x = x_init;
@@ -379,11 +326,6 @@ namespace exo_simu
             vectorN_t uLast;
             vectorN_t uCommandLast;
             float64_t energyLast; ///< Energy (kinetic + potential) of the system at the last state.
-
-            std::vector<std::string> qNames;
-            std::vector<std::string> vNames;
-            std::vector<std::string> aNames;
-            std::vector<std::string> uCommandNames;
 
             // Internal buffers required for the adaptive step computation and system dynamics
             vectorN_t x;

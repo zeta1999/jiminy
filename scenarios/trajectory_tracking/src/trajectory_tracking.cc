@@ -103,20 +103,21 @@ int main(int argc, char *argv[])
     // Instantiate and configuration the exoskeleton model
     ExoModel model;
     configHolder_t mdlOptions = model.getOptions();
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableForceSensors")) = false;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableForceSensors")) = true;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableImuSensors")) = true;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableEncoderSensors")) = false;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
+
     std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
     configHolder_t imuSensorOptions;
     model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
     // boost::get<bool>(imuSensorOptions.at("rawData")) = true;
-    boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    // boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
     model.setSensorsOptions(ImuSensor::type_, imuSensorOptions);
-    boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
-    boost::get<float64_t>(imuSensorOptions.at("delay")) = 2.0e-3;
-    boost::get<uint32_t>(imuSensorOptions.at("delayInterpolationOrder")) = 0U;
+    // boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    // boost::get<float64_t>(imuSensorOptions.at("delay")) = 2.0e-3;
+    // boost::get<uint32_t>(imuSensorOptions.at("delayInterpolationOrder")) = 0U;
     model.setSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
 
     // Instantiate and configuration the exoskeleton controller
@@ -126,15 +127,15 @@ int main(int argc, char *argv[])
     controller.setOptions(ctrlOptions);
     controller.initialize(model, compute_command);
 
-    vectorN_t qRef = vectorN_t::Zero(model.getJointsName().size());
+    vectorN_t qRef = vectorN_t::Zero(model.getMotorsName().size());
     vectorN_t dqRef = vectorN_t::Zero(qRef.size());
     float64_t hzdState = 2.0; // Right leg support
     std::vector<std::string> qRefNames;
     std::vector<std::string> dqRefNames;
-    for (std::string const & jointName : removeFieldnamesSuffix(model.getJointsName(), "Joint"))
+    for (std::string const & motorName : removeFieldnamesSuffix(model.getMotorsName(), "Joint"))
     {
-        qRefNames.emplace_back("targetPosition" + jointName);
-        dqRefNames.emplace_back("targetVelocity" + jointName);
+        qRefNames.emplace_back("targetPosition" + motorName);
+        dqRefNames.emplace_back("targetVelocity" + motorName);
     }
     controller.registerNewVectorEntry(qRefNames, qRef);
     controller.registerNewVectorEntry(dqRefNames, dqRef);

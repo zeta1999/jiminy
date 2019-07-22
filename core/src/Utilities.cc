@@ -7,11 +7,12 @@
 
 #include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/TelemetrySender.h"
+#include "exo_simu/core/Model.h"
 
 
 namespace exo_simu
 {
-    // *********************** Timer **************************
+    // ************************* Timer **************************
 
     Timer::Timer(void) :
     t0(),
@@ -33,7 +34,7 @@ namespace exo_simu
         dt = timeDiff.count();
     }
 
-    // **************** Random number generator *****************
+    // ***************** Random number generator *****************
     // Based on Ziggurat generator by Marsaglia and Tsang (JSS, 2000)
 
     std::mt19937 generator;
@@ -135,7 +136,7 @@ namespace exo_simu
         }
     }
 
-    // ***************** Random number generator utilities **********************
+    // ************** Random number generator utilities ****************
 
 	void resetRandGenerators(uint32_t seed)
 	{
@@ -199,7 +200,7 @@ namespace exo_simu
                                       });
     }
 
-    // ********************** Telemetry utilities **********************
+    // ******************* Telemetry utilities **********************
 
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,
@@ -264,6 +265,200 @@ namespace exo_simu
                            return name;
                        });
         return fieldnames;
+    }
+
+    // ********************** Pinocchio utilities **********************
+
+    result_t getJointNameFromPositionId(Model       const & model,
+                                        int32_t     const & idIn,
+                                        std::string       & jointNameOut)
+    {
+        result_t returnCode = result_t::ERROR_GENERIC;
+
+        // Iterate over all joints.
+        for (int32_t i = 0; i < model.pncModel_.njoints; i++)
+        {
+            // Get joint starting and ending index in position vector.
+            int32_t startIndex = model.pncModel_.joints[i].idx_q();
+            int32_t endIndex = startIndex + model.pncModel_.joints[i].nq();
+
+            // If inIn is between start and end, we found the joint we were looking for.
+            if(startIndex <= idIn && endIndex > idIn)
+            {
+                jointNameOut = model.pncModel_.names[i];
+                returnCode = result_t::SUCCESS;
+                break;
+            }
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            std::cout << "Error - Utilities::getJointNameFromVelocityId - Position index out of range." << std::endl;
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointNameFromVelocityId(Model       const & model,
+                                        int32_t     const & idIn,
+                                        std::string       & jointNameOut)
+    {
+        result_t returnCode = result_t::ERROR_GENERIC;
+
+        // Iterate over all joints.
+        for(int32_t i = 0; i < model.pncModel_.njoints; i++)
+        {
+            // Get joint starting and ending index in velocity vector.
+            int32_t startIndex = model.pncModel_.joints[i].idx_v();
+            int32_t endIndex = startIndex + model.pncModel_.joints[i].nv();
+
+            // If inIn is between start and end, we found the joint we were looking for.
+            if(startIndex <= idIn && endIndex > idIn)
+            {
+                jointNameOut = model.pncModel_.names[i];
+                returnCode = result_t::SUCCESS;
+                break;
+            }
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            std::cout << "Error - Utilities::getJointNameFromVelocityId - Velocity index out of range." << std::endl;
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointTypeFromId(Model     const & model,
+                                int32_t   const & idIn,
+                                joint_t         & jointTypeOut)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if(model.pncModel_.njoints < idIn - 1)
+        {
+            std::cout << "Error - Utilities::getJointTypeFromId - Joint id out of range." << std::endl;
+            returnCode = result_t::ERROR_GENERIC;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            auto joint = model.pncModel_.joints[idIn];
+
+            if (joint.shortname() == "JointModelFreeFlyer")
+            {
+                jointTypeOut = joint_t::FREE;
+            }
+            else if (joint.shortname() == "JointModelSpherical")
+            {
+                jointTypeOut = joint_t::SPHERICAL;
+            }
+            else if (joint.shortname() == "JointModelPlanar")
+            {
+                jointTypeOut = joint_t::PLANAR;
+            }
+            else if (joint.shortname() == "JointModelPX" ||
+                     joint.shortname() == "JointModelPY" ||
+                     joint.shortname() == "JointModelPZ")
+            {
+                jointTypeOut = joint_t::LINEAR;
+            }
+            else if (joint.shortname() == "JointModelRX" ||
+                     joint.shortname() == "JointModelRY" ||
+                     joint.shortname() == "JointModelRZ")
+            {
+                jointTypeOut = joint_t::ROTARY;
+            }
+            else
+            {
+                // Unknown joint, throw an error to avoid any wrong manipulation.
+                jointTypeOut = joint_t::NONE;
+                std::cout << "Error - Utilities::getJointTypeFromId - Unknown joint type." << std::endl;
+                returnCode = result_t::ERROR_GENERIC;
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointTypePositionSuffixes(joint_t                  const & jointTypeIn,
+                                          std::vector<std::string>       & jointTypeSuffixesOut)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        jointTypeSuffixesOut = std::vector<std::string>({std::string("")}); // If no extra discrimination is needed
+        switch (jointTypeIn)
+        {
+        case joint_t::LINEAR:
+            break;
+        case joint_t::ROTARY:
+            break;
+        case joint_t::PLANAR:
+            jointTypeSuffixesOut = std::vector<std::string>({std::string("TransX"),
+                                                             std::string("TransY"),
+                                                             std::string("TransZ")});
+            break;
+        case joint_t::SPHERICAL:
+            jointTypeSuffixesOut = std::vector<std::string>({std::string("QuatX"),
+                                                             std::string("QuatY"),
+                                                             std::string("QuatZ"),
+                                                             std::string("QuatW")});
+            break;
+        case joint_t::FREE:
+            jointTypeSuffixesOut = std::vector<std::string>({std::string("TransX"),
+                                                             std::string("TransY"),
+                                                             std::string("TransZ"),
+                                                             std::string("QuatX"),
+                                                             std::string("QuatY"),
+                                                             std::string("QuatZ"),
+                                                             std::string("QuatW")});
+            break;
+        case joint_t::NONE:
+        default:
+            std::cout << "Error - Utilities::getJointFieldnamesFromType - Joints of type 'NONE' do not have fieldnames." << std::endl;
+            returnCode = result_t::ERROR_GENERIC;
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointTypeVelocitySuffixes(joint_t                  const & jointTypeIn,
+                                          std::vector<std::string>       & jointTypeSuffixesOut)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        jointTypeSuffixesOut = std::vector<std::string>({std::string("")}); // If no extra discrimination is needed
+        switch (jointTypeIn)
+        {
+        case joint_t::LINEAR:
+            break;
+        case joint_t::ROTARY:
+            break;
+        case joint_t::PLANAR:
+            jointTypeSuffixesOut = std::vector<std::string>({std::string("LinX"),
+                                                             std::string("LinY"),
+                                                             std::string("LinZ")});
+            break;
+        case joint_t::SPHERICAL:
+            jointTypeSuffixesOut = std::vector<std::string>({std::string("AngX"),
+                                                             std::string("AngY"),
+                                                             std::string("AngZ")});
+            break;
+        case joint_t::FREE:
+            jointTypeSuffixesOut = std::vector<std::string>({std::string("LinX"),
+                                                             std::string("LinY"),
+                                                             std::string("LinZ"),
+                                                             std::string("AngX"),
+                                                             std::string("AngY"),
+                                                             std::string("AngZ")});
+            break;
+        case joint_t::NONE:
+        default:
+            std::cout << "Error - Utilities::getJointFieldnamesFromType - Joints of type 'NONE' do not have fieldnames." << std::endl;
+            returnCode = result_t::ERROR_GENERIC;
+        }
+
+        return returnCode;
     }
 
     // ********************** Math utilities *************************

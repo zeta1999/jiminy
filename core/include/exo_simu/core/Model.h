@@ -17,6 +17,9 @@
 
 namespace exo_simu
 {
+    std::string const JOINT_PREFIX_BASE("current");
+    std::string const FREE_FLYER_PREFIX_BASE_NAME(JOINT_PREFIX_BASE + "FreeFlyer");
+
     class Engine;
     class AbstractSensorBase;
     class TelemetryData;
@@ -82,7 +85,7 @@ namespace exo_simu
 
         result_t initialize(std::string              const & urdfPath,
                             std::vector<std::string> const & contactFramesNames,
-                            std::vector<std::string> const & jointsNames,
+                            std::vector<std::string> const & motorsNames,
                             bool                     const & hasFreeflyer = true);
         virtual void reset(bool const & resetTelemetry = false);
 
@@ -124,9 +127,13 @@ namespace exo_simu
                             vectorN_t const & u);
         void updateTelemetry(void);
         std::vector<int32_t> const & getContactFramesIdx(void) const;
-        std::vector<std::string> const & getJointsName(void) const;
-        std::vector<int32_t> const & getJointsPositionIdx(void) const;
-        std::vector<int32_t> const & getJointsVelocityIdx(void) const;
+        std::vector<std::string> const & getMotorsName(void) const;
+        std::vector<int32_t> const & getMotorsPositionIdx(void) const;
+        std::vector<int32_t> const & getMotorsVelocityIdx(void) const;
+        std::vector<std::string> const & getPositionFieldNames(void) const;
+        std::vector<std::string> const & getVelocityFieldNames(void) const;
+        std::vector<std::string> const & getAccelerationFieldNames(void) const;
+        std::vector<std::string> const & getMotorTorqueFieldNames(void) const;
         uint32_t nq(void) const; // no get keyword for consistency with pinocchio C++ API
         uint32_t nv(void) const;
         uint32_t nx(void) const;
@@ -144,12 +151,12 @@ namespace exo_simu
                              int32_t           & frameIdx) const;
         result_t getFramesIdx(std::vector<std::string> const & framesNames,
                               std::vector<int32_t>           & framesIdx) const;
-        result_t getJointIdx(std::string const & jointName,
-                             int32_t           & jointPositionIdx,
-                             int32_t           & jointVelocityIdx) const;
-        result_t getJointsIdx(std::vector<std::string> const & jointsNames,
-                              std::vector<int32_t>           & jointsPositionIdx,
-                              std::vector<int32_t>           & jointsVelocityIdx) const;
+        result_t getJointIdx(std::string const & motorName,
+                             int32_t           & motorPositionIdx,
+                             int32_t           & motorVelocityIdx) const;
+        result_t getJointsIdx(std::vector<std::string> const & motorsNames,
+                              std::vector<int32_t>           & motorsPositionIdx,
+                              std::vector<int32_t>           & motorsVelocityIdx) const;
 
     public:
         pinocchio::Model pncModel_;
@@ -168,10 +175,14 @@ namespace exo_simu
         sensorsGroupHolder_t sensorsGroupHolder_;
 
         std::vector<std::string> contactFramesNames_;
-        std::vector<std::string> jointsNames_;
+        std::vector<std::string> motorsNames_;
         std::vector<int32_t> contactFramesIdx_;  // Indices of the contact frame in the model
-        std::vector<int32_t> jointsPositionIdx_; // Indices of the actuated joints in the configuration representation
-        std::vector<int32_t> jointsVelocityIdx_; // Indices of the actuated joints in the velocity vector representation
+        std::vector<int32_t> motorsPositionIdx_; // Indices of the actuated joints in the configuration representation
+        std::vector<int32_t> motorsVelocityIdx_; // Indices of the actuated joints in the velocity vector representation
+        std::vector<std::string> positionFieldNames_;
+        std::vector<std::string> velocityFieldNames_;
+        std::vector<std::string> accelerationFieldNames_;
+        std::vector<std::string> motorTorqueFieldNames_;
 
     private:
         std::map<std::string, std::shared_ptr<SensorDataHolder_t> > sensorsDataHolder_;

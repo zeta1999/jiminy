@@ -25,10 +25,14 @@ namespace exo_simu
     telemetryData_(nullptr),
     sensorsGroupHolder_(),
     contactFramesNames_(),
-    jointsNames_(),
+    motorsNames_(),
     contactFramesIdx_(),
-    jointsPositionIdx_(),
-    jointsVelocityIdx_(),
+    motorsPositionIdx_(),
+    motorsVelocityIdx_(),
+    positionFieldNames_(),
+    velocityFieldNames_(),
+    accelerationFieldNames_(),
+    motorTorqueFieldNames_(),
     sensorsDataHolder_(),
     nq_(0),
     nv_(0),
@@ -44,7 +48,7 @@ namespace exo_simu
 
     result_t Model::initialize(std::string              const & urdfPath,
                                std::vector<std::string> const & contactFramesNames,
-                               std::vector<std::string> const & jointsNames,
+                               std::vector<std::string> const & motorsNames,
                                bool                     const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
@@ -55,9 +59,105 @@ namespace exo_simu
 
         // Initialize the URDF model
         contactFramesNames_ = contactFramesNames;
-        jointsNames_ = jointsNames;
+        motorsNames_ = motorsNames;
         returnCode = loadUrdfModel(urdfPath, hasFreeflyer);
-        pncData_ = pinocchio::Data(pncModel_);
+
+        /* Generate the fieldname of the elements of the vectorial representation
+           of the configuration, velocity, acceleration and motor torques. */
+        positionFieldNames_.clear();
+        positionFieldNames_.resize(pncModel_.nq);
+        velocityFieldNames_.clear();
+        velocityFieldNames_.resize(pncModel_.nv);
+        accelerationFieldNames_.clear();
+        accelerationFieldNames_.resize(pncModel_.nv);
+        std::vector<std::string> jointNames = removeFieldnamesSuffix(pncModel_.names, "Joint");
+        for (int32_t jointId=0; jointId<pncModel_.njoints; ++jointId)
+        {
+            int32_t idx_q = pncModel_.joints[jointId].idx_q();
+
+            if (idx_q >= 0) // Otherwise the joint is not part of the vectorial representation
+            {
+                int32_t idx_v = pncModel_.joints[jointId].idx_v();
+
+                joint_t jointType;
+                std::string jointPrefix;
+                if (returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointTypeFromId(*this, jointId, jointType);
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    if (jointType == joint_t::FREE)
+                    {
+                        jointPrefix = FREE_FLYER_PREFIX_BASE_NAME;
+                        jointNames[jointId] = ""; // Discard the joint name for FREE joint type since it is unique if any
+                    }
+                    else
+                    {
+                        jointPrefix = JOINT_PREFIX_BASE;
+                    }
+
+                    returnCode = getJointTypeFromId(*this, jointId, jointType);
+                }
+
+                std::vector<std::string> jointTypePositionSuffixes;
+                std::vector<std::string> jointPositionFieldnames;
+                if (returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointTypePositionSuffixes(jointType, jointTypePositionSuffixes);
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    for (std::string const & suffix : jointTypePositionSuffixes)
+                    {
+                        jointPositionFieldnames.emplace_back(jointPrefix + "Position" + jointNames[jointId] + suffix);
+                    }
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    std::copy(jointPositionFieldnames.begin(),
+                              jointPositionFieldnames.end(),
+                              positionFieldNames_.begin() + idx_q);
+                }
+
+                std::vector<std::string> jointTypeVelocitySuffixes;
+                std::vector<std::string> jointVelocityFieldnames;
+                std::vector<std::string> jointAccelerationFieldnames;
+                if (returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointTypeVelocitySuffixes(jointType, jointTypeVelocitySuffixes);
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    for (std::string const & suffix : jointTypeVelocitySuffixes)
+                    {
+                        jointVelocityFieldnames.emplace_back(jointPrefix + "Velocity" + jointNames[jointId] + suffix);
+                        jointAccelerationFieldnames.emplace_back(jointPrefix + "Acceleration" + jointNames[jointId] + suffix);
+                    }
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    std::copy(jointVelocityFieldnames.begin(),
+                              jointVelocityFieldnames.end(),
+                              velocityFieldNames_.begin() + idx_v);
+                    std::copy(jointAccelerationFieldnames.begin(),
+                              jointAccelerationFieldnames.end(),
+                              accelerationFieldNames_.begin() + idx_v);
+                }
+            }
+        }
+
+        motorTorqueFieldNames_.clear();
+        for (std::string const & jointName : motorsNames_)
+        {
+            motorTorqueFieldNames_.emplace_back(JOINT_PREFIX_BASE + "Torque" + jointName);
+        }
+
+        // Initialize pinocchio data buffer
+        if (returnCode == result_t::SUCCESS)
+        {
+            pncData_ = pinocchio::Data(pncModel_);
+        }
 
         // Update the bounds if necessary
         if (returnCode == result_t::SUCCESS)
@@ -78,7 +178,7 @@ namespace exo_simu
         }
         if (returnCode == result_t::SUCCESS)
         {
-            returnCode = getJointsIdx(jointsNames_, jointsPositionIdx_, jointsVelocityIdx_);
+            returnCode = getJointsIdx(motorsNames_, motorsPositionIdx_, motorsVelocityIdx_);
         }
 
         return returnCode;
@@ -418,17 +518,17 @@ namespace exo_simu
         {
             if (boost::get<bool>(jointOptionsHolder_.at("boundsFromUrdf")))
             {
-                boundsMin = vectorN_t::Zero(jointsPositionIdx_.size());
-                boundsMax = vectorN_t::Zero(jointsPositionIdx_.size());
-                for (uint32_t i=0; i < jointsPositionIdx_.size(); i++)
+                boundsMin = vectorN_t::Zero(motorsPositionIdx_.size());
+                boundsMax = vectorN_t::Zero(motorsPositionIdx_.size());
+                for (uint32_t i=0; i < motorsPositionIdx_.size(); i++)
                 {
-                    boundsMin[i] = pncModel_.lowerPositionLimit[jointsPositionIdx_[i]];
-                    boundsMax[i] = pncModel_.upperPositionLimit[jointsPositionIdx_[i]];
+                    boundsMin[i] = pncModel_.lowerPositionLimit[motorsPositionIdx_[i]];
+                    boundsMax[i] = pncModel_.upperPositionLimit[motorsPositionIdx_[i]];
                 }
             }
             else
             {
-                if((int32_t) jointsPositionIdx_.size() != boundsMin.size() || (uint32_t) jointsPositionIdx_.size() != boundsMax.size())
+                if((int32_t) motorsPositionIdx_.size() != boundsMin.size() || (uint32_t) motorsPositionIdx_.size() != boundsMax.size())
                 {
                     std::cout << "Error - Model::setOptions - Wrong vector size for boundsMin or boundsMax." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
@@ -561,19 +661,39 @@ namespace exo_simu
         return contactFramesIdx_;
     }
 
-    std::vector<std::string> const & Model::getJointsName(void) const
+    std::vector<std::string> const & Model::getMotorsName(void) const
     {
-        return jointsNames_;
+        return motorsNames_;
     }
 
-    std::vector<int32_t> const & Model::getJointsPositionIdx(void) const
+    std::vector<int32_t> const & Model::getMotorsPositionIdx(void) const
     {
-        return jointsPositionIdx_;
+        return motorsPositionIdx_;
     }
 
-    std::vector<int32_t> const & Model::getJointsVelocityIdx(void) const
+    std::vector<int32_t> const & Model::getMotorsVelocityIdx(void) const
     {
-        return jointsVelocityIdx_;
+        return motorsVelocityIdx_;
+    }
+
+    std::vector<std::string> const & Model::getPositionFieldNames(void) const
+    {
+        return positionFieldNames_;
+    }
+
+    std::vector<std::string> const & Model::getVelocityFieldNames(void) const
+    {
+        return velocityFieldNames_;
+    }
+
+    std::vector<std::string> const & Model::getAccelerationFieldNames(void) const
+    {
+        return accelerationFieldNames_;
+    }
+
+    std::vector<std::string> const & Model::getMotorTorqueFieldNames(void) const
+    {
+        return motorTorqueFieldNames_;
     }
 
     result_t Model::getFrameIdx(std::string const & frameName,
@@ -614,9 +734,9 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t Model::getJointIdx(std::string const & jointName,
-                                int32_t           & jointPositionIdx,
-                                int32_t           & jointVelocityIdx) const
+    result_t Model::getJointIdx(std::string const & motorName,
+                                int32_t           & motorPositionIdx,
+                                int32_t           & motorVelocityIdx) const
     {
         // It only return the index of the first element if the joint has multiple degrees of freedom
 
@@ -626,44 +746,44 @@ namespace exo_simu
 
         result_t returnCode = result_t::SUCCESS;
 
-        if (!pncModel_.existJointName(jointName))
+        if (!pncModel_.existJointName(motorName))
         {
-            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << jointName << "' not found in urdf." << std::endl;
+            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << motorName << "' not found in urdf." << std::endl;
             returnCode = result_t::ERROR_BAD_INPUT;
         }
 
         if (returnCode == result_t::SUCCESS)
         {
-            int32_t jointModelIdx = pncModel_.getJointId(jointName);
-            jointPositionIdx = 0;
-            jointVelocityIdx = 0;
+            int32_t jointModelIdx = pncModel_.getJointId(motorName);
+            motorPositionIdx = 0;
+            motorVelocityIdx = 0;
             for (auto jointIt = pncModel_.joints.begin() + 1; jointIt != pncModel_.joints.begin() + jointModelIdx; jointIt++)
             {
-                jointPositionIdx += jointIt->nq();
-                jointVelocityIdx += jointIt->nv();
+                motorPositionIdx += jointIt->nq();
+                motorVelocityIdx += jointIt->nv();
             }
         }
 
         return returnCode;
     }
 
-    result_t Model::getJointsIdx(std::vector<std::string> const & jointsNames,
-                                 std::vector<int32_t>           & jointsPositionIdx,
-                                 std::vector<int32_t>           & jointsVelocityIdx) const
+    result_t Model::getJointsIdx(std::vector<std::string> const & motorsNames,
+                                 std::vector<int32_t>           & motorsPositionIdx,
+                                 std::vector<int32_t>           & motorsVelocityIdx) const
     {
         result_t returnCode = result_t::SUCCESS;
 
-        jointsPositionIdx.resize(0);
-        jointsVelocityIdx.resize(0);
-        for (std::string const & name : jointsNames)
+        motorsPositionIdx.resize(0);
+        motorsVelocityIdx.resize(0);
+        for (std::string const & name : motorsNames)
         {
             if (returnCode == result_t::SUCCESS)
             {
                 int32_t positionIdx;
                 int32_t velocityIdx;
                 returnCode = getJointIdx(name, positionIdx, velocityIdx);
-                jointsPositionIdx.push_back(positionIdx);
-                jointsVelocityIdx.push_back(velocityIdx);
+                motorsPositionIdx.push_back(positionIdx);
+                motorsVelocityIdx.push_back(velocityIdx);
             }
         }
 
