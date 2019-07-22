@@ -16,7 +16,7 @@
 
 namespace exo_simu
 {
-    std::string const ENGINE_OBJECT_NAME("Global");
+    std::string const ENGINE_OBJECT_NAME("HighLevelController");
     float64_t const MIN_TIME_STEP_MAX(1e-5);
     extern float64_t const MAX_TIME_STEP_MAX; // Must be external to be accessible by multiple .cpp
 
@@ -146,7 +146,7 @@ namespace exo_simu
             int32_t const iterMax;
             float64_t const sensorsUpdatePeriod;
             float64_t const controllerUpdatePeriod;
-            
+
             stepperOptions_t(configHolder_t const & options):
             randomSeed(boost::get<int32_t>(options.at("randomSeed"))),
             solver(boost::get<std::string>(options.at("solver"))),
@@ -277,6 +277,7 @@ namespace exo_simu
 
                 if (returnCode == result_t::SUCCESS)
                 {
+                    // Initialize the odestepper state buffers
                     iterLast = 0;
                     tLast = 0;
                     qLast = x_init.head(model.nq());
@@ -285,20 +286,65 @@ namespace exo_simu
                     uLast = vectorN_t::Zero(model.nv());
                     uCommandLast = vectorN_t::Zero(model.getJointsVelocityIdx().size());
 
-                    qNames = defaultVectorFieldnames("q", qLast.size());
-                    vNames = defaultVectorFieldnames("v", vLast.size());
-                    aNames = defaultVectorFieldnames("a", aLast.size());
-                    uCommandNames = defaultVectorFieldnames("uCommand", uCommandLast.size());
+                    // Generate the list of names
+                    std::string const jointPrefixBase = "current";
+                    std::string const freeFlyerPrefixBase = jointPrefixBase + "FreeFlyer";
+                    std::vector<std::string> const & jointNames = removeFieldnamesSuffix(model.getJointsName(), "Joint");
+                    auto getVectorFieldnames =
+                        [&](std::vector<std::string>         names,
+                            std::string              const & infoPrefix) -> std::vector<std::string>
+                        {
+                            std::string const freeFlyerPrefix = freeFlyerPrefixBase + infoPrefix;
+                            std::string const jointPrefix = jointPrefixBase + infoPrefix;
+                            std::vector<int32_t> jointsIdx;
+                            if (infoPrefix == "Position")
+                            {
+                                jointsIdx = model.getJointsPositionIdx();
+                            }
+                            else
+                            {
+                                jointsIdx = model.getJointsVelocityIdx();
+                            }
 
+                            if (model.getHasFreeFlyer())
+                            {
+                                std::vector<std::string> positionFreeFlyerNames({freeFlyerPrefix + std::string("TransX"),
+                                                                                 freeFlyerPrefix + std::string("TransY"),
+                                                                                 freeFlyerPrefix + std::string("TransZ"),
+                                                                                 freeFlyerPrefix + std::string("QuatX"),
+                                                                                 freeFlyerPrefix + std::string("QuatY"),
+                                                                                 freeFlyerPrefix + std::string("QuatZ"),
+                                                                                 freeFlyerPrefix + std::string("QuatW")});
+                                std::copy(positionFreeFlyerNames.begin(), positionFreeFlyerNames.end(), names.begin());
+                            }
+                            for (uint8_t i=0; i<jointNames.size(); ++i)
+                            {
+                                names[jointsIdx[i]] = jointPrefix + jointNames[i];
+                            }
+
+                            return names;
+                        };
+
+                    qNames = getVectorFieldnames(defaultVectorFieldnames("Q", qLast.size()), "Position");
+                    vNames = getVectorFieldnames(defaultVectorFieldnames("V", vLast.size()), "Velocity");
+                    aNames = getVectorFieldnames(defaultVectorFieldnames("A", aLast.size()), "Acceleration");
+                    uCommandNames.clear();
+                    std::string const jointPrefixTorque = jointPrefixBase + "Torque";
+                    for (std::string const & jointName : jointNames)
+                    {
+                        uCommandNames.emplace_back(jointPrefixTorque + jointName);
+                    }
+
+                    // Initialize the internal systemDynamics buffers
                     x = x_init;
                     dxdt = vectorN_t::Zero(model.nx());
                     uControl = vectorN_t::Zero(model.nv());
-
                     fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(),
                                                                                   pinocchio::Force::Zero());
                     uBounds = vectorN_t::Zero(model.nv());
                     uInternal = vectorN_t::Zero(model.nv());
 
+                    // Set the initialization flag
                     isInitialized = true;
                 }
 
@@ -360,6 +406,10 @@ namespace exo_simu
         result_t initialize(Model              & model,
                             AbstractController & controller,
                             callbackFct_t        callbackFct);
+        void reset(bool const & resetTelemetry = false);
+
+        result_t configureTelemetry(void);
+        void updateTelemetry(void);
 
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
@@ -367,6 +417,7 @@ namespace exo_simu
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & engineOptions);
         bool getIsInitialized(void) const;
+        bool getIsTelemetryConfigured(void) const;
         Model const & getModel(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
         void getLogData(std::vector<std::string> & header,
@@ -417,10 +468,10 @@ namespace exo_simu
         }
 
         template<class System>
-        controlled_step_result try_step(System       system, 
-                                        state_type & x, 
-                                        deriv_type & dxdt, 
-                                        time_type  & t, 
+        controlled_step_result try_step(System       system,
+                                        state_type & x,
+                                        deriv_type & dxdt,
+                                        time_type  & t,
                                         time_type  & dt) const
         {
             t += dt;

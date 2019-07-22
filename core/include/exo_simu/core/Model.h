@@ -84,7 +84,7 @@ namespace exo_simu
                             std::vector<std::string> const & contactFramesNames,
                             std::vector<std::string> const & jointsNames,
                             bool                     const & hasFreeflyer = true);
-        void reset(void);
+        virtual void reset(bool const & resetTelemetry = false);
 
         template<typename TSensor>
         result_t addSensor(std::string              const & sensorName,
@@ -92,23 +92,25 @@ namespace exo_simu
         result_t removeSensor(std::string const & sensorType,
                               std::string const & sensorName);
         result_t removeSensors(std::string const & sensorType);
-        void removeSensors(void);
 
         configHolder_t getOptions(void) const;
         result_t setOptions(configHolder_t mdlOptions); // Make a copy !
-        configHolder_t getSensorOptions(std::string const & sensorType,
-                                        std::string const & sensorName) const;
-        configHolder_t getSensorsOptions(std::string const & sensorType) const;
-        configHolder_t getSensorsOptions(void) const;
-        void setSensorOptions(std::string    const & sensorType,
-                              std::string    const & sensorName,
-                              configHolder_t const & sensorOptions);
-        void setSensorsOptions(std::string    const & sensorType,
-                               configHolder_t const & sensorsOptions);
-        void setSensorsOptions(configHolder_t const & sensorsOptions);
+        result_t getSensorOptions(std::string    const & sensorType,
+                                  std::string    const & sensorName,
+                                  configHolder_t       & sensorOptions) const;
+        result_t getSensorsOptions(std::string    const & sensorType,
+                                   configHolder_t       & sensorsOptions) const;
+        result_t getSensorsOptions(configHolder_t & sensorsOptions) const;
+        result_t setSensorOptions(std::string    const & sensorType,
+                                  std::string    const & sensorName,
+                                  configHolder_t const & sensorOptions);
+        result_t setSensorsOptions(std::string    const & sensorType,
+                                   configHolder_t const & sensorsOptions);
+        result_t setSensorsOptions(configHolder_t const & sensorsOptions);
         bool getIsInitialized(void) const;
         bool getIsTelemetryConfigured(void) const;
         std::string getUrdfPath(void) const;
+        bool getHasFreeFlyer(void) const;
         std::map<std::string, std::vector<std::string> > getSensorsNames(void) const;
         result_t getSensorsData(std::string const & sensorType,
                                 matrixN_t         & data) const;
@@ -120,23 +122,24 @@ namespace exo_simu
                             vectorN_t const & v,
                             vectorN_t const & a,
                             vectorN_t const & u);
-        void updateSensorsTelemetry(void);
+        void updateTelemetry(void);
         std::vector<int32_t> const & getContactFramesIdx(void) const;
+        std::vector<std::string> const & getJointsName(void) const;
         std::vector<int32_t> const & getJointsPositionIdx(void) const;
         std::vector<int32_t> const & getJointsVelocityIdx(void) const;
         uint32_t nq(void) const; // no get keyword for consistency with pinocchio C++ API
         uint32_t nv(void) const;
         uint32_t nx(void) const;
 
-    protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
-        
-        template<typename TSensor>
-        std::shared_ptr<TSensor> getSensor(std::string const & sensorType,
-                                           std::string const & sensorName);
 
-        result_t setUrdfPath(std::string const & urdfPath, 
-                             bool        const & hasFreeflyer);
+        template<typename TSensor>
+        result_t getSensor(std::string              const & sensorType,
+                           std::string              const & sensorName,
+                           std::shared_ptr<TSensor>       & sensor);
+
+        result_t loadUrdfModel(std::string const & urdfPath,
+                               bool        const & hasFreeflyer);
         result_t getFrameIdx(std::string const & frameName,
                              int32_t           & frameIdx) const;
         result_t getFramesIdx(std::vector<std::string> const & framesNames,
@@ -158,6 +161,7 @@ namespace exo_simu
         bool isInitialized_;
         bool isTelemetryConfigured_;
         std::string urdfPath_;
+        bool hasFreeflyer_;
         configHolder_t mdlOptionsHolder_;
 
         std::shared_ptr<TelemetryData> telemetryData_;
@@ -191,7 +195,7 @@ namespace exo_simu
         ~SensorDataHolder_t(void)
         {
             // Empty.
-        }; 
+        };
 
         boost::circular_buffer_space_optimized<float64_t> time_;
         boost::circular_buffer_space_optimized<matrixN_t> data_;

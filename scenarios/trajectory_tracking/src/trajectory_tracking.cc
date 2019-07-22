@@ -25,7 +25,7 @@ using namespace exo_simu;
 
 rowN_t Kp = (rowN_t(12) << 41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0,
                            41000.0, 16000.0, 16000.0, 32000.0, 4500.0, 3500.0).finished();
-rowN_t Kd = (rowN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0, 
+rowN_t Kd = (rowN_t(12) << 500.0, 160.0, 120.0, 270.0, 15.0, 20.0,
                            500.0, 160.0, 120.0, 270.0, 15.0, 20.0).finished();
 
 void compute_command(float64_t const & t,
@@ -39,7 +39,7 @@ void compute_command(float64_t const & t,
     u = -(Kp.array() * encoderSensorsData.row(0).array() + Kd.array() * encoderSensorsData.row(1).array());
 }
 
-bool callback(float64_t const & t, 
+bool callback(float64_t const & t,
               vectorN_t const & x)
 {
     return true;
@@ -104,26 +104,41 @@ int main(int argc, char *argv[])
     ExoModel model;
     configHolder_t mdlOptions = model.getOptions();
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableForceSensors")) = false;
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableImuSensors")) = true; 
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableImuSensors")) = true;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableEncoderSensors")) = false;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
     std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
-    configHolder_t imuSensorOptions = model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0]);
-    boost::get<bool>(imuSensorOptions.at("rawData")) = true;
+    configHolder_t imuSensorOptions;
+    model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
+    // boost::get<bool>(imuSensorOptions.at("rawData")) = true;
     boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
     model.setSensorsOptions(ImuSensor::type_, imuSensorOptions);
     boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
-    boost::get<float64_t>(imuSensorOptions.at("delay")) = 0.0e-3;
+    boost::get<float64_t>(imuSensorOptions.at("delay")) = 2.0e-3;
     boost::get<uint32_t>(imuSensorOptions.at("delayInterpolationOrder")) = 0U;
     model.setSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
 
     // Instantiate and configuration the exoskeleton controller
     ExoController controller;
     configHolder_t ctrlOptions = controller.getOptions();
-    boost::get<bool>(ctrlOptions.at("telemetryEnable")) = false;
+    boost::get<bool>(ctrlOptions.at("telemetryEnable")) = true;
     controller.setOptions(ctrlOptions);
-    controller.initialize(compute_command);
+    controller.initialize(model, compute_command);
+
+    vectorN_t qRef = vectorN_t::Zero(model.getJointsName().size());
+    vectorN_t dqRef = vectorN_t::Zero(qRef.size());
+    float64_t hzdState = 2.0; // Right leg support
+    std::vector<std::string> qRefNames;
+    std::vector<std::string> dqRefNames;
+    for (std::string const & jointName : removeFieldnamesSuffix(model.getJointsName(), "Joint"))
+    {
+        qRefNames.emplace_back("targetPosition" + jointName);
+        dqRefNames.emplace_back("targetVelocity" + jointName);
+    }
+    controller.registerNewVectorEntry(qRefNames, qRef);
+    controller.registerNewVectorEntry(dqRefNames, dqRef);
+    controller.registerNewEntry("HzdState", hzdState);
 
     // Instantiate and configuration the engine
     Engine engine;

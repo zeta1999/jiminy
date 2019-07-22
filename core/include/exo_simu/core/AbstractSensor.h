@@ -7,7 +7,7 @@
 #include "exo_simu/core/Model.h"
 
 namespace exo_simu
-{    
+{
     static uint8_t const MIN_DELAY_BUFFER_RESERVE(20);
     static uint8_t const MAX_DELAY_BUFFER_EXCEED(20);
 
@@ -60,7 +60,7 @@ namespace exo_simu
                            std::string const & name);
         virtual ~AbstractSensorBase(void);
 
-        virtual void reset(void) = 0;
+        virtual void reset(bool const & resetTelemetry = false) = 0;
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
 
         configHolder_t getOptions(void);
@@ -70,6 +70,7 @@ namespace exo_simu
         bool getIsTelemetryConfigured(void) const;
         virtual std::string getName(void) const;
         virtual std::string getType(void) const = 0;
+        virtual std::string getTelemetryName(void) const = 0;
         virtual std::vector<std::string> const & getFieldNames(void) const = 0;
 
         virtual result_t get(Eigen::Ref<vectorN_t> data) = 0;
@@ -92,7 +93,7 @@ namespace exo_simu
 
     public:
         std::unique_ptr<abstractSensorOptions_t const> sensorOptions_;
-        
+
     protected:
         configHolder_t sensorOptionsHolder_;
         TelemetrySender telemetrySender_;
@@ -120,7 +121,7 @@ namespace exo_simu
                           std::string                         const & name);
         virtual ~AbstractSensorTpl(void);
 
-        virtual void reset(void) override;
+        virtual void reset(bool const & resetTelemetry = false) override;
 
         virtual void setOptions(configHolder_t const & sensorOptions) override;
         virtual void setOptionsAll(configHolder_t const & sensorOptions) override;
@@ -138,10 +139,13 @@ namespace exo_simu
         void updateTelemetryAll(void) override;
 
     protected:
+        virtual std::string getTelemetryName(void) const override;
+
         virtual matrixN_t::ColXpr data(void) override;
 
     public:
         static std::string const type_;
+        static bool const areFieldNamesGrouped_;
         static std::vector<std::string> const fieldNamesPostProcess_;
         static std::vector<std::string> const fieldNamesPreProcess_;
         static float64_t delayMax_;

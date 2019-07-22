@@ -24,30 +24,30 @@ namespace exo_simu
         MemoryDevice& operator=(MemoryDevice&& other);
 
         int64_t size(void) const override
-        { 
-            return buffer_.size(); 
+        {
+            return buffer_.size();
         }
 
         bool_t isSequential(void) const override
-        { 
-            return false; 
+        {
+            return false;
         }
 
         int64_t pos(void) const override
-        { 
-            return currentPos_; 
+        {
+            return currentPos_;
         }
 
         int64_t bytesAvailable(void) const override
-        { 
+        {
             return (buffer_.size() - currentPos_);
         }
 
         result_t seek(int64_t pos) override;
 
-        int64_t readData(void    * data, 
+        int64_t readData(void    * data,
                          int64_t   dataSize) override;
-        int64_t writeData(void    const * data, 
+        int64_t writeData(void    const * data,
                           int64_t         dataSize) override;
 
         result_t setBlockingMode(bool_t) override;

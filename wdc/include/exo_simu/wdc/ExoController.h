@@ -9,6 +9,11 @@ namespace exo_simu
 {
     class ExoController : public AbstractController
     {
+    public:
+        // Disable the copy of the class
+        ExoController(ExoController const & controller) = delete;
+        ExoController & operator = (ExoController const & controller) = delete;
+
     protected:
         typedef std::function<void(float64_t const & /*t*/,
                                    vectorN_t const & /*q*/,
@@ -22,24 +27,26 @@ namespace exo_simu
         ExoController(void);
         ~ExoController(void);
 
-        result_t initialize(commandFct_t commandFct);
+        result_t initialize(Model        const & model,
+                            commandFct_t         commandFct);
         result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
 
-        virtual void updateTelemetry(void) override;
+        result_t fetchSensors(void);
 
-        void compute_command(Model     const & model,
-                             float64_t const & t,
-                             vectorN_t const & q,
-                             vectorN_t const & v,
-                             vectorN_t       & u) override;
-
-        void internalDynamics(Model     const & model,
-                              float64_t const & t,
-                              vectorN_t const & q,
-                              vectorN_t const & v,
-                              vectorN_t       & u) override;
+        result_t computeCommand(float64_t const & t,
+                                vectorN_t const & q,
+                                vectorN_t const & v,
+                                vectorN_t       & u) override;
+        result_t internalDynamics(float64_t const & t,
+                                  vectorN_t const & q,
+                                  vectorN_t const & v,
+                                  vectorN_t       & u) override;
 
     private:
+        using AbstractController::initialize; // Discourage the use
+
+    private:
+        ExoModel const * exoModel_; // Raw pointer to avoid managing its deletion
         commandFct_t commandFct_;
         matrixN_t forceSensorsData_;
         matrixN_t imuSensorsData_;

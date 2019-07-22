@@ -6,7 +6,7 @@
 
 namespace exo_simu
 {
-    std::string const CONTROLLER_OBJECT_NAME("Controller");
+    std::string const CONTROLLER_OBJECT_NAME("HighLevelController");
 
     class Model;
 
@@ -41,10 +41,15 @@ namespace exo_simu
         AbstractController(void);
         virtual ~AbstractController(void);
 
-        virtual void reset(void);
+        virtual result_t initialize(Model const & model);
+        virtual void reset(bool const & resetTelemetry = false);
 
-        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
-        virtual void updateTelemetry(void) = 0;
+        result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+        result_t registerNewVectorEntry(std::vector<std::string> const & fieldNames,
+                                        Eigen::Ref<vectorN_t>    const & values);
+        result_t registerNewEntry(std::string const & fieldName,
+                                  float64_t   const & value);
+        void updateTelemetry(void);
 
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & ctrlOptions);
@@ -52,26 +57,25 @@ namespace exo_simu
         bool getIsTelemetryConfigured(void) const;
 
         // It assumes that the model internal state is consistent with other input arguments
-        virtual void compute_command(Model     const & model,
-                                     float64_t const & t,
-                                     vectorN_t const & q,
-                                     vectorN_t const & v,
-                                     vectorN_t       & u) = 0;
-
-        virtual void internalDynamics(Model     const & model,
-                                      float64_t const & t,
-                                      vectorN_t const & q,
-                                      vectorN_t const & v,
-                                      vectorN_t       & u) = 0;
+        virtual result_t computeCommand(float64_t const & t,
+                                        vectorN_t const & q,
+                                        vectorN_t const & v,
+                                        vectorN_t       & u) = 0;
+        virtual result_t internalDynamics(float64_t const & t,
+                                          vectorN_t const & q,
+                                          vectorN_t const & v,
+                                          vectorN_t       & u) = 0;
 
     public:
         std::unique_ptr<controllerOptions_t const> ctrlOptions_;
 
     protected:
+        Model const * model_; // Raw pointer to avoid managing its deletion
         bool isInitialized_;
         bool isTelemetryConfigured_;
         configHolder_t ctrlOptionsHolder_;
         TelemetrySender telemetrySender_;
+        std::vector<std::pair<std::string, float64_t const *> > registeredInfo_;
     };
 }
 

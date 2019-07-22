@@ -43,7 +43,7 @@ namespace exo_simu
 
         bool_t isRegisteringAvailable;  ///< True if registering is available, false otherwise.
     };
-    
+
     class MemoryBuffer
     {
     public:
@@ -58,10 +58,10 @@ namespace exo_simu
         /// \param  name  Name of the shared memory.
         /// \param  size  Size of the shared memory in bytes.
         ///////////////////////////////////////////////////////////////////////
-        MemoryBuffer(std::string const & name, 
+        MemoryBuffer(std::string const & name,
                      std::size_t         size) :
-        name_(name), 
-        size_(size), 
+        name_(name),
+        size_(size),
         memAddress_(nullptr)
         {
             // Empty on purpose.
@@ -155,7 +155,7 @@ namespace exo_simu
         /// \return S_OK if successful, the corresponding telemetry error otherwise.
         ////////////////////////////////////////////////////////////////////////
         template <typename T>
-        result_t registerVariable(std::string const   & variableNameIn, 
+        result_t registerVariable(std::string const   & variableNameIn,
                                   T                 * & positionInBufferOut);
 
         ////////////////////////////////////////////////////////////////////////
@@ -201,8 +201,8 @@ namespace exo_simu
         /// \return S_OK if successful, the corresponding telemetry error otherwise.
         ////////////////////////////////////////////////////////////////////////
         template <typename T>
-        result_t internalRegisterVariable(struct memHeader       *   header, 
-                                          std::string      const   & variableNameIn, 
+        result_t internalRegisterVariable(struct memHeader       *   header,
+                                          std::string      const   & variableNameIn,
                                           T                      * & positionInBufferOut);
 
         ////////////////////////////////////////////////////////////////////////
@@ -213,7 +213,7 @@ namespace exo_simu
         ///
         /// \return -1 is the entry was not found, the position of the entry otherwise
         ////////////////////////////////////////////////////////////////////////
-        int32_t findEntry(struct memHeader       * header, 
+        int32_t findEntry(struct memHeader       * header,
                           std::string      const & name);
 
         MemoryBuffer constantsMem_;                ///< Shared memory to handle constants.
@@ -231,8 +231,8 @@ namespace exo_simu
 
 
     template <typename T>
-    result_t TelemetryData::internalRegisterVariable(struct memHeader       *   header, 
-                                                     std::string      const   & variableName, 
+    result_t TelemetryData::internalRegisterVariable(struct memHeader       *   header,
+                                                     std::string      const   & variableName,
                                                      T                      * & positionInBufferOut)
     {
         char_t * const memAddress = reinterpret_cast<char_t*>(header);

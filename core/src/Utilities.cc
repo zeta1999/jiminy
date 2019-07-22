@@ -13,7 +13,7 @@ namespace exo_simu
 {
     // *********************** Timer **************************
 
-    Timer::Timer(void) : 
+    Timer::Timer(void) :
     t0(),
     tf(),
     dt(0)
@@ -25,7 +25,7 @@ namespace exo_simu
     {
         t0 = Time::now();
     }
-    
+
     void Timer::toc(void)
     {
         tf = Time::now();
@@ -34,8 +34,8 @@ namespace exo_simu
     }
 
     // **************** Random number generator *****************
-    // Based on Ziggurat generator by Marsaglia and Tsang (JSS, 2000) 
-    
+    // Based on Ziggurat generator by Marsaglia and Tsang (JSS, 2000)
+
     std::mt19937 generator;
     std::uniform_real_distribution<float32_t> distUniform(0.0,1.0);
 
@@ -144,26 +144,26 @@ namespace exo_simu
         r4_nor_setup();
 	}
 
-	float64_t randUniform(float64_t const & lo, 
+	float64_t randUniform(float64_t const & lo,
 	                      float64_t const & hi)
     {
         return lo + r4_uni() * (hi - lo);
     }
 
-	float64_t randNormal(float64_t const & mean, 
+	float64_t randNormal(float64_t const & mean,
 	                     float64_t const & std)
     {
         return mean + r4_nor() * std;
     }
 
-    vectorN_t randVectorNormal(uint32_t  const & size, 
+    vectorN_t randVectorNormal(uint32_t  const & size,
                                float64_t const & mean,
                                float64_t const & std)
     {
         if (std > 0.0)
         {
-            return vectorN_t::NullaryExpr(size, 
-                                        [&mean, &std] (vectorN_t::Index const &) -> float64_t 
+            return vectorN_t::NullaryExpr(size,
+                                        [&mean, &std] (vectorN_t::Index const &) -> float64_t
                                         {
                                             return randNormal(mean, std);
                                         });
@@ -174,7 +174,7 @@ namespace exo_simu
         }
     }
 
-    vectorN_t randVectorNormal(uint32_t  const & size, 
+    vectorN_t randVectorNormal(uint32_t  const & size,
                                float64_t const & std)
     {
         return randVectorNormal(size, 0, std);
@@ -183,8 +183,8 @@ namespace exo_simu
     vectorN_t randVectorNormal(vectorN_t const & mean,
                                vectorN_t const & std)
     {
-        return vectorN_t::NullaryExpr(std.size(), 
-                                      [&mean, &std] (vectorN_t::Index const & i) -> float64_t 
+        return vectorN_t::NullaryExpr(std.size(),
+                                      [&mean, &std] (vectorN_t::Index const & i) -> float64_t
                                       {
                                           return randNormal(mean[i], std[i]);
                                       });
@@ -192,8 +192,8 @@ namespace exo_simu
 
     vectorN_t randVectorNormal(vectorN_t const & std)
     {
-        return vectorN_t::NullaryExpr(std.size(), 
-                                      [&std] (vectorN_t::Index const & i) -> float64_t 
+        return vectorN_t::NullaryExpr(std.size(),
+                                      [&std] (vectorN_t::Index const & i) -> float64_t
                                       {
                                           return randNormal(0, std[i]);
                                       });
@@ -237,15 +237,32 @@ namespace exo_simu
         }
     }
 
-    std::vector<std::string> defaultVectorFieldnames(std::string const & baseName, 
+    std::vector<std::string> defaultVectorFieldnames(std::string const & baseName,
                                                      uint32_t    const & size)
     {
         std::vector<std::string> fieldnames;
         fieldnames.reserve(size);
         for (uint32_t i=0; i<size; i++)
         {
-            fieldnames.emplace_back(baseName + "_" + std::to_string(i)); // TODO: MR going to support "." delimiter
+            fieldnames.emplace_back(baseName + std::to_string(i)); // TODO: MR going to support "." delimiter
         }
+        return fieldnames;
+    }
+
+    std::vector<std::string> removeFieldnamesSuffix(std::vector<std::string>         fieldnames,
+                                                    std::string              const & suffix)
+    {
+        std::transform(fieldnames.begin(),
+                       fieldnames.end(),
+                       fieldnames.begin(),
+                       [&suffix](std::string name) -> std::string
+                       {
+                           if (!name.compare(name.size() - suffix.size(), suffix.size(), suffix))
+                           {
+                               name.erase(name.size() - suffix.size(), name.size());
+                           }
+                           return name;
+                       });
         return fieldnames;
     }
 
