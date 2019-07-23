@@ -29,13 +29,19 @@ namespace exo_simu
 
     // math types.
     typedef Eigen::Matrix<float64_t, Eigen::Dynamic, Eigen::Dynamic> matrixN_t;
+    typedef Eigen::Matrix<float64_t, 3, 3>                           matrix3_t;
     typedef Eigen::Matrix<float64_t, Eigen::Dynamic, 1>              vectorN_t;
+    typedef Eigen::Matrix<float64_t, 3, 1>                           vector3_t;
+    typedef Eigen::Matrix<float64_t, 6, 1>                           vector6_t;
     typedef Eigen::Matrix<float64_t, 1, Eigen::Dynamic>              rowN_t;
 
     typedef Eigen::Block<matrixN_t const, Eigen::Dynamic, Eigen::Dynamic> constBlockXpr;
     typedef Eigen::Block<matrixN_t, Eigen::Dynamic, Eigen::Dynamic> blockXpr;
 
     typedef Eigen::Quaternion<float64_t> quaternion_t;
+
+    float64_t const INF = std::numeric_limits<float64_t>::infinity();
+    float64_t const EPS = std::numeric_limits<float64_t>::epsilon();
 
     // exo_simu specific type
     enum class result_t : int32_t
@@ -46,7 +52,8 @@ namespace exo_simu
         ERROR_INIT_FAILED = -3
     };
 
-    typedef boost::make_recursive_variant<bool_t, uint32_t, int32_t, float64_t, std::string, std::vector<std::string>, vectorN_t, matrixN_t,
+    typedef boost::make_recursive_variant<bool_t, uint32_t, int32_t, float64_t, std::string, vectorN_t, matrixN_t,
+                                          std::vector<std::string>, std::vector<vectorN_t>, std::vector<matrixN_t>,
                                           std::map<std::string, boost::recursive_variant_> >::type configField_t;
     typedef std::map<std::string, configField_t> configHolder_t;
 

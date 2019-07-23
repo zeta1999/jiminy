@@ -1,6 +1,7 @@
 #ifndef SIMU_ENGINE_H
 #define SIMU_ENGINE_H
 
+#include <tuple>
 #include <string>
 #include <functional>
 
@@ -30,6 +31,9 @@ namespace exo_simu
     class Engine
     {
     protected:
+        typedef std::function<vector3_t(float64_t const & /*t*/,
+                                        vectorN_t const & /*x*/)> external_force_t;
+
         typedef std::function<bool(float64_t const & /*t*/,
                                    vectorN_t const & /*x*/)> callbackFct_t;
 
@@ -274,18 +278,19 @@ namespace exo_simu
                 if (returnCode == result_t::SUCCESS)
                 {
                     // Initialize the odestepper state buffers
-                    iterLast = 0;
+                    iterLast = -1;
                     tLast = 0;
                     qLast = x_init.head(model.nq());
                     vLast = x_init.tail(model.nv());
                     aLast = vectorN_t::Zero(model.nv());
                     uLast = vectorN_t::Zero(model.nv());
-                    uCommandLast = vectorN_t::Zero(model.getMotorsVelocityIdx().size());
+                    uCommandLast = vectorN_t::Zero(model.getMotorsNames().size());
 
                     // Initialize the internal systemDynamics buffers
                     x = x_init;
                     dxdt = vectorN_t::Zero(model.nx());
                     uControl = vectorN_t::Zero(model.nv());
+
                     fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(),
                                                                                   pinocchio::Force::Zero());
                     uBounds = vectorN_t::Zero(model.nv());
@@ -318,7 +323,7 @@ namespace exo_simu
 
         public:
             // State information about the last iteration
-            uint32_t iterLast;
+            int32_t iterLast;
             float64_t tLast;
             vectorN_t qLast;
             vectorN_t vLast;
@@ -348,13 +353,20 @@ namespace exo_simu
         result_t initialize(Model              & model,
                             AbstractController & controller,
                             callbackFct_t        callbackFct);
-        void reset(bool const & resetTelemetry = false);
+        void reset(bool const & resetDynamicForceRegister = false);
 
         result_t configureTelemetry(void);
         void updateTelemetry(void);
 
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
+
+        void registerForceImpulse(std::string const & frameName,
+                                  float64_t   const & t,
+                                  float64_t   const & dt,
+                                  vector3_t   const & F);
+        void registerForceProfile(std::string      const & frameName,
+                                  external_force_t         forceFct);
 
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & engineOptions);
@@ -374,6 +386,8 @@ namespace exo_simu
         void boundsDynamics(vectorN_t const & q,
                             vectorN_t const & v,
                             vectorN_t       & u);
+        vector6_t computeFrameForceOnParentJoint(int32_t   const & frameId,
+                                                 vector3_t const & fextInWorld) const;
         vectorN_t contactDynamics(int32_t const & frameId) const;
 
     public:
@@ -381,6 +395,7 @@ namespace exo_simu
 
     protected:
         bool isInitialized_;
+        bool isTelemetryConfigured_;
         Model * model_;
         AbstractController * controller_;
         configHolder_t engineOptionsHolder_;
@@ -391,6 +406,9 @@ namespace exo_simu
         std::shared_ptr<TelemetryData> telemetryData_;
         std::unique_ptr<TelemetryRecorder> telemetryRecorder_;
         stepperState_t stepperState_; // Internal state for the integration loop
+        std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> > forcesImpulse_;
+        std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> >::const_iterator forceImpulseNextIt_;
+        std::vector<std::pair<std::string, std::tuple<int32_t, external_force_t> > > forcesProfile_;
     };
 
     class explicit_euler

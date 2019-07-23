@@ -46,12 +46,12 @@ namespace exo_simu
                 float64_t t = 0;
                 vectorN_t q = vectorN_t::Zero(model_->nq());
                 vectorN_t v = vectorN_t::Zero(model_->nv());
-                vectorN_t uCommand = vectorN_t::Zero(model_->getMotorsVelocityIdx().size());
+                vectorN_t uCommand = vectorN_t::Zero(model_->getMotorsNames().size());
                 vectorN_t uInternal = vectorN_t::Zero(model_->nv());
                 returnCode = computeCommand(t, q, v, uCommand);
                 if (returnCode == result_t::SUCCESS)
                 {
-                    if(uCommand.size() != (int32_t) model_->getMotorsVelocityIdx().size())
+                    if(uCommand.size() != (int32_t) model_->getMotorsNames().size())
                     {
                         std::cout << "Error - AbstractController::initialize - 'computeCommand' returns command with wrong size." << std::endl;
                         returnCode = result_t::ERROR_BAD_INPUT;
@@ -83,14 +83,15 @@ namespace exo_simu
         return returnCode;
     }
 
-    void AbstractController::reset(bool const & resetTelemetry)
+    void AbstractController::reset(bool const & resetDynamicTelemetry)
     {
-        // Reset the telemetry state
-        if (resetTelemetry)
+        // Reset the telemetry buffer of dynamically registered quantities
+        if (resetDynamicTelemetry)
         {
             registeredInfo_.clear();
-            isTelemetryConfigured_ = false;
         }
+
+        isTelemetryConfigured_ = false;
     }
 
     result_t AbstractController::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
@@ -105,9 +106,9 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            if (telemetryData)
+            if (!isTelemetryConfigured_ && ctrlOptions_->telemetryEnable)
             {
-                if (ctrlOptions_->telemetryEnable)
+                if (telemetryData)
                 {
                     telemetrySender_.configureObject(telemetryData, CONTROLLER_OBJECT_NAME);
                     for (std::pair<std::string, float64_t const *> const & registeredVariable : registeredInfo_)
@@ -116,12 +117,17 @@ namespace exo_simu
                     }
                     isTelemetryConfigured_ = true;
                 }
+                else
+                {
+                    std::cout << "Error - AbstractController::configureTelemetry - Telemetry not initialized. Impossible to log controller data." << std::endl;
+                    returnCode = result_t::ERROR_INIT_FAILED;
+                }
             }
-            else
-            {
-                std::cout << "Error - AbstractController::configureTelemetry - Telemetry not initialized. Impossible to log controller data." << std::endl;
-                returnCode = result_t::ERROR_INIT_FAILED;
-            }
+        }
+
+        if (returnCode != result_t::SUCCESS)
+        {
+            isTelemetryConfigured_ = false;
         }
 
         return returnCode;
@@ -134,7 +140,7 @@ namespace exo_simu
 
         result_t returnCode = result_t::SUCCESS;
 
-        if (getIsTelemetryConfigured())
+        if (isTelemetryConfigured_)
         {
             std::cout << "Error - AbstractController::registerNewVectorEntry - Telemetry already initialized. Impossible to register new variables." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -159,7 +165,7 @@ namespace exo_simu
 
         result_t returnCode = result_t::SUCCESS;
 
-        if (getIsTelemetryConfigured())
+        if (isTelemetryConfigured_)
         {
             std::cout << "Error - AbstractController::registerNewEntry - Telemetry already initialized. Impossible to register new variables." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -175,7 +181,7 @@ namespace exo_simu
 
     void AbstractController::updateTelemetry(void)
     {
-        if (getIsTelemetryConfigured())
+        if (isTelemetryConfigured_)
         {
             for (std::pair<std::string, float64_t const *> const & registeredVariable : registeredInfo_)
             {

@@ -71,32 +71,8 @@ namespace python
     ///////////////////////////////////////////////////////////////////////////////
     /// \brief  Convert Eigen vector to Numpy array by reference.
     ///////////////////////////////////////////////////////////////////////////////
-    PyObject * getNumpyReferenceFromEigenVector(vectorN_t  & data,
-                                                pyVector_t   type = pyVector_t::vector)
-    {
-        if (type == pyVector_t::vector)
-        {
-            npy_intp dims[1] = {npy_intp(data.size())};
-            return PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, data.data());
-        }
-        else
-        {
-            npy_intp dims[2] = {npy_intp(1), npy_intp(data.size())};
-            PyObject * pyData = PyArray_SimpleNewFromData(2, dims, NPY_DOUBLE, data.data());
-
-            if (type == pyVector_t::matrixCol)
-            {
-                return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(pyData), NULL);
-            }
-            else
-            {
-                return pyData;
-            }
-        }
-    }
-
-    PyObject * getNumpyReferenceFromEigenVector(vectorN_t  const & data,
-                                                pyVector_t         type = pyVector_t::vector)
+    PyObject * getNumpyReferenceFromEigenVector(Eigen::Ref<vectorN_t const> data, // Must use Ref to support fixed size array without copy
+                                                pyVector_t                  type = pyVector_t::vector)
     {
         if (type == pyVector_t::vector)
         {
@@ -110,11 +86,11 @@ namespace python
 
             if (type == pyVector_t::matrixCol)
             {
-                return pyData;
+                return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(pyData), NULL);
             }
             else
             {
-                return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(pyData),NULL);
+                return pyData;
             }
         }
     }
@@ -122,14 +98,7 @@ namespace python
     ///////////////////////////////////////////////////////////////////////////////
     /// \brief  Convert Eigen matrix to Numpy array by reference.
     ///////////////////////////////////////////////////////////////////////////////
-    PyObject * getNumpyReferenceFromEigenMatrix(matrixN_t & data)
-    {
-        npy_intp dims[2] = {npy_intp(data.cols()), npy_intp(data.rows())};
-        return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(
-            PyArray_SimpleNewFromData(2, dims, NPY_DOUBLE, data.data())),NULL);
-    }
-
-    PyObject * getNumpyReferenceFromEigenMatrix(matrixN_t const & data)
+    PyObject * getNumpyReferenceFromEigenMatrix(Eigen::Ref<matrixN_t const> data)
     {
         npy_intp dims[2] = {npy_intp(data.cols()), npy_intp(data.rows())};
         return  PyArray_Transpose(reinterpret_cast<PyArrayObject *>(
@@ -200,10 +169,6 @@ namespace python
             {
                 configPy[name] = boost::get<std::string>(config.at(name));
             }
-            else if (optionType == typeid(std::vector<std::string>))
-            {
-                configPy[name] = boost::get<std::vector<std::string> >(config.at(name));
-            }
             else if (optionType == typeid(vectorN_t))
             {
                 configPy[name] = eigenVectorTolistPy(boost::get<vectorN_t>(config.at(name)));
@@ -211,6 +176,18 @@ namespace python
             else if (optionType == typeid(matrixN_t))
             {
                 configPy[name] = eigenMatrixTolistPy(boost::get<matrixN_t>(config.at(name)));
+            }
+            else if (optionType == typeid(std::vector<std::string>))
+            {
+                configPy[name] = boost::get<std::vector<std::string> >(config.at(name));
+            }
+            else if (optionType == typeid(std::vector<vectorN_t>))
+            {
+                configPy[name] = boost::get<std::vector<vectorN_t> >(config.at(name));
+            }
+            else if (optionType == typeid(std::vector<matrixN_t>))
+            {
+                configPy[name] = boost::get<std::vector<matrixN_t> >(config.at(name));
             }
             else if (optionType == typeid(configHolder_t))
             {
@@ -330,11 +307,6 @@ namespace python
             {
                  boost::get<std::string>(config.at(name)) = bp::extract<std::string>(configPy[name]);
             }
-            else if (optionType == typeid(std::vector<std::string>))
-            {
-                boost::get<std::vector<std::string> >(config.at(name)) =
-                    listPyToStdVector<std::string>(bp::extract<bp::list>(configPy[name]));
-            }
             else if (optionType == typeid(vectorN_t))
             {
                 boost::get<vectorN_t>(config.at(name)) =
@@ -344,6 +316,21 @@ namespace python
             {
                 boost::get<matrixN_t>(config.at(name)) =
                     listPyToEigenMatrix(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(std::vector<std::string>))
+            {
+                boost::get<std::vector<std::string> >(config.at(name)) =
+                    listPyToStdVector<std::string>(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(std::vector<vectorN_t>))
+            {
+                boost::get<std::vector<vectorN_t> >(config.at(name)) =
+                    listPyToStdVector<vectorN_t>(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(std::vector<matrixN_t>))
+            {
+                boost::get<std::vector<matrixN_t> >(config.at(name)) =
+                    listPyToStdVector<matrixN_t>(bp::extract<bp::list>(configPy[name]));
             }
             else if (optionType == typeid(configHolder_t))
             {

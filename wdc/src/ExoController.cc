@@ -118,6 +118,18 @@ namespace exo_simu
             {
                 u(jointId) = -frictionViscous * v(jointId);
             }
+
+            // Compute the flexibilities
+            std::vector<int32_t> const & jointPositionId = exoModel_->getFlexibleJointsPositionIdx();
+            std::vector<int32_t> const & jointVelocityId = exoModel_->getFlexibleJointsVelocityIdx();
+            for (uint32_t i=0; i<jointVelocityId.size(); ++i)
+            {
+                float64_t theta;
+                quaternion_t quat(q.segment<4>(jointPositionId[i]).data()); // Only way to initialize with [x,y,z,w] order
+                vectorN_t axis = pinocchio::quaternion::log3(quat, theta);
+                u.segment<3>(jointVelocityId[i]) = - exoModel_->exoMdlOptions_->dynamics.flexibleJointsStiffness[i].array() * axis.array()
+                    - exoModel_->exoMdlOptions_->dynamics.flexibleJointsDamping[i].array() * v.segment<3>(jointVelocityId[i]).array();
+            }
         }
 
         return returnCode;

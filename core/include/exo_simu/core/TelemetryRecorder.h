@@ -43,6 +43,11 @@ namespace exo_simu
         result_t initialize(void);
 
         ////////////////////////////////////////////////////////////////////////
+        /// \brief Reset the recorder.
+        ////////////////////////////////////////////////////////////////////////
+        void reset(void);
+
+        ////////////////////////////////////////////////////////////////////////
         /// \brief Create a new line in the record with the current telemetry data.
         ////////////////////////////////////////////////////////////////////////
         result_t flushDataSnapshot(float64_t const & timestamp);
@@ -71,6 +76,8 @@ namespace exo_simu
         ///////////////////////////////////////////////////////////////////////
         std::shared_ptr<TelemetryData const> telemetryData_;
         std::vector<MemoryDevice> flows_;
+
+        bool isInitialized_;
 
         int64_t recordedBytesLimits_;
         int64_t recordedBytesDataLine_;

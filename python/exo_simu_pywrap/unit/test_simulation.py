@@ -1,4 +1,5 @@
 import time
+from math import *
 import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit # Use to precompile Python code
@@ -74,6 +75,15 @@ simu_options['contacts']['frictionDry'] = 5.0
 simu_options['contacts']['frictionViscous'] = 5.0
 simu_options['contacts']['transitionEps'] = 0.001
 
+model_options["dynamics"]["inertiaBodiesBiasStd"] = 0.0
+model_options["dynamics"]["massBodiesBiasStd"] = 0.0
+model_options["dynamics"]["centerOfMassPositionBodiesBiasStd"] = 0.0
+model_options["dynamics"]["relativePositionBodiesBiasStd"] = 0.0
+model_options["dynamics"]["enableFlexibleModel"] = True
+model_options["dynamics"]["flexibleJointsNames"] = ["RightTransverseHipJoint"]
+model_options["dynamics"]["flexibleJointsStiffness"] = [np.array([[1.0e5, 1.0e5, 1.0e5]]).T]
+model_options["dynamics"]["flexibleJointsDamping"] = [np.array([[1.0e1, 1.0e1, 1.0e1]]).T]
+
 # for sensorOptions in sensors_options['ImuSensor'].values():
 #     sensorOptions['rawData'] = True
 #     sensorOptions['noiseStd'] = [5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0]
@@ -100,6 +110,13 @@ def callback(t, x, out):
 x0 = get_initial_state_simulation(trajectory_data)
 tf = 3.0
 
+# simulator.register_force_impulse("PelvisLink", 1.5, 10.0e-3, np.array([[1.0e3, 0.0, 0.0]]).T)
+# simulator.register_force_impulse("PelvisLink", 2.2, 20.0e-3, np.array([[0.0, 1.0e3, 0.0]]).T)
+# def forceFct(t, x, out):
+#     out[0] = 1.0e2 * sin(2 * pi * (t / 0.5))
+#     out[1] = 1.0e2 * cos(2 * pi * (t / 0.5))
+# simulator.register_force_profile("PelvisLink", forceFct)
+
 controller.reset()
 simulator.run(x0, 5e-2, controller.compute_command, callback) # Force compile Python controller for a fair benchmark
 
@@ -119,7 +136,8 @@ log_header = log_info[(log_info.index('StartColumns')+1):-1]
 
 print('%i log points' % log_data.shape[0])
 print(log_constants)
-trajectory_data_log = extract_state_from_simulation_log(urdf_path, log_header, log_data)
+pinocchio_model = simulator.get_pinocchio_model()
+trajectory_data_log = extract_state_from_simulation_log(urdf_path, log_header, log_data, pinocchio_model)
 
 nb_steps = int(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evolution_robot'][-1].t)
 trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
@@ -132,7 +150,10 @@ trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 # plt.show()
 
 # Display the simulation trajectory and the reference
-# play_trajectories([trajectory_data_ref, trajectory_data_log], xyz_offset=[None, None], urdf_rgba=[(1.0,0.0,0.0,0.5), None], speed_ratio=0.5)
+# play_trajectories([trajectory_data_ref, trajectory_data_log],
+#                   xyz_offset=[None, None],
+#                   urdf_rgba=[(1.0,0.0,0.0,0.5), None],
+#                   speed_ratio=0.5)
 
 # Display some kinematics data
 # plot_kinematics(trajectory_data_log, trajectory_data_ref)

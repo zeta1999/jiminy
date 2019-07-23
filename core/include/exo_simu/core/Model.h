@@ -19,6 +19,7 @@ namespace exo_simu
 {
     std::string const JOINT_PREFIX_BASE("current");
     std::string const FREE_FLYER_PREFIX_BASE_NAME(JOINT_PREFIX_BASE + "FreeFlyer");
+    std::string const FLEXIBLE_JOINT_SUFFIX = "FlexibleJoint";
 
     class Engine;
     class AbstractSensorBase;
@@ -68,8 +69,10 @@ namespace exo_simu
             config["massBodiesBiasStd"] = 0.0;
             config["centerOfMassPositionBodiesBiasStd"] = 0.0;
             config["relativePositionBodiesBiasStd"] = 0.0;
-            config["isFlexibleModel"] = true;
-            config["flexibleJointNames"] = std::vector<std::string>();
+            config["enableFlexibleModel"] = true;
+            config["flexibleJointsNames"] = std::vector<std::string>();
+            config["flexibleJointsStiffness"] = std::vector<vectorN_t>();
+            config["flexibleJointsDamping"] = std::vector<vectorN_t>();
 
             return config;
         };
@@ -80,16 +83,20 @@ namespace exo_simu
             float64_t                const massBodiesBiasStd;
             float64_t                const centerOfMassPositionBodiesBiasStd;
             float64_t                const relativePositionBodiesBiasStd;
-            bool                     const isFlexibleModel;
-            std::vector<std::string> const flexibleJointNames;
+            bool                     const enableFlexibleModel;
+            std::vector<std::string> const flexibleJointsNames;
+            std::vector<vectorN_t>   const flexibleJointsStiffness;
+            std::vector<vectorN_t>   const flexibleJointsDamping;
 
             dynamicsOptions_t(configHolder_t const & options) :
             inertiaBodiesBiasStd(boost::get<float64_t>(options.at("inertiaBodiesBiasStd"))),
             massBodiesBiasStd(boost::get<float64_t>(options.at("massBodiesBiasStd"))),
             centerOfMassPositionBodiesBiasStd(boost::get<float64_t>(options.at("centerOfMassPositionBodiesBiasStd"))),
             relativePositionBodiesBiasStd(boost::get<float64_t>(options.at("relativePositionBodiesBiasStd"))),
-            isFlexibleModel(boost::get<bool>(options.at("isFlexibleModel"))),
-            flexibleJointNames(boost::get<std::vector<std::string> >(options.at("flexibleJointNames")))
+            enableFlexibleModel(boost::get<bool>(options.at("enableFlexibleModel"))),
+            flexibleJointsNames(boost::get<std::vector<std::string> >(options.at("flexibleJointsNames"))),
+            flexibleJointsStiffness(boost::get<std::vector<vectorN_t> >(options.at("flexibleJointsStiffness"))),
+            flexibleJointsDamping(boost::get<std::vector<vectorN_t> >(options.at("flexibleJointsDamping")))
             {
                 // Empty.
             }
@@ -125,7 +132,10 @@ namespace exo_simu
                             std::vector<std::string> const & contactFramesNames,
                             std::vector<std::string> const & motorsNames,
                             bool                     const & hasFreeflyer = true);
-        virtual void reset(bool const & resetTelemetry = false);
+        virtual void reset(void);
+
+        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+        void updateTelemetry(void);
 
         template<typename TSensor>
         result_t addSensor(std::string              const & sensorName,
@@ -163,38 +173,37 @@ namespace exo_simu
                             vectorN_t const & v,
                             vectorN_t const & a,
                             vectorN_t const & u);
-        void updateTelemetry(void);
         std::vector<int32_t> const & getContactFramesIdx(void) const;
-        std::vector<std::string> const & getMotorsName(void) const;
+        std::vector<std::string> const & getMotorsNames(void) const;
         std::vector<int32_t> const & getMotorsPositionIdx(void) const;
         std::vector<int32_t> const & getMotorsVelocityIdx(void) const;
+        std::vector<std::string> const & getRigidJointsNames(void) const;
+        std::vector<int32_t> const & getRigidJointsPositionIdx(void) const;
+        std::vector<int32_t> const & getRigidJointsVelocityIdx(void) const;
+        std::vector<std::string> const & getFlexibleJointsNames(void) const;
+        std::vector<int32_t> const & getFlexibleJointsPositionIdx(void) const;
+        std::vector<int32_t> const & getFlexibleJointsVelocityIdx(void) const;
         std::vector<std::string> const & getPositionFieldNames(void) const;
         std::vector<std::string> const & getVelocityFieldNames(void) const;
         std::vector<std::string> const & getAccelerationFieldNames(void) const;
         std::vector<std::string> const & getMotorTorqueFieldNames(void) const;
-        uint32_t nq(void) const; // no get keyword for consistency with pinocchio C++ API
-        uint32_t nv(void) const;
-        uint32_t nx(void) const;
 
-        virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
+        // Getter without keywords for consistency with pinocchio C++ API
+        uint32_t const & nq(void) const;
+        uint32_t const & nv(void) const;
+        uint32_t const & nx(void) const;
 
         template<typename TSensor>
         result_t getSensor(std::string              const & sensorType,
                            std::string              const & sensorName,
                            std::shared_ptr<TSensor>       & sensor);
 
+    protected:
         result_t loadUrdfModel(std::string const & urdfPath,
                                bool        const & hasFreeflyer);
-        result_t getFrameIdx(std::string const & frameName,
-                             int32_t           & frameIdx) const;
-        result_t getFramesIdx(std::vector<std::string> const & framesNames,
-                              std::vector<int32_t>           & framesIdx) const;
-        result_t getJointIdx(std::string const & motorName,
-                             int32_t           & motorPositionIdx,
-                             int32_t           & motorVelocityIdx) const;
-        result_t getJointsIdx(std::vector<std::string> const & motorsNames,
-                              std::vector<int32_t>           & motorsPositionIdx,
-                              std::vector<int32_t>           & motorsVelocityIdx) const;
+        result_t generateFlexibleModel(void);
+        result_t generateBiasedModel(void);
+        result_t generateFieldNames(void);
 
     public:
         pinocchio::Model pncModel_;
@@ -212,17 +221,26 @@ namespace exo_simu
         std::shared_ptr<TelemetryData> telemetryData_;
         sensorsGroupHolder_t sensorsGroupHolder_;
 
-        std::vector<std::string> contactFramesNames_;
-        std::vector<std::string> motorsNames_;
-        std::vector<int32_t> contactFramesIdx_;  // Indices of the contact frame in the model
-        std::vector<int32_t> motorsPositionIdx_; // Indices of the actuated joints in the configuration representation
-        std::vector<int32_t> motorsVelocityIdx_; // Indices of the actuated joints in the velocity vector representation
-        std::vector<std::string> positionFieldNames_;
-        std::vector<std::string> velocityFieldNames_;
-        std::vector<std::string> accelerationFieldNames_;
-        std::vector<std::string> motorTorqueFieldNames_;
+        std::vector<std::string> contactFramesNames_;       // Name of the frames of the contact points of the model
+        std::vector<int32_t> contactFramesIdx_;             // Indices of the contact frames in the frame list of the model
+        std::vector<std::string> motorsNames_;              // Joint name of the motors of the model
+        std::vector<int32_t> motorsPositionIdx_;            // First indices of the motors in the configuration vector of the model
+        std::vector<int32_t> motorsVelocityIdx_;            // First indices of the motors in the velocity vector of the model
+        std::vector<std::string> rigidJointsNames_;         // Name of the actual joints of the model
+        std::vector<int32_t> rigidJointsPositionIdx_;       // Indices of the actual joints in the configuration vector of the model
+        std::vector<int32_t> rigidJointsVelocityIdx_;       // Indices of the actual joints in the velocity vector of the model
+        std::vector<std::string> flexibleJointsNames_;      // Name of the flexibility joints of the model
+        std::vector<int32_t> flexibleJointsPositionIdx_;    // First indices of the flexibility joints in the configuration vector of the model
+        std::vector<int32_t> flexibleJointsVelocityIdx_;    // First indices of the flexibility joints in the velocity vector of the model
+
+        std::vector<std::string> positionFieldNames_;       // Fieldnames of the elements in the configuration vector of the rigid model
+        std::vector<std::string> velocityFieldNames_;       // Fieldnames of the elements in the velocity vector of the rigid model
+        std::vector<std::string> accelerationFieldNames_;   // Fieldnames of the elements in the acceleration vector of the rigid model
+        std::vector<std::string> motorTorqueFieldNames_;    // Fieldnames of the torques of the motors
 
     private:
+        pinocchio::Model pncModelRigidOrig_;
+        pinocchio::Model pncModelFlexibleOrig_;
         std::map<std::string, std::shared_ptr<SensorDataHolder_t> > sensorsDataHolder_;
         uint32_t nq_;
         uint32_t nv_;

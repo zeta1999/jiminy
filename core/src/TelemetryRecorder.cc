@@ -15,6 +15,7 @@ namespace exo_simu
     TelemetryRecorder::TelemetryRecorder(std::shared_ptr<TelemetryData const> const & telemetryDataInstance) :
     telemetryData_(telemetryDataInstance),
     flows_(),
+    isInitialized_(false),
     recordedBytesLimits_(0),
     recordedBytesDataLine_(0),
     recordedBytes_(0),
@@ -36,36 +37,60 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        // Get telemetry data infos.
-        telemetryData_->getData(integersAddress_,
-                                integerSectionSize_,
-                                floatsAddress_,
-                                floatSectionSize_);
-        recordedBytesDataLine_ = integerSectionSize_ + floatSectionSize_ + static_cast<int64_t>(START_LINE_TOKEN.size() + sizeof(uint32_t));
+        if (isInitialized_)
+        {
+            std::cout << "Error - TelemetryRecorder::initialize - TelemetryRecorder already initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
 
-        // Get the header
         std::vector<char_t> header;
-        telemetryData_->formatHeader(header);
-        headerSize_ = header.size();
+        if (returnCode == result_t::SUCCESS)
+        {
+            // Reset the internal state
+            reset();
 
+            // Get telemetry data infos.
+            telemetryData_->getData(integersAddress_,
+                                    integerSectionSize_,
+                                    floatsAddress_,
+                                    floatSectionSize_);
+            recordedBytesDataLine_ = integerSectionSize_ + floatSectionSize_ + static_cast<int64_t>(START_LINE_TOKEN.size() + sizeof(uint32_t));
+
+            // Get the header
+            telemetryData_->formatHeader(header);
+            headerSize_ = header.size();
+
+            // Create a new MemoryDevice and open it.
+            returnCode = createNewChunk();
+        }
+
+        // Write the Header
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = flows_[0].write(header);
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            recordedBytes_ = headerSize_;
+            isInitialized_ = true;
+        }
+
+        return returnCode;
+    }
+
+    void TelemetryRecorder::reset(void)
+    {
         // Close the current MemoryDevice, if any and if it was opened.
         if (!flows_.empty())
         {
             flows_.back().close();
         }
 
-        // Create a new MemoryDevice and open it.
+        // Clear the MemoryDevice buffer
         flows_.clear();
-        returnCode = createNewChunk();
 
-        // Write the Header
-        if (returnCode == result_t::SUCCESS)
-        {
-            returnCode = flows_[0].write(header);
-            recordedBytes_ = headerSize_;
-        }
-
-        return returnCode;
+        isInitialized_ = false;
     }
 
     result_t TelemetryRecorder::createNewChunk()

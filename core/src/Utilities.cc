@@ -7,7 +7,6 @@
 
 #include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/TelemetrySender.h"
-#include "exo_simu/core/Model.h"
 
 
 namespace exo_simu
@@ -37,8 +36,8 @@ namespace exo_simu
     // ***************** Random number generator *****************
     // Based on Ziggurat generator by Marsaglia and Tsang (JSS, 2000)
 
-    std::mt19937 generator;
-    std::uniform_real_distribution<float32_t> distUniform(0.0,1.0);
+    std::mt19937 generator_;
+    std::uniform_real_distribution<float32_t> distUniform_(0.0,1.0);
 
     uint32_t kn[128];
     float32_t fn[128];
@@ -74,7 +73,7 @@ namespace exo_simu
 
     float32_t r4_uni(void)
     {
-        return distUniform(generator);
+        return distUniform_(generator_);
     }
 
     float32_t r4_nor(void)
@@ -85,7 +84,7 @@ namespace exo_simu
         float32_t x;
         float32_t y;
 
-        hz = static_cast<int32_t>(generator());
+        hz = static_cast<int32_t>(generator_());
         iz = (hz & 127U);
 
         if (fabs(hz) < kn[iz])
@@ -125,7 +124,7 @@ namespace exo_simu
                     return x;
                 }
 
-                hz = static_cast<int32_t>(generator());
+                hz = static_cast<int32_t>(generator_());
                 iz = (hz & 127);
 
                 if (fabs(hz) < kn[iz])
@@ -141,7 +140,7 @@ namespace exo_simu
 	void resetRandGenerators(uint32_t seed)
 	{
 		srand(seed); // Eigen relies on srand for genering random matrix
-        generator.seed(seed);
+        generator_.seed(seed);
         r4_nor_setup();
 	}
 
@@ -204,13 +203,33 @@ namespace exo_simu
 
     void registerNewVectorEntry(TelemetrySender                & telemetrySender,
                                 std::vector<std::string> const & fieldNames,
+                                vectorN_t                const & initialValues,
+                                std::vector<uint32_t>    const & idx)
+    {
+        for (uint32_t i=0; i < idx.size(); ++i)
+        {
+            (void) telemetrySender.registerNewEntry<float64_t>(fieldNames[i], initialValues[idx[i]]);
+        }
+    }
+
+    void registerNewVectorEntry(TelemetrySender                & telemetrySender,
+                                std::vector<std::string> const & fieldNames,
                                 vectorN_t                const & initialValues)
     {
-        std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
-        std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
+        for (uint32_t i=0; i < initialValues.size(); ++i)
         {
-            (void) telemetrySender.registerNewEntry<float64_t>(*fieldIt, initialValues[i]);
+            (void) telemetrySender.registerNewEntry<float64_t>(fieldNames[i], initialValues[i]);
+        }
+    }
+
+    void updateVectorValue(TelemetrySender                & telemetrySender,
+                           std::vector<std::string> const & fieldNames,
+                           vectorN_t                const & values,
+                           std::vector<uint32_t>    const & idx)
+    {
+        for (uint32_t i=0; i < idx.size(); ++i)
+        {
+            telemetrySender.updateValue(fieldNames[i], values[idx[i]]);
         }
     }
 
@@ -218,23 +237,9 @@ namespace exo_simu
                            std::vector<std::string> const & fieldNames,
                            vectorN_t                const & values)
     {
-        std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
-        std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
+        for (uint32_t i=0; i < values.size(); ++i)
         {
-            telemetrySender.updateValue(*fieldIt, values[i]);
-        }
-    }
-
-    void updateVectorValue(TelemetrySender                & telemetrySender,
-                           std::vector<std::string> const & fieldNames,
-                           matrixN_t::ConstColXpr           values)
-    {
-        std::vector<std::string>::const_iterator fieldIt = fieldNames.begin();
-        std::vector<std::string>::const_iterator fieldEnd = fieldNames.end();
-        for (uint32_t i=0; fieldIt != fieldEnd; ++fieldIt, ++i)
-        {
-            telemetrySender.updateValue(*fieldIt, values[i]);
+            telemetrySender.updateValue(fieldNames[i], values[i]);
         }
     }
 
@@ -250,42 +255,49 @@ namespace exo_simu
         return fieldnames;
     }
 
+
+    std::string removeFieldnameSuffix(std::string         fieldname,
+                                      std::string const & suffix)
+    {
+        if (!fieldname.compare(fieldname.size() - suffix.size(), suffix.size(), suffix))
+        {
+            fieldname.erase(fieldname.size() - suffix.size(), fieldname.size());
+        }
+        return fieldname;
+    }
+
     std::vector<std::string> removeFieldnamesSuffix(std::vector<std::string>         fieldnames,
                                                     std::string              const & suffix)
     {
         std::transform(fieldnames.begin(),
                        fieldnames.end(),
                        fieldnames.begin(),
-                       [&suffix](std::string name) -> std::string
+                       [&suffix](std::string const & name) -> std::string
                        {
-                           if (!name.compare(name.size() - suffix.size(), suffix.size(), suffix))
-                           {
-                               name.erase(name.size() - suffix.size(), name.size());
-                           }
-                           return name;
+                           return removeFieldnameSuffix(name, suffix);
                        });
         return fieldnames;
     }
 
     // ********************** Pinocchio utilities **********************
 
-    result_t getJointNameFromPositionId(Model       const & model,
-                                        int32_t     const & idIn,
-                                        std::string       & jointNameOut)
+    result_t getJointNameFromPositionId(pinocchio::Model const & model,
+                                        int32_t          const & idIn,
+                                        std::string            & jointNameOut)
     {
         result_t returnCode = result_t::ERROR_GENERIC;
 
         // Iterate over all joints.
-        for (int32_t i = 0; i < model.pncModel_.njoints; i++)
+        for (int32_t i = 0; i < model.njoints; i++)
         {
             // Get joint starting and ending index in position vector.
-            int32_t startIndex = model.pncModel_.joints[i].idx_q();
-            int32_t endIndex = startIndex + model.pncModel_.joints[i].nq();
+            int32_t startIndex = model.joints[i].idx_q();
+            int32_t endIndex = startIndex + model.joints[i].nq();
 
             // If inIn is between start and end, we found the joint we were looking for.
             if(startIndex <= idIn && endIndex > idIn)
             {
-                jointNameOut = model.pncModel_.names[i];
+                jointNameOut = model.names[i];
                 returnCode = result_t::SUCCESS;
                 break;
             }
@@ -299,23 +311,23 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t getJointNameFromVelocityId(Model       const & model,
-                                        int32_t     const & idIn,
-                                        std::string       & jointNameOut)
+    result_t getJointNameFromVelocityId(pinocchio::Model const & model,
+                                        int32_t          const & idIn,
+                                        std::string            & jointNameOut)
     {
         result_t returnCode = result_t::ERROR_GENERIC;
 
         // Iterate over all joints.
-        for(int32_t i = 0; i < model.pncModel_.njoints; i++)
+        for(int32_t i = 0; i < model.njoints; i++)
         {
             // Get joint starting and ending index in velocity vector.
-            int32_t startIndex = model.pncModel_.joints[i].idx_v();
-            int32_t endIndex = startIndex + model.pncModel_.joints[i].nv();
+            int32_t startIndex = model.joints[i].idx_v();
+            int32_t endIndex = startIndex + model.joints[i].nv();
 
             // If inIn is between start and end, we found the joint we were looking for.
             if(startIndex <= idIn && endIndex > idIn)
             {
-                jointNameOut = model.pncModel_.names[i];
+                jointNameOut = model.names[i];
                 returnCode = result_t::SUCCESS;
                 break;
             }
@@ -329,13 +341,13 @@ namespace exo_simu
         return returnCode;
     }
 
-    result_t getJointTypeFromId(Model     const & model,
-                                int32_t   const & idIn,
-                                joint_t         & jointTypeOut)
+    result_t getJointTypeFromId(pinocchio::Model const & model,
+                                int32_t          const & idIn,
+                                joint_t                & jointTypeOut)
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if(model.pncModel_.njoints < idIn - 1)
+        if(model.njoints < idIn - 1)
         {
             std::cout << "Error - Utilities::getJointTypeFromId - Joint id out of range." << std::endl;
             returnCode = result_t::ERROR_GENERIC;
@@ -343,7 +355,7 @@ namespace exo_simu
 
         if (returnCode == result_t::SUCCESS)
         {
-            auto joint = model.pncModel_.joints[idIn];
+            auto joint = model.joints[idIn];
 
             if (joint.shortname() == "JointModelFreeFlyer")
             {
@@ -461,6 +473,406 @@ namespace exo_simu
         return returnCode;
     }
 
+    result_t getFrameIdx(pinocchio::Model const & model,
+                         std::string      const & frameName,
+                         int32_t                & frameIdx)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!model.existFrame(frameName))
+        {
+            std::cout << "Error - Utilities::getFrameIdx - Frame not found in urdf." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            frameIdx = model.getFrameId(frameName);
+        }
+
+        return returnCode;
+    }
+
+    result_t getFramesIdx(pinocchio::Model         const & model,
+                          std::vector<std::string> const & framesNames,
+                          std::vector<int32_t>           & framesIdx)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        framesIdx.resize(0);
+        for (std::string const & name : framesNames)
+        {
+            if (returnCode == result_t::SUCCESS)
+            {
+                int32_t idx;
+                returnCode = getFrameIdx(model, name, idx);
+                framesIdx.push_back(idx);
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointPositionIdx(pinocchio::Model     const & model,
+                                 std::string          const & jointName,
+                                 std::vector<int32_t>       & jointPositionIdx)
+    {
+        // It returns all the indices if the joint has multiple degrees of freedom
+
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!model.existJointName(jointName))
+        {
+            std::cout << "Error - Utilities::getJointPositionIdx - Joint not found in urdf." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            int32_t const & jointModelIdx = model.getJointId(jointName);
+            int32_t const & jointPositionFirstIdx = model.joints[jointModelIdx].idx_q();
+            int32_t const & jointNq = model.joints[jointModelIdx].nq();
+            jointPositionIdx.resize(jointNq);
+            std::iota(jointPositionIdx.begin(), jointPositionIdx.end(), jointPositionFirstIdx);
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointPositionIdx(pinocchio::Model const & model,
+                                 std::string      const & jointName,
+                                 int32_t                & jointPositionFirstIdx)
+    {
+        // It returns the first index even if the joint has multiple degrees of freedom
+
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!model.existJointName(jointName))
+        {
+            std::cout << "Error - Utilities::getJointPositionIdx - Joint not found in urdf." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            int32_t const & jointModelIdx = model.getJointId(jointName);
+            jointPositionFirstIdx = model.joints[jointModelIdx].idx_q();
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointsPositionIdx(pinocchio::Model         const & model,
+                                  std::vector<std::string> const & jointsNames,
+                                  std::vector<int32_t>           & jointsPositionIdx,
+                                  bool                     const & firstJointIdxOnly)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        jointsPositionIdx.clear();
+        if (!firstJointIdxOnly)
+        {
+            std::vector<int32_t> jointPositionIdx;
+            for (std::string const & jointName : jointsNames)
+            {
+                if (returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointPositionIdx(model, jointName, jointPositionIdx);
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    jointsPositionIdx.insert(jointsPositionIdx.end(), jointPositionIdx.begin(), jointPositionIdx.end());
+                }
+            }
+        }
+        else
+        {
+            int32_t jointPositionIdx;
+            for (std::string const & jointName : jointsNames)
+            {
+                if (returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointPositionIdx(model, jointName, jointPositionIdx);
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    jointsPositionIdx.push_back(jointPositionIdx);
+                }
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointVelocityIdx(pinocchio::Model     const & model,
+                                 std::string          const & jointName,
+                                 std::vector<int32_t>       & jointVelocityIdx)
+    {
+        // It returns all the indices if the joint has multiple degrees of freedom
+
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!model.existJointName(jointName))
+        {
+            std::cout << "Error - ExogetFrameIdx - Frame not found in urdf." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            int32_t const & jointModelIdx = model.getJointId(jointName);
+            int32_t const & jointVelocityFirstIdx = model.joints[jointModelIdx].idx_v();
+            int32_t const & jointNv = model.joints[jointModelIdx].nv();
+            jointVelocityIdx.resize(jointNv);
+            std::iota(jointVelocityIdx.begin(), jointVelocityIdx.end(), jointVelocityFirstIdx);
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointVelocityIdx(pinocchio::Model const & model,
+                                 std::string      const & jointName,
+                                 int32_t                & jointVelocityFirstIdx)
+    {
+        // It returns the first index even if the joint has multiple degrees of freedom
+
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!model.existJointName(jointName))
+        {
+            std::cout << "Error - ExogetFrameIdx - Frame not found in urdf." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            int32_t const & jointModelIdx = model.getJointId(jointName);
+            jointVelocityFirstIdx = model.joints[jointModelIdx].idx_v();
+        }
+
+        return returnCode;
+    }
+
+    result_t getJointsVelocityIdx(pinocchio::Model         const & model,
+                                  std::vector<std::string> const & jointsNames,
+                                  std::vector<int32_t>           & jointsVelocityIdx,
+                                  bool                     const & firstJointIdxOnly)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        jointsVelocityIdx.clear();
+        if (!firstJointIdxOnly)
+        {
+            std::vector<int32_t> jointVelocityIdx;
+            for (std::string const & jointName : jointsNames)
+            {
+                if (returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointVelocityIdx(model, jointName, jointVelocityIdx);
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    jointsVelocityIdx.insert(jointsVelocityIdx.end(), jointVelocityIdx.begin(), jointVelocityIdx.end());
+                }
+            }
+        }
+        else
+        {
+            int32_t jointVelocityIdx;
+            for (std::string const & jointName : jointsNames)
+            {
+                if (returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointVelocityIdx(model, jointName, jointVelocityIdx);
+                }
+                if (returnCode == result_t::SUCCESS)
+                {
+                    jointsVelocityIdx.push_back(jointVelocityIdx);
+                }
+            }
+        }
+
+        return returnCode;
+    }
+
+    void switchJoints(pinocchio::Model       & modelInOut,
+                      uint32_t         const & firstJointId,
+                      uint32_t         const & secondJointId)
+    {
+        // Only perform swap if firstJointId is less that secondJointId
+        if (firstJointId < secondJointId)
+        {
+            // Update parents for other joints.
+            for(uint32_t i = 0; i < modelInOut.parents.size(); i++)
+            {
+                if(firstJointId == modelInOut.parents[i])
+                {
+                    modelInOut.parents[i] = secondJointId;
+                }
+                else if(secondJointId == modelInOut.parents[i])
+                {
+                    modelInOut.parents[i] = firstJointId;
+                }
+            }
+            // Update frame parents.
+            for(uint32_t i = 0; i < modelInOut.frames.size(); i++)
+            {
+                if(firstJointId == modelInOut.frames[i].parent)
+                {
+                    modelInOut.frames[i].parent = secondJointId;
+                }
+                else if(secondJointId == modelInOut.frames[i].parent)
+                {
+                    modelInOut.frames[i].parent = firstJointId;
+                }
+            }
+            // Update values in subtrees.
+            for(uint32_t i = 0; i < modelInOut.subtrees.size(); i++)
+            {
+                for(uint32_t j = 0; j < modelInOut.subtrees[i].size(); j++)
+                {
+                    if(firstJointId == modelInOut.subtrees[i][j])
+                    {
+                        modelInOut.subtrees[i][j] = secondJointId;
+                    }
+                    else if(secondJointId == modelInOut.subtrees[i][j])
+                    {
+                        modelInOut.subtrees[i][j] = firstJointId;
+                    }
+                }
+            }
+
+            // Update vectors based on joint index: effortLimit, velocityLimit,
+            // lowerPositionLimit and upperPositionLimit.
+            swapVectorBlocks(modelInOut.effortLimit,
+                             modelInOut.joints[firstJointId].idx_v(),
+                             modelInOut.joints[firstJointId].nv(),
+                             modelInOut.joints[secondJointId].idx_v(),
+                             modelInOut.joints[secondJointId].nv());
+            swapVectorBlocks(modelInOut.velocityLimit,
+                             modelInOut.joints[firstJointId].idx_v(),
+                             modelInOut.joints[firstJointId].nv(),
+                             modelInOut.joints[secondJointId].idx_v(),
+                             modelInOut.joints[secondJointId].nv());
+
+            swapVectorBlocks(modelInOut.lowerPositionLimit,
+                             modelInOut.joints[firstJointId].idx_q(),
+                             modelInOut.joints[firstJointId].nq(),
+                             modelInOut.joints[secondJointId].idx_q(),
+                             modelInOut.joints[secondJointId].nq());
+            swapVectorBlocks(modelInOut.upperPositionLimit,
+                             modelInOut.joints[firstJointId].idx_q(),
+                             modelInOut.joints[firstJointId].nq(),
+                             modelInOut.joints[secondJointId].idx_q(),
+                             modelInOut.joints[secondJointId].nq());
+            swapVectorBlocks(modelInOut.neutralConfiguration,
+                             modelInOut.joints[firstJointId].idx_q(),
+                             modelInOut.joints[firstJointId].nq(),
+                             modelInOut.joints[secondJointId].idx_q(),
+                             modelInOut.joints[secondJointId].nq());
+
+            // Switch elements in joint-indexed vectors:
+            // parents, names, subtrees, joints, jointPlacements, inertias.
+            uint32_t tempParent = modelInOut.parents[firstJointId];
+            modelInOut.parents[firstJointId] = modelInOut.parents[secondJointId];
+            modelInOut.parents[secondJointId] = tempParent;
+
+            std::string tempName = modelInOut.names[firstJointId];
+            modelInOut.names[firstJointId] = modelInOut.names[secondJointId];
+            modelInOut.names[secondJointId] = tempName;
+
+            std::vector<pinocchio::Index> tempSubtree = modelInOut.subtrees[firstJointId];
+            modelInOut.subtrees[firstJointId] = modelInOut.subtrees[secondJointId];
+            modelInOut.subtrees[secondJointId] = tempSubtree;
+
+            pinocchio::JointModel jointTemp = modelInOut.joints[firstJointId];
+            modelInOut.joints[firstJointId] = modelInOut.joints[secondJointId];
+            modelInOut.joints[secondJointId] = jointTemp;
+
+            pinocchio::SE3 tempPlacement = modelInOut.jointPlacements[firstJointId];
+            modelInOut.jointPlacements[firstJointId] = modelInOut.jointPlacements[secondJointId];
+            modelInOut.jointPlacements[secondJointId] = tempPlacement;
+
+            pinocchio::Inertia tempInertia = modelInOut.inertias[firstJointId];
+            modelInOut.inertias[firstJointId] = modelInOut.inertias[secondJointId];
+            modelInOut.inertias[secondJointId] = tempInertia;
+
+            /* Recompute all position and velocity indexes, as we may have
+               switched joints that didn't have the same size.
+               Skip 'universe' joint since it is not an actual joint. */
+            uint32_t incrementalNq = 0;
+            uint32_t incrementalNv = 0;
+            for(uint32_t i = 1; i < modelInOut.joints.size(); i++)
+            {
+                modelInOut.joints[i].setIndexes(i, incrementalNq, incrementalNv);
+                incrementalNq += modelInOut.joints[i].nq();
+                incrementalNv += modelInOut.joints[i].nv();
+            }
+        }
+    }
+
+    result_t insertFlexibilityInModel(pinocchio::Model       & modelInOut,
+                                      std::string      const & childJointNameIn,
+                                      std::string      const & newJointNameIn)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if(!modelInOut.existJointName(childJointNameIn))
+        {
+            returnCode = result_t::ERROR_GENERIC;
+        }
+
+        if(returnCode == result_t::SUCCESS)
+        {
+            int32_t childId = modelInOut.getJointId(childJointNameIn);
+            // Flexible joint is placed at the same position as the child joint, in its parent frame.
+            pinocchio::SE3 jointPosition = modelInOut.jointPlacements[childId];
+
+            // Create joint.
+            int32_t newId = modelInOut.addJoint(modelInOut.parents[childId],
+                                                pinocchio::JointModelSpherical(),
+                                                jointPosition,
+                                                newJointNameIn);
+
+            // Set child joint to be a child of the new joint, at the origin.
+            modelInOut.parents[childId] = newId;
+            modelInOut.jointPlacements[childId] = pinocchio::SE3::Identity();
+
+            // Add new joint to frame list.
+            int32_t childFrameId = modelInOut.getFrameId(childJointNameIn);
+            int32_t newFrameId = modelInOut.addJointFrame(newId, modelInOut.frames[childFrameId].previousFrame);
+
+            // Update child joint previousFrame id.
+            modelInOut.frames[childFrameId].previousFrame = newFrameId;
+
+            // Update new joint subtree to include all the joints below it.
+            for(uint32_t i = 0; i < modelInOut.subtrees[childId].size(); i++)
+            {
+                modelInOut.subtrees[newId].push_back(modelInOut.subtrees[childId][i]);
+            }
+
+            /* Add weightless body.
+               In practice having a zero inertia makes some of pinocchio algorithm crash,
+               so we set a very small value instead: 1g. */
+            std::string bodyName = newJointNameIn + "Body";
+            pinocchio::Inertia inertia = pinocchio::Inertia::Identity();
+            inertia.mass() *= 1.0e-3;
+            inertia.FromEllipsoid(inertia.mass(), 1.0, 1.0, 1.0);
+            modelInOut.appendBodyToJoint(newId, inertia, pinocchio::SE3::Identity());
+
+            /* Pinocchio requires that joints are in increasing order as we move to the
+               leaves of the kinematic tree. Here this is no longer the case, as an
+               intermediate joint was appended at the end. We put back this joint at the
+               correct position, by doing successive permutations. */
+            for(int32_t i = childId; i < newId; i++)
+            {
+                switchJoints(modelInOut, i, newId);
+            }
+        }
+
+        return returnCode;
+    }
+
     // ********************** Math utilities *************************
 
     float64_t saturateSoft(float64_t const & in,
@@ -509,5 +921,15 @@ namespace exo_simu
             out = in;
         }
         return out;
+    }
+
+    vectorN_t clamp(Eigen::Ref<vectorN_t const> const & data,
+                    float64_t                   const & minThr,
+                    float64_t                   const & maxThr)
+    {
+        return data.unaryExpr([&minThr, &maxThr](float64_t x) -> float64_t
+                              {
+                                  return std::min(std::max(x, minThr), maxThr);
+                              });
     }
 }

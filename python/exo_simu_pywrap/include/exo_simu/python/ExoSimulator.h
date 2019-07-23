@@ -42,7 +42,7 @@ namespace python
         PyEngine(void) :
         model_(),
         controller_(),
-        simulator_()
+        engine_()
         {
             // Empty.
         }
@@ -68,12 +68,12 @@ namespace python
 
             if (returnCode == result_t::SUCCESS)
             {
-                returnCode = simulator_.initialize(model_, controller_, callbackFct);
+                returnCode = engine_.initialize(model_, controller_, callbackFct);
             }
 
             if (returnCode == result_t::SUCCESS)
             {
-                returnCode = simulator_.simulate(x_init, end_time);
+                returnCode = engine_.simulate(x_init, end_time);
             }
 
             return returnCode;
@@ -84,7 +84,8 @@ namespace python
             if (pyEnginePtr_.use_count())
             {
                 boost::shared_ptr<PyEngine> pyEnginePtrStrong = pyEnginePtr_.lock();
-                pyEnginePtrStrong->simulator_.reset(true);
+                pyEnginePtrStrong->engine_.reset(true);
+                pyEnginePtrStrong->controller_.reset(true);
                 return pyEnginePtrStrong;
             }
             else
@@ -98,7 +99,7 @@ namespace python
     public:
         ExoModel model_;
         ExoController controller_;
-        Engine simulator_;
+        Engine engine_;
 
     private:
         static boost::weak_ptr<PyEngine> pyEnginePtr_;
@@ -123,30 +124,97 @@ namespace python
             bp::handle<> forceSensorsDataPy(getNumpyReferenceFromEigenMatrix(forceSensorsData));
             bp::handle<> imuSensorsDataPy(getNumpyReferenceFromEigenMatrix(imuSensorsData));
             bp::handle<> encoderSensorsDataPy(getNumpyReferenceFromEigenMatrix(encoderSensorsData));
-            bp::handle<> uCommandPy(getNumpyReferenceFromEigenVector(uCommand, pyVector_t::vector));
+            bp::handle<> uCommandPy(getNumpyReferenceFromEigenVector(uCommand));
             funcPyPtr_(t, qPy, vPy, forceSensorsDataPy, imuSensorsDataPy, encoderSensorsDataPy, uCommandPy);
         }
     private:
         bp::object funcPyPtr_;
     };
 
-    struct callbackPyWrapper {
-    public:
-        callbackPyWrapper(bp::object const& objPy) : funcPyPtr_(objPy) {}
-        bool operator() (float64_t const & t,
-                         vectorN_t const & x)
-        {
-            bool out;
+    template<typename T>
+    PyObject * getNumpyReference(T & data)
+    {
+        return getNumpyReferenceFromScalar(data);
+    }
 
+    template<>
+    PyObject * getNumpyReference<vector3_t>(vector3_t & data)
+    {
+        return getNumpyReferenceFromEigenVector(data);
+    }
+
+    template<typename T>
+    struct timeStateFctPyWrapper {
+    public:
+        // Disable the copy of the class
+        timeStateFctPyWrapper & operator = (timeStateFctPyWrapper const & other) = delete;
+
+    public:
+        timeStateFctPyWrapper(bp::object const& objPy) :
+        funcPyPtr_(objPy),
+        outPtr_(new T),
+        outPyPtr_()
+        {
+            outPyPtr_ = getNumpyReference(*outPtr_);
+        }
+
+        // Copy constructor, same as the normal constructor
+        timeStateFctPyWrapper(timeStateFctPyWrapper const & other) :
+        funcPyPtr_(other.funcPyPtr_),
+        outPtr_(new T),
+        outPyPtr_()
+        {
+            *outPtr_ = *(other.outPtr_);
+            outPyPtr_ = getNumpyReference(*outPtr_);
+        }
+
+        // Move constructor, takes a rvalue reference &&
+        timeStateFctPyWrapper(timeStateFctPyWrapper&& other) :
+        funcPyPtr_(other.funcPyPtr_),
+        outPtr_(nullptr),
+        outPyPtr_(nullptr)
+        {
+            // Steal the resource from "other"
+            outPtr_ = other.outPtr_;
+            outPyPtr_ = other.outPyPtr_;
+
+            /* "other" will soon be destroyed and its destructor will
+               do nothing because we null out its resource here */
+            other.outPtr_ = nullptr;
+            other.outPyPtr_ = nullptr;
+        }
+
+        // Destructor
+        ~timeStateFctPyWrapper()
+        {
+            delete outPtr_;
+        }
+
+        // Move assignment, takes a rvalue reference &&
+        timeStateFctPyWrapper& operator=(timeStateFctPyWrapper&& other)
+        {
+            /* "other" is soon going to be destroyed, so we let it destroy our current resource
+               instead and we take "other"'s current resource via swapping */
+            std::swap(funcPyPtr_, other.funcPyPtr_);
+            std::swap(outPtr_, other.outPtr_);
+            std::swap(outPyPtr_, other.outPyPtr_);
+            return *this;
+        }
+
+        T operator() (float64_t const & t,
+                      vectorN_t const & x)
+        {
             // Pass the arguments by reference (be careful const qualifiers are lost)
             bp::handle<> xPy(getNumpyReferenceFromEigenVector(x));
-            bp::handle<> outPy(getNumpyReferenceFromScalar(out));
+            bp::handle<> outPy(bp::borrowed(outPyPtr_));
             funcPyPtr_(t, xPy, outPy);
-
-            return out;
+            return *outPtr_;
         }
+
     private:
         bp::object funcPyPtr_;
+        T * outPtr_;
+        PyObject * outPyPtr_; // Its lifetime in managed by boost::python
     };
 
     struct PyEngineVisitor
@@ -171,14 +239,24 @@ namespace python
                                 bp::return_value_policy<bp::return_by_value>())
                 .def("write_log", &PyEngineVisitor::writeLog,
                                  (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
-                .def("register_new_entry", &PyEngineVisitor::registerNewEntry,
-                                           (bp::arg("self"), "fieldname", "value"))
-                .def("register_new_vector_entry", &PyEngineVisitor::registerNewVectorEntry,
-                                                  (bp::arg("self"), "fieldnames", "values"))
+                .def("removes_entries", &PyEngineVisitor::removeEntries)
+                .def("register_entry", &PyEngineVisitor::registerNewEntry,
+                                       (bp::arg("self"), "fieldname", "value"))
+                .def("register_entry", &PyEngineVisitor::registerNewVectorEntry)
+                .def("register_force_impulse", &PyEngineVisitor::registerForceImpulse,
+                                               (bp::arg("self"), "frame_name", "t", "dt", "F"))
+                .def("register_force_profile", &PyEngineVisitor::registerForceProfile,
+                                               (bp::arg("self"), "frame_name", "force_handle"))
+                .def("get_pinocchio_model", &PyEngineVisitor::getPinocchioModel,
+                                            bp::return_value_policy<bp::return_by_value>())
                 .def("get_urdf_path", &PyEngineVisitor::getUrdfPath,
                                       bp::return_value_policy<bp::return_by_value>())
-                .def("get_motor_names", &PyEngineVisitor::getMotorsName,
-                                        bp::return_value_policy<bp::return_by_value>())
+                .def("get_motors_names", &PyEngineVisitor::getMotorsNames,
+                                         bp::return_value_policy<bp::return_by_value>())
+                .def("get_joints_names", &PyEngineVisitor::getJointsNames,
+                                         bp::return_value_policy<bp::return_by_value>())
+                .def("get_frames_names", &PyEngineVisitor::getFramesNames,
+                                         bp::return_value_policy<bp::return_by_value>())
                 .def("get_model_options", &PyEngineVisitor::getModelOptions,
                                           bp::return_value_policy<bp::return_by_value>())
                 .def("set_model_options", &PyEngineVisitor::setModelOptions)
@@ -226,9 +304,9 @@ namespace python
                                          bp::object const & controllerPy,
                                          bp::object const & callbackPy)
         {
-            controllerPyWrapper controllerFct = controllerPyWrapper(controllerPy);
-            callbackPyWrapper callbackFct = callbackPyWrapper(callbackPy);
-            self.simulate(x_init, end_time, controllerFct, callbackFct);
+            controllerPyWrapper controllerFct(controllerPy);
+            timeStateFctPyWrapper<bool> callbackFct(callbackPy);
+            self.simulate(x_init, end_time, controllerFct, std::move(callbackFct));
         }
 
         static void writeLog(PyEngine          & self,
@@ -237,12 +315,17 @@ namespace python
         {
             if (isModeBinary)
             {
-                self.simulator_.writeLogBinary(filename);
+                self.engine_.writeLogBinary(filename);
             }
             else
             {
-                self.simulator_.writeLogTxt(filename);
+                self.engine_.writeLogTxt(filename);
             }
+        }
+
+        static void removeEntries(PyEngine & self)
+        {
+            self.controller_.reset(true);
         }
 
         static void registerNewEntry(PyEngine          & self,
@@ -255,11 +338,28 @@ namespace python
 
         static void registerNewVectorEntry(PyEngine       & self,
                                            bp::list const & fieldNamesPy,
-                                           PyObject       * dataPy) // Const qualifier is not supported by PyArray_DATA
+                                           PyObject       * dataPy) // Const qualifier is not supported by PyArray_DATA anyway
         {
             std::vector<std::string> fieldNames = listPyToStdVector<std::string>(fieldNamesPy);
             Eigen::Map<vectorN_t> data((float64_t *) PyArray_DATA(reinterpret_cast<PyArrayObject *>(dataPy)), fieldNames.size());
             self.controller_.registerNewVectorEntry(fieldNames, data);
+        }
+
+        static void registerForceImpulse(PyEngine          & self,
+                                         std::string const & frameName,
+                                         float64_t   const & t,
+                                         float64_t   const & dt,
+                                         vector3_t   const & F)
+        {
+            self.engine_.registerForceImpulse(frameName, t, dt, F);
+        }
+
+        static void registerForceProfile(PyEngine          & self,
+                                         std::string const & frameName,
+                                         bp::object  const & forcePy)
+        {
+            timeStateFctPyWrapper<vector3_t> forceFct(forcePy);
+            self.engine_.registerForceProfile(frameName, std::move(forceFct));
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -270,7 +370,7 @@ namespace python
         {
             std::vector<std::string> header;
             matrixN_t log;
-            self.simulator_.getLogData(header, log);
+            self.engine_.getLogData(header, log);
             return bp::make_tuple(header, log);
         }
 
@@ -279,9 +379,31 @@ namespace python
             return self.model_.getUrdfPath();
         }
 
-        static std::vector<std::string> getMotorsName(PyEngine & self)
+        static pinocchio::Model getPinocchioModel(PyEngine & self)
         {
-            return self.model_.getMotorsName();
+            return self.model_.pncModel_;
+        }
+
+        static std::vector<std::string> getMotorsNames(PyEngine & self)
+        {
+            return self.model_.getMotorsNames();
+        }
+
+        static std::vector<std::string> getJointsNames(PyEngine & self)
+        {
+            return self.model_.getRigidJointsNames();
+        }
+
+        static std::vector<std::string> getFramesNames(PyEngine & self)
+        {
+            pinocchio::container::aligned_vector<pinocchio::Frame> frames =
+                self.model_.pncModel_.frames;
+            std::vector<std::string> framesNames;
+            for (pinocchio::Frame const & frame : frames)
+            {
+                framesNames.push_back(frame.name);
+            }
+            return framesNames;
         }
 
         static bp::dict getModelOptions(PyEngine & self)
@@ -337,16 +459,16 @@ namespace python
         static bp::dict getEngineOptions(PyEngine & self)
         {
             bp::dict configPy;
-            convertConfigHolderPy(self.simulator_.getOptions(), configPy);
+            convertConfigHolderPy(self.engine_.getOptions(), configPy);
             return configPy;
         }
 
         static void setEngineOptions(PyEngine       & self,
                                      bp::dict const & configPy)
         {
-            configHolder_t config = self.simulator_.getOptions();
+            configHolder_t config = self.engine_.getOptions();
             loadConfigHolder(configPy, config);
-            self.simulator_.setOptions(config);
+            self.engine_.setOptions(config);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -356,6 +478,8 @@ namespace python
         {
             import_array(); // Required to create Py arrays
             bp::to_python_converter<std::vector<std::string>, stdVectorToListPyConverter<std::string> >();
+            bp::to_python_converter<std::vector<vectorN_t>, stdVectorToListPyConverter<vectorN_t> >();
+            bp::to_python_converter<std::vector<matrixN_t>, stdVectorToListPyConverter<matrixN_t> >();
             bp::class_<PyEngine, boost::shared_ptr<PyEngine>, boost::noncopyable>("simulator").def(PyEngineVisitor());
         }
 

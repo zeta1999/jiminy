@@ -101,6 +101,7 @@ namespace exo_simu
         result_t initialize(std::string          const & urdfPath,
                             std::vector<int32_t> const & contactFramesIdx) = delete;
         result_t initialize(std::string const & urdfPath);
+        virtual void reset(void) override;
 
         result_t setOptions(configHolder_t const & mdlOptions);
         std::vector<int32_t> const & getToesVelocityIdx(void) const;
@@ -108,7 +109,7 @@ namespace exo_simu
     protected:
         virtual result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData) override;
 
-        result_t loadUrdfModel(std::string const & urdfPath); // Discourage the use of the method
+        result_t loadUrdfModel(std::string const & urdfPath) = delete;
 
     public:
         std::unique_ptr<exoModelOptions_t const> exoMdlOptions_;

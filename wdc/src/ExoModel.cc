@@ -40,23 +40,14 @@ namespace exo_simu
         boost::get<bool>(jointConfig.at("boundsFromUrdf")) = true;
         returnCode = Model::initialize(urdfPath, contactFramesNames_, motorsNames_); // The joint names are unknown at this point
         boost::get<configHolder_t>(mdlOptionsHolder_.at("joints")) = jointConfigOld; // Be careful, the reference jointConfig may become invalid after calling 'initialize' method.
-        isInitialized_ = false; // ExoModel is not initialized so far
+        isInitialized_ = true;
 
         if (returnCode == result_t::SUCCESS)
         {
-            // isInitialized_ must be true to be able to add sensors
-            isInitialized_ = true;
-
-            // The joint names are obtained by removing the universe and root joint from the joint list
-            motorsNames_.assign(pncModel_.names.begin() + 2, pncModel_.names.end());
+            // The joint names are obtained by removing the root joint from the joint list
+            motorsNames_ = getRigidJointsNames();
+            motorsNames_.erase(motorsNames_.begin());
             toesNames_ = motorsNames_;
-
-            // Initialize the command fieldnames, since the motor names were omitted previously in Model::initialize.
-            motorTorqueFieldNames_.clear();
-            for (std::string const & jointName : motorsNames_)
-            {
-                motorTorqueFieldNames_.emplace_back(JOINT_PREFIX_BASE + "Torque" + jointName);
-            }
 
             // Separate the toes froms the other joints since they are not actuated nor physically meaningful
             auto detectToeFct = [](std::string const & joint) -> bool
@@ -72,11 +63,9 @@ namespace exo_simu
                                             not_f(detectToeFct)),
                              toesNames_.end());
 
-            /* Update the joint names manually to avoid calling back Model::initialize
-               (It cannot throw an error since the names are extracted dynamically from the model) */
-            getJointsIdx(motorsNames_, motorsPositionIdx_, motorsVelocityIdx_);
-            std::vector<int32_t> toesPositionIdx;
-            getJointsIdx(toesNames_, toesPositionIdx, toesVelocityIdx_);
+            getJointsPositionIdx(pncModel_, motorsNames_, motorsPositionIdx_, true);
+            getJointsVelocityIdx(pncModel_, motorsNames_, motorsVelocityIdx_, true);
+            getJointsVelocityIdx(pncModel_, toesNames_, toesVelocityIdx_, true);
 
             // The names of the frames of the IMUs end with IMU
             std::vector<std::string> imuFramesNames;
@@ -89,7 +78,7 @@ namespace exo_simu
                 }
             }
             std::vector<int32_t> imuFramesIdx;
-            getFramesIdx(imuFramesNames, imuFramesIdx); // It cannot throw an error
+            getFramesIdx(pncModel_, imuFramesNames, imuFramesIdx); // It cannot throw an error
 
             // ********** Add the IMU sensors **********
             for(uint32_t i = 0; i < imuFramesNames.size(); i++)
@@ -106,7 +95,7 @@ namespace exo_simu
                 if (returnCode == result_t::SUCCESS)
                 {
                     // Configure the sensor
-                    imuSensor->initialize(imuFramesIdx[i]);
+                    imuSensor->initialize(imuFramesNames[i]);
                 }
             }
 
@@ -125,7 +114,7 @@ namespace exo_simu
                 if (returnCode == result_t::SUCCESS)
                 {
                     // Configure the sensor
-                    forceSensor->initialize(contactFramesIdx_[i]);
+                    forceSensor->initialize(contactFramesNames_[i]);
                 }
             }
 
@@ -144,58 +133,80 @@ namespace exo_simu
                 if (returnCode == result_t::SUCCESS)
                 {
                     // Configure the sensor
-                    encoderSensor->initialize(motorsPositionIdx_[i], motorsVelocityIdx_[i]);
+                    encoderSensor->initialize(motorsNames_[i]);
                 }
             }
-
-            isInitialized_ = false;
         }
 
-         // Update the bounds if necessary and set the initialization flag
+        // Update the bounds if necessary
         if (returnCode == result_t::SUCCESS)
         {
-            isInitialized_ = true;
             returnCode = setOptions(mdlOptionsHolder_);
         }
 
+        // Set the initialization flag
+        if (returnCode != result_t::SUCCESS)
+        {
+            isInitialized_ = false;
+        }
+
         return returnCode;
+    }
+
+    void ExoModel::reset(void)
+    {
+        Model::reset();
+
+        getJointsVelocityIdx(pncModel_, toesNames_, toesVelocityIdx_, true);
     }
 
     result_t ExoModel::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
         result_t returnCode = result_t::SUCCESS;
 
+        bool isTelemetryConfigured = isTelemetryConfigured_; // Backup the original state since it will be updated
         returnCode = Model::configureTelemetry(telemetryData);
 
-        for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+        if (returnCode == result_t::SUCCESS)
         {
-            for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+            if (!isTelemetryConfigured)
             {
-                if (returnCode == result_t::SUCCESS)
+                for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
                 {
-                    if (sensorGroup.first == ImuSensor::type_)
+                    for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
                     {
-                        if (exoMdlOptions_->telemetry.enableImuSensors)
+                        if (returnCode == result_t::SUCCESS)
                         {
-                            returnCode = sensor.second->configureTelemetry(telemetryData_);
-                        }
-                    }
-                    else if (sensorGroup.first == ForceSensor::type_)
-                    {
-                        if (exoMdlOptions_->telemetry.enableForceSensors)
-                        {
-                            returnCode = sensor.second->configureTelemetry(telemetryData_);
-                        }
-                    }
-                    else
-                    {
-                        if (exoMdlOptions_->telemetry.enableEncoderSensors)
-                        {
-                            returnCode = sensor.second->configureTelemetry(telemetryData_);
+                            if (sensorGroup.first == ImuSensor::type_)
+                            {
+                                if (exoMdlOptions_->telemetry.enableImuSensors)
+                                {
+                                    returnCode = sensor.second->configureTelemetry(telemetryData_);
+                                }
+                            }
+                            else if (sensorGroup.first == ForceSensor::type_)
+                            {
+                                if (exoMdlOptions_->telemetry.enableForceSensors)
+                                {
+                                    returnCode = sensor.second->configureTelemetry(telemetryData_);
+                                }
+                            }
+                            else
+                            {
+                                if (exoMdlOptions_->telemetry.enableEncoderSensors)
+                                {
+                                    returnCode = sensor.second->configureTelemetry(telemetryData_);
+                                }
+                            }
                         }
                     }
                 }
             }
+        }
+
+        if (returnCode != result_t::SUCCESS)
+        {
+            isTelemetryConfigured_ = false;
         }
 
         return returnCode;

@@ -30,6 +30,7 @@ namespace exo_simu
     Engine::Engine(void):
     engineOptions_(nullptr),
     isInitialized_(false),
+    isTelemetryConfigured_(false),
     model_(nullptr),
     controller_(nullptr),
     engineOptionsHolder_(),
@@ -41,7 +42,10 @@ namespace exo_simu
     telemetrySender_(),
     telemetryData_(nullptr),
     telemetryRecorder_(nullptr),
-    stepperState_()
+    stepperState_(),
+    forcesImpulse_(),
+    forceImpulseNextIt_(forcesImpulse_.begin()),
+    forcesProfile_()
     {
         // Initialize the configuration options to the default.
         setOptions(getDefaultOptions());
@@ -51,7 +55,8 @@ namespace exo_simu
         telemetryData_->reset();
 
         // Initialize the global telemetry recorder
-        telemetryRecorder_ = std::make_unique<TelemetryRecorder>(std::const_pointer_cast<TelemetryData const>(telemetryData_));
+        telemetryRecorder_ = std::make_unique<TelemetryRecorder>(
+            std::const_pointer_cast<TelemetryData const>(telemetryData_));
 
         // Initialize the engine-specific telemetry sender
         telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
@@ -71,7 +76,7 @@ namespace exo_simu
         if (!model.getIsInitialized())
         {
             std::cout << "Error - Engine::initialize - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
         model_ = &model;
 
@@ -83,7 +88,7 @@ namespace exo_simu
         if (!controller.getIsInitialized())
         {
             std::cout << "Error - Engine::initialize - Controller not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
         if (returnCode == result_t::SUCCESS)
         {
@@ -100,78 +105,100 @@ namespace exo_simu
         if (returnCode == result_t::SUCCESS)
         {
             setOptions(engineOptionsHolder_);
-        }
-
-        /* Preconfigure the telemetry with quantities known at compile time.
-           Note that registration is only locked at the beginning of the
-           simulation to enable dynamic registration until then. */
-        if (returnCode == result_t::SUCCESS)
-        {
-            returnCode = configureTelemetry();
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
             isInitialized_ = true;
+        }
+
+        if (returnCode != result_t::SUCCESS)
+        {
+            isInitialized_ = false;
         }
 
         return returnCode;
     }
 
-    void Engine::reset(bool const & resetTelemetry)
+    void Engine::reset(bool const & resetDynamicForceRegister)
     {
         // Initialize the random number generators
         resetRandGenerators(engineOptions_->stepper.randomSeed);
 
-        // Reset the internal state of the model and controller
-        model_->reset(resetTelemetry);
-        controller_->reset(resetTelemetry);
-
-        if (resetTelemetry)
+        if (resetDynamicForceRegister)
         {
-            // Reset the telemetry
-            telemetryData_->reset();
+            forcesImpulse_.clear();
+            forceImpulseNextIt_ = forcesImpulse_.begin();
+            forcesProfile_.clear();
         }
+
+        // Reset the internal state of the model and controller
+        model_->reset();
+        controller_->reset();
+
+        // Reset the telemetry
+        telemetryRecorder_->reset();
+        telemetryData_->reset();
+
+        /* Preconfigure the telemetry with quantities known at compile time.
+           Note that registration is only locked at the beginning of the
+           simulation to enable dynamic registration until then. */
+        isTelemetryConfigured_ = false;
+        configureTelemetry();
     }
 
     result_t Engine::configureTelemetry(void)
     {
         result_t returnCode = result_t::SUCCESS;
 
-        // Register variables to the telemetry senders
-        if (engineOptions_->telemetry.enableConfiguration)
+        if (!getIsInitialized())
         {
-            (void) registerNewVectorEntry(telemetrySender_,
-                                          model_->getPositionFieldNames(),
-                                          stepperState_.qLast);
+            std::cout << "Error - Engine::configureTelemetry - The engine is not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
-        if (engineOptions_->telemetry.enableVelocity)
+
+        if (returnCode == result_t::SUCCESS)
         {
-            (void) registerNewVectorEntry(telemetrySender_,
-                                          model_->getVelocityFieldNames(),
-                                          stepperState_.vLast);
-        }
-        if (engineOptions_->telemetry.enableAcceleration)
-        {
-            (void) registerNewVectorEntry(telemetrySender_,
-                                          model_->getAccelerationFieldNames(),
-                                          stepperState_.aLast);
-        }
-        if (engineOptions_->telemetry.enableCommand)
-        {
-            (void) registerNewVectorEntry(telemetrySender_,
-                                          model_->getMotorTorqueFieldNames(),
-                                          stepperState_.uCommandLast);
-        }
-        if (engineOptions_->telemetry.enableEnergy)
-        {
-            telemetrySender_.registerNewEntry<float64_t>("energy", stepperState_.energyLast);
+            if (!isTelemetryConfigured_)
+            {
+                // Register variables to the telemetry senders
+                if (engineOptions_->telemetry.enableConfiguration)
+                {
+                    (void) registerNewVectorEntry(telemetrySender_,
+                                                  model_->getPositionFieldNames(),
+                                                  vectorN_t::Zero(model_->nq()));
+                }
+                if (engineOptions_->telemetry.enableVelocity)
+                {
+                    (void) registerNewVectorEntry(telemetrySender_,
+                                                  model_->getVelocityFieldNames(),
+                                                  vectorN_t::Zero(model_->nv()));
+                }
+                if (engineOptions_->telemetry.enableAcceleration)
+                {
+                    (void) registerNewVectorEntry(telemetrySender_,
+                                                  model_->getAccelerationFieldNames(),
+                                                  vectorN_t::Zero(model_->nv()));
+                }
+                if (engineOptions_->telemetry.enableCommand)
+                {
+                    (void) registerNewVectorEntry(telemetrySender_,
+                                                  model_->getMotorTorqueFieldNames(),
+                                                  vectorN_t::Zero(model_->getMotorsNames().size()));
+                }
+                if (engineOptions_->telemetry.enableEnergy)
+                {
+                    telemetrySender_.registerNewEntry<float64_t>("energy", 0.0);
+                }
+                isTelemetryConfigured_ = true;
+            }
         }
 
         returnCode = controller_->configureTelemetry(telemetryData_);
         if (returnCode == result_t::SUCCESS)
         {
             returnCode = model_->configureTelemetry(telemetryData_);
+        }
+
+        if (returnCode != result_t::SUCCESS)
+        {
+            isTelemetryConfigured_ = false;
         }
 
         return returnCode;
@@ -226,7 +253,9 @@ namespace exo_simu
             return result_t::ERROR_INIT_FAILED;
         }
 
-        if(x_init.rows() != model_->nx())
+        std::vector<int32_t> const & rigidJointsPositionIdx = model_->getRigidJointsPositionIdx();
+        std::vector<int32_t> const & rigidJointsVelocityIdx = model_->getRigidJointsVelocityIdx();
+        if(x_init.rows() != (uint32_t) (rigidJointsPositionIdx.size() + rigidJointsVelocityIdx.size()))
         {
             std::cout << "Error - Engine::simulate - Size of x_init inconsistent with model size." << std::endl;
             return result_t::ERROR_BAD_INPUT;
@@ -264,9 +293,31 @@ namespace exo_simu
             return result_t::ERROR_BAD_INPUT;
         }
 
-        // Reset the model, controller, engine (soft reset), and stepper internal state
-        reset(false);
-        stepperState_.initialize(*model_, x_init);
+        // Reset the model, controller, and engine
+        reset();
+
+        // Initialize the flexible state based on the rigid initial state
+        vectorN_t x0 = vectorN_t::Zero(model_->nx());
+        for (uint32_t i=0; i<rigidJointsPositionIdx.size(); ++i)
+        {
+            x0[rigidJointsPositionIdx[i]] = x_init[i];
+        }
+        for (uint32_t i=0; i<rigidJointsVelocityIdx.size(); ++i)
+        {
+            x0[rigidJointsVelocityIdx[i] + model_->nq()] = x_init[i + rigidJointsPositionIdx.size()];
+        }
+        for (int32_t const & jointId : model_->getFlexibleJointsPositionIdx())
+        {
+            x0[jointId + 3] = 1.0;
+        }
+
+        // Initialize the stepper internal state
+        forceImpulseNextIt_ = forcesImpulse_.begin();
+        for (auto & forceProfile : forcesProfile_)
+        {
+            getFrameIdx(model_->pncModel_, forceProfile.first, std::get<0>(forceProfile.second));
+        }
+        stepperState_.initialize(*model_, x0);
         systemDynamics(0, stepperState_.x, stepperState_.dxdt);
 
         // Reset the telemetry recorder, write the header, and lock the registration of new variables
@@ -274,11 +325,11 @@ namespace exo_simu
 
         // Compute the breakpoints' period (for command or observation) during the integration loop
         float64_t updatePeriod = 0.0;
-        if (engineOptions_->stepper.sensorsUpdatePeriod < std::numeric_limits<float64_t>::epsilon())
+        if (engineOptions_->stepper.sensorsUpdatePeriod < EPS)
         {
             updatePeriod = engineOptions_->stepper.controllerUpdatePeriod;
         }
-        else if (engineOptions_->stepper.controllerUpdatePeriod < std::numeric_limits<float64_t>::epsilon())
+        else if (engineOptions_->stepper.controllerUpdatePeriod < EPS)
         {
             updatePeriod = engineOptions_->stepper.sensorsUpdatePeriod;
         }
@@ -290,7 +341,7 @@ namespace exo_simu
 
         // Set the initial time step
         float64_t dt = 0.0;
-        if (updatePeriod > std::numeric_limits<float64_t>::epsilon())
+        if (updatePeriod > EPS)
         {
             dt = updatePeriod; // The initial time step is the update period
         }
@@ -305,19 +356,35 @@ namespace exo_simu
         failed_step_checker fail_checker; // to throw a runtime_error if step size adjustment fail
         while (true)
         {
-            // Log the current time, state, command, and sensors
+            // Update internal state of the stepper
+            vectorN_t const & q = stepperState_.x.head(model_->nq());
+            vectorN_t const & v = stepperState_.x.tail(model_->nv());
+            vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
+            stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a); // Update uLast directly to avoid temporary
+            // Get system energy, kinematic computation are not needed since they were already done in RNEA.
+            float64_t energy =
+                pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false)
+                + pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
+            stepperState_.updateLast(current_time,
+                                     q,
+                                     v,
+                                     a,
+                                     stepperState_.uLast,
+                                     stepperState_.uCommandLast,
+                                     energy); // uCommandLast are already up-to-date
+
+            // Monitor current iteration number, and log the current time, state, command, and sensors data.
             updateTelemetry();
 
             /* Stop the simulation if the end time has been reached, if
                the callback returns false, or if the number of integration
                steps exceeds 1e5. */
-            if (std::abs(end_time - current_time) < std::numeric_limits<float64_t>::epsilon()
-            || !callbackFct_(current_time, stepperState_.x))
+            if (std::abs(end_time - current_time) < EPS || !callbackFct_(current_time, stepperState_.x))
             {
                 break;
             }
             else if (engineOptions_->stepper.iterMax > 0
-            && stepperState_.iterLast >= (uint32_t) engineOptions_->stepper.iterMax)
+            && stepperState_.iterLast >= engineOptions_->stepper.iterMax)
             {
                 break;
             }
@@ -329,14 +396,14 @@ namespace exo_simu
 
             if (updatePeriod > 0)
             {
-                // Get the current time and target time at next iteration
+                // Get the current time
                 current_time = next_time;
-                next_time += std::min(updatePeriod, end_time - current_time); // Make sure it ends exactly at the end_time
 
                 // Update the sensor data if necessary (only for finite update frequency)
                 if (engineOptions_->stepper.sensorsUpdatePeriod > 0)
                 {
-                    float64_t next_time_update_sensor = std::round(current_time / engineOptions_->stepper.sensorsUpdatePeriod) *
+                    float64_t next_time_update_sensor =
+                        std::round(current_time / engineOptions_->stepper.sensorsUpdatePeriod) *
                         engineOptions_->stepper.sensorsUpdatePeriod;
                     if (std::abs(current_time - next_time_update_sensor) < 1e-8)
                     {
@@ -351,8 +418,9 @@ namespace exo_simu
                 // Update the controller command if necessary (only for finite update frequency)
                 if (engineOptions_->stepper.controllerUpdatePeriod > 0)
                 {
-                    float64_t next_time_update_controller = std::round(current_time / engineOptions_->stepper.controllerUpdatePeriod) *
-                        engineOptions_->stepper.controllerUpdatePeriod;
+                    float64_t next_time_update_controller =
+                        std::round(current_time / engineOptions_->stepper.controllerUpdatePeriod) *
+                            engineOptions_->stepper.controllerUpdatePeriod;
                     if (std::abs(current_time - next_time_update_controller) < 1e-8)
                     {
                         controller_->computeCommand(stepperState_.tLast,
@@ -364,25 +432,70 @@ namespace exo_simu
                         {
                             uint32_t jointId = motorsVelocityIdx[i];
                             float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
-                            stepperState_.uCommandLast[i] = boost::algorithm::clamp(stepperState_.uCommandLast[i], -torque_max, torque_max);
+                            stepperState_.uCommandLast[i] = boost::algorithm::clamp(
+                                stepperState_.uCommandLast[i], -torque_max, torque_max);
                             stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
                         }
+
+                        /* Update the internal stepper state dxdt since the dynamics has changed.
+                           Make sure the next impulse force iterator has NOT been updated at this point ! */
                         if (engineOptions_->stepper.solver != "explicit_euler")
                         {
-                            systemDynamics(current_time, stepperState_.x, stepperState_.dxdt); // Update the internal stepper state dxdt since the dynamics has changed.
+                            systemDynamics(current_time, stepperState_.x, stepperState_.dxdt);
                         }
                     }
                 }
+            }
+
+            // Get the next impulse force application time and update the iterator if necessary
+            float64_t tForceImpulseNext = end_time;
+            if (forceImpulseNextIt_ != forcesImpulse_.end())
+            {
+                float64_t tForceImpulseNextTmp = forceImpulseNextIt_->first;
+                float64_t dtForceImpulseNext = std::get<1>(forceImpulseNextIt_->second);
+                if (current_time > tForceImpulseNextTmp + dtForceImpulseNext)
+                {
+                    ++forceImpulseNextIt_;
+                    tForceImpulseNextTmp = forceImpulseNextIt_->first;
+                }
+
+                if (forceImpulseNextIt_ != forcesImpulse_.end())
+                {
+                    if (tForceImpulseNextTmp > current_time)
+                    {
+                        tForceImpulseNext = tForceImpulseNextTmp;
+                    }
+                    else
+                    {
+                        if (forceImpulseNextIt_ != std::prev(forcesImpulse_.end()))
+                        {
+                            tForceImpulseNext = std::next(forceImpulseNextIt_)->first;
+                        }
+                    }
+                }
+            }
+
+            if (updatePeriod > 0)
+            {
+                // Get the target time at next iteration
+                next_time += min(updatePeriod,
+                                 end_time - current_time,
+                                 tForceImpulseNext - current_time);
 
                 // Compute the next step using adaptive step method
                 while (current_time < next_time)
                 {
                     // adjust stepsize to end up exactly at the next breakpoint
                     float64_t current_dt = std::min(dt, next_time - current_time);
-                    if (success == boost::apply_visitor([&](auto && one)
-                                                        {
-                                                            return one.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, current_dt);
-                                                        }, stepper))
+                    if (success == boost::apply_visitor(
+                        [&](auto && one)
+                        {
+                            return one.try_step(rhsBind,
+                                                stepperState_.x,
+                                                stepperState_.dxdt,
+                                                current_time,
+                                                current_dt);
+                        }, stepper))
                     {
                         fail_checker.reset(); // reset the fail counter, see #173
                         dt = std::max(dt, current_dt); // continue with the original step size if dt was reduced due to the next breakpoint
@@ -397,15 +510,25 @@ namespace exo_simu
             }
             else
             {
+                // Make sure it ends exactly at the end_time, never exceeds dtMax, and stop to apply impulse forces
+                dt = min(dt,
+                         engineOptions_->stepper.dtMax,
+                         end_time - current_time,
+                         tForceImpulseNext - current_time);
+
                 // Compute the next step using adaptive step method
-                dt = std::min(std::min(dt, engineOptions_->stepper.dtMax), end_time - current_time); // Make sure it ends exactly at the end_time and never exceeds dtMax
                 controlled_step_result res = fail;
                 while (res == fail)
                 {
-                    res = boost::apply_visitor([&](auto && one)
-                                               {
-                                                   return one.try_step(rhsBind, stepperState_.x, stepperState_.dxdt, current_time, dt);
-                                               }, stepper);
+                    res = boost::apply_visitor(
+                        [&](auto && one)
+                        {
+                            return one.try_step(rhsBind,
+                                                stepperState_.x,
+                                                stepperState_.dxdt,
+                                                current_time,
+                                                dt);
+                        }, stepper);
                     if (res == success)
                     {
                         fail_checker.reset(); // reset the fail counter
@@ -416,19 +539,25 @@ namespace exo_simu
                     }
                 }
             }
-
-            // Update internal state of the stepper
-            vectorN_t const & q = stepperState_.x.head(model_->nq());
-            vectorN_t const & v = stepperState_.x.tail(model_->nv());
-            vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
-            stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a);
-            // Get system energy, kinematic computation are not needed since they were already done in RNEA.
-            float64_t energy = pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false) +
-                               pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
-            stepperState_.updateLast(current_time, q, v, a, stepperState_.uLast, stepperState_.uCommandLast, energy); // uLast and uCommandLast are already up-to-date
         }
 
         return returnCode;
+    }
+
+    void Engine::registerForceImpulse(std::string const & frameName,
+                                      float64_t   const & t,
+                                      float64_t   const & dt,
+                                      vector3_t   const & F)
+    {
+        // Make sure that the forces do NOT overlap while taking into account dt.
+
+        forcesImpulse_[t] = std::make_tuple(frameName, dt, F);
+    }
+
+    void Engine::registerForceProfile(std::string      const & frameName,
+                                      external_force_t         forceFct)
+    {
+        forcesProfile_.emplace_back(frameName, std::make_tuple(0, forceFct));
     }
 
     void Engine::systemDynamics(float64_t const & t,
@@ -447,35 +576,63 @@ namespace exo_simu
         pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
 
         // Compute the external forces
-        pinocchio::container::aligned_vector<pinocchio::Force> fext(model_->pncModel_.joints.size(),
-                                                                    pinocchio::Force::Zero());
+        pinocchio::container::aligned_vector<pinocchio::Force> fext(
+            model_->pncModel_.joints.size(), pinocchio::Force::Zero());
         std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
         for(uint32_t i=0; i < contactFramesIdx.size(); i++)
         {
             int32_t const & contactFrameIdx = contactFramesIdx[i];
             model_->contactForces_[i] = pinocchio::Force(contactDynamics(contactFrameIdx));
-            int32_t parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
+            int32_t const & parentIdx = model_->pncModel_.frames[contactFrameIdx].parent;
             fext[parentIdx] += model_->contactForces_[i];
         }
 
-        // Update the sensor data if necessary (only for infinite update frequency)
-        if (engineOptions_->stepper.sensorsUpdatePeriod < std::numeric_limits<float64_t>::epsilon())
+        /* Update the sensor data if necessary (only for infinite update frequency).
+           Impossible to have access to the current acceleration and efforts. */
+        if (engineOptions_->stepper.sensorsUpdatePeriod < EPS)
         {
-            model_->setSensorsData(t, q, v, stepperState_.aLast, stepperState_.uLast); // Impossible to have access to the current acceleration and efforts
+            model_->setSensorsData(t, q, v, stepperState_.aLast, stepperState_.uLast);
         }
 
-        // Update the controller command if necessary (only for infinite update frequency)
-        if (engineOptions_->stepper.controllerUpdatePeriod < std::numeric_limits<float64_t>::epsilon())
+        /* Update the controller command if necessary (only for infinite update frequency).
+           Be careful, in this particular case uCommandLast is not guarantee to be the last command. */
+        if (engineOptions_->stepper.controllerUpdatePeriod < EPS)
         {
-            controller_->computeCommand(t, q, v, stepperState_.uCommandLast); // Be careful, in this particular case uCommandLast is not guarantee to be the last command
+            controller_->computeCommand(t, q, v, stepperState_.uCommandLast);
+
             std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
             for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
             {
-                uint32_t jointId = motorsVelocityIdx[i];
-                float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
-                stepperState_.uCommandLast[i] = boost::algorithm::clamp(stepperState_.uCommandLast[i], -torque_max, torque_max);
+                uint32_t const & jointId = motorsVelocityIdx[i];
+                float64_t const & torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
+                stepperState_.uCommandLast[i] = boost::algorithm::clamp(
+                    stepperState_.uCommandLast[i], -torque_max, torque_max);
                 stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
             }
+        }
+
+        // Add the effect of user-defined external forces
+        if (forceImpulseNextIt_ != forcesImpulse_.end())
+        {
+            float64_t const & tForceImpulseNext = forceImpulseNextIt_->first;
+            float64_t const & dt = std::get<1>(forceImpulseNextIt_->second);
+            if (tForceImpulseNext <= t && t <= tForceImpulseNext + dt)
+            {
+                int32_t frameIdx;
+                std::string const & frameName = std::get<0>(forceImpulseNextIt_->second);
+                vector3_t const & F = std::get<2>(forceImpulseNextIt_->second);
+                getFrameIdx(model_->pncModel_, frameName, frameIdx);
+                int32_t const & parentIdx = model_->pncModel_.frames[frameIdx].parent;
+                fext[parentIdx] += pinocchio::Force(computeFrameForceOnParentJoint(frameIdx, F));
+            }
+        }
+
+        for (auto const & forceProfile : forcesProfile_)
+        {
+            int32_t const & frameIdx = std::get<0>(forceProfile.second);
+            int32_t const & parentIdx = model_->pncModel_.frames[frameIdx].parent;
+            external_force_t const & forceFct = std::get<1>(forceProfile.second);
+            fext[parentIdx] += pinocchio::Force(computeFrameForceOnParentJoint(frameIdx, forceFct(t, x)));
         }
 
         // Compute command and internal dynamics
@@ -488,8 +645,7 @@ namespace exo_simu
 
         /* Hack to compute the configuration vector derivative, including the
            quaternions on SO3 automatically. Note that the time difference must
-           not be too small to avoid failure. Note that pinocchio::integrate is
-           quite slow (more than 5ns, compare to 85ns for pinocchio::aba). */
+           not be too small to avoid failure. */
         float64_t dt = std::max(1e-5, t - stepperState_.tLast);
         vectorN_t qNext = vectorN_t::Zero(model_->nq());
         pinocchio::integrate(model_->pncModel_, q, v*dt, qNext);
@@ -501,30 +657,42 @@ namespace exo_simu
         dxdt.tail(model_->nv()) = a;
     }
 
+    vector6_t Engine::computeFrameForceOnParentJoint(int32_t   const & frameId,
+                                                     vector3_t const & fextInWorld) const
+    {
+        // Get various transformations
+        matrix3_t const & tformFrameRot = model_->pncData_.oMf[frameId].rotation();
+        matrix3_t const & tformFrameJointRot = model_->pncModel_.frames[frameId].placement.rotation();
+        vector3_t const & posFrameJoint = model_->pncModel_.frames[frameId].placement.translation();
+
+        // Compute the forces at the origin of the parent joint frame
+        vector6_t fextLocal = vector6_t::Zero();
+        fextLocal.head<3>() = tformFrameJointRot * tformFrameRot.transpose() * fextInWorld;
+        fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>());
+
+        return fextLocal;
+    }
+
     vectorN_t Engine::contactDynamics(int32_t const & frameId) const
     {
         // /* /!\ Note that the contact dynamics depends only on kinematics data. /!\ */
 
         contactOptions_t const * const contactOptions_ = &engineOptions_->contacts;
 
-        Eigen::Matrix3d const & tformFrameRot = model_->pncData_.oMf[frameId].rotation();
-        Eigen::Vector3d const & posFrame = model_->pncData_.oMf[frameId].translation();
+        matrix3_t const & tformFrameRot = model_->pncData_.oMf[frameId].rotation();
+        vector3_t const & posFrame = model_->pncData_.oMf[frameId].translation();
 
         vectorN_t fextLocal = vectorN_t::Zero(6);
 
         if(posFrame(2) < 0.0)
         {
             // Initialize the contact force
-            Eigen::Vector3d fextInWorld(0.0, 0.0, 0.0);
+            vector3_t fextInWorld = vector3_t::Zero();
 
-            // Get various transformations
-            Eigen::Matrix3d const & tformFrameJointRot = model_->pncModel_.frames[frameId].placement.rotation();
-            Eigen::Vector3d const & posFrameJoint = model_->pncModel_.frames[frameId].placement.translation();
-
-            Eigen::Vector3d motionFrame = pinocchio::getFrameVelocity(model_->pncModel_,
-                                                                      model_->pncData_,
-                                                                      frameId).linear();
-            Eigen::Vector3d vFrameInWorld = tformFrameRot * motionFrame;
+            vector3_t motionFrame = pinocchio::getFrameVelocity(model_->pncModel_,
+                                                                model_->pncData_,
+                                                                frameId).linear();
+            vector3_t vFrameInWorld = tformFrameRot * motionFrame;
 
             // Compute normal force
             float64_t damping = 0;
@@ -542,9 +710,9 @@ namespace exo_simu
             {
                 if(vNorm < 1.5 * contactOptions_->dryFrictionVelEps)
                 {
-                    frictionCoeff = -2.0 * vNorm * (contactOptions_->frictionDry - contactOptions_->frictionViscous) \
-                        / contactOptions_->dryFrictionVelEps + 3.0*contactOptions_->frictionDry - \
-                        2.0*contactOptions_->frictionViscous;
+                    frictionCoeff = -2.0 * vNorm * (contactOptions_->frictionDry -
+                        contactOptions_->frictionViscous) / contactOptions_->dryFrictionVelEps
+                        + 3.0 * contactOptions_->frictionDry - 2.0*contactOptions_->frictionViscous;
                 }
                 else
                 {
@@ -553,19 +721,16 @@ namespace exo_simu
             }
             else
             {
-                frictionCoeff = vNorm * contactOptions_->frictionDry / contactOptions_->dryFrictionVelEps;
+                frictionCoeff = vNorm * contactOptions_->frictionDry /
+                    contactOptions_->dryFrictionVelEps;
             }
             fextInWorld.head<2>() = -vxy * frictionCoeff * fextInWorld(2);
 
             // Make sure that the tangential force never exceeds 1e5 N for the sake of numerical stability
-            fextInWorld.head<2>() = fextInWorld.head<2>().unaryExpr([](float64_t x) -> float64_t
-                                                                    {
-                                                                        return std::min(std::max(x, -1e5), 1e5);
-                                                                    });
+            fextInWorld.head<2>() = clamp(fextInWorld.head<2>(), -1e5, 1e5);
 
             // Compute the forces at the origin of the parent joint frame
-            fextLocal.head<3>() = tformFrameJointRot * tformFrameRot.transpose() * fextInWorld;
-            fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>());
+            fextLocal = computeFrameForceOnParentJoint(frameId, fextInWorld);
 
             // Add blending factor
             float64_t blendingFactor = -posFrame(2) / contactOptions_->transitionEps;
@@ -629,7 +794,8 @@ namespace exo_simu
         engineOptionsHolder_ = engineOptions;
 
         // Make sure some parameters are in the required bounds
-        float64_t & dtMax = boost::get<float64_t>(boost::get<configHolder_t>(engineOptionsHolder_.at("stepper")).at("dtMax"));
+        float64_t & dtMax = boost::get<float64_t>(
+            boost::get<configHolder_t>(engineOptionsHolder_.at("stepper")).at("dtMax"));
         dtMax = std::min(std::max(dtMax, MIN_TIME_STEP_MAX), MAX_TIME_STEP_MAX);
 
         // Create a fast struct accessor
@@ -662,19 +828,19 @@ namespace exo_simu
 
         // Never empty since it contains at least the initial state
         logData.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
-        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(timestamps.data(),
-                                                                          timestamps.size()).cast<float64_t>();
+        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(
+            timestamps.data(), timestamps.size()).cast<float64_t>();
         for (uint32_t i=0; i<intData.size(); i++)
         {
             logData.block(i, 1, 1, intData[i].size()) =
-                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(intData[i].data(),
-                                                               intData[i].size()).cast<float64_t>();
+                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(
+                    intData[i].data(), intData[i].size()).cast<float64_t>();
         }
         for (uint32_t i=0; i<floatData.size(); i++)
         {
             logData.block(i, 1 + intData[0].size(), 1, floatData[i].size()) =
-                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(floatData[i].data(),
-                                                                 floatData[i].size()).cast<float64_t>();
+                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(
+                    floatData[i].data(), floatData[i].size()).cast<float64_t>();
         }
     }
 
@@ -689,10 +855,18 @@ namespace exo_simu
                                              std::ofstream::trunc);
 
         auto indexConstantEnd = std::find(header.begin(), header.end(), START_COLUMNS);
-        std::copy(header.begin()+1, indexConstantEnd-1, std::ostream_iterator<std::string>(myfile, ", ")); // Discard the first one (start constant flag)
-        std::copy(indexConstantEnd-1, indexConstantEnd, std::ostream_iterator<std::string>(myfile, "\n"));
-        std::copy(indexConstantEnd+1, header.end()-2, std::ostream_iterator<std::string>(myfile, ", "));
-        std::copy(header.end()-2, header.end()-1, std::ostream_iterator<std::string>(myfile, "\n")); // Discard the last one (start data flag)
+        std::copy(header.begin() + 1,
+                  indexConstantEnd - 1,
+                  std::ostream_iterator<std::string>(myfile, ", ")); // Discard the first one (start constant flag)
+        std::copy(indexConstantEnd - 1,
+                  indexConstantEnd,
+                  std::ostream_iterator<std::string>(myfile, "\n"));
+        std::copy(indexConstantEnd + 1,
+                  header.end() - 2,
+                  std::ostream_iterator<std::string>(myfile, ", "));
+        std::copy(header.end() - 2,
+                  header.end() - 1,
+                  std::ostream_iterator<std::string>(myfile, "\n")); // Discard the last one (start data flag)
 
         Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
         myfile << log.format(CSVFormat);

@@ -123,12 +123,12 @@ class pid_feedforward:
         qRefNames = []
         dqRefNames = []
         q_ref_names = ["targetPosition" + (joint_name[:-5] if joint_name.endswith('Joint') else joint_name)
-                       for joint_name in list(simulator.get_motor_names())]
+                       for joint_name in list(simulator.get_motors_names())]
         dq_ref_names = ["targetVelocity" + (joint_name[:-5] if joint_name.endswith('Joint') else joint_name)
-                        for joint_name in list(simulator.get_motor_names())]
-        simulator.register_new_vector_entry(q_ref_names, self.q_ref)
-        simulator.register_new_vector_entry(dq_ref_names, self.dq_ref)
-        simulator.register_new_entry("HzdState", self.hzd_state)
+                        for joint_name in list(simulator.get_motors_names())]
+        simulator.register_entry(q_ref_names, self.q_ref)
+        simulator.register_entry(dq_ref_names, self.dq_ref)
+        simulator.register_entry("HzdState", self.hzd_state)
 
     def reset(self):
         self.time_offset = 0

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 import os
 import re
 import shutil
@@ -14,8 +15,10 @@ import numpy as np
 from scipy.interpolate import UnivariateSpline
 
 import pinocchio as pnc
+sys.path.append(os.path.dirname(pnc.__file__)) # Required to be able to find libpinocchio_pywrap.so
 from pinocchio.utils import *
 from pinocchio.robot_wrapper import RobotWrapper
+import libpinocchio_pywrap as pin
 from gepetto.corbaserver import Client
 
 from wdc_dynamicsteller import DynamicsTeller, rootjoint
@@ -191,10 +194,11 @@ def extract_state_from_neural_network_prediction(urdf_path, pred):
 
     return trajectory_data
 
-def extract_state_from_simulation_log(urdf_path, log_header, log_data):
+def extract_state_from_simulation_log(urdf_path, log_header, log_data, pinocchio_model=None):
     # Extract time, joint positions and velocities evolution from log.
     # Note that the quaternion angular velocity vectors are expressed
     # it body frame rather than world frame.
+
     t = log_data[:,log_header.index('Global.Time')]
     qe = log_data[:,np.array(['currentFreeFlyerPosition' in field
                               or 'currentPosition' in field for field in log_header])].T
@@ -210,7 +214,7 @@ def extract_state_from_simulation_log(urdf_path, log_header, log_data):
         evolution_robot.append(State(qe[:,[i]], dqe[:,[i]], ddqe[:,[i]], t[i], hzd_state[i],
                                SUPPORT_FOOT_ENUM[np.round(hzd_state[i]) == HZD_STATE_ENUM[1]]))
 
-    return {"evolution_robot": evolution_robot, "urdf": urdf_path}
+    return {"evolution_robot": evolution_robot, "urdf": urdf_path, "pinocchio_model": pinocchio_model}
 
 def load_csv_log(csv_log_path):
     return np.genfromtxt(csv_log_path, delimiter=',')
@@ -271,7 +275,12 @@ def get_n_steps(trajectory_data, n):
             else:
                 state_dict_gbl[key] = np.concatenate((state_dict_gbl[key], state_dict_tmp[key]), axis=-1) # list concatenation
 
-    return {"evolution_robot": State.fromdict(state_dict_gbl), "urdf": trajectory_data["urdf"]}
+    if ("pinocchio_model" not in trajectory_data.keys()):
+        trajectory_data["pinocchio_model"] = None
+
+    return {"evolution_robot": State.fromdict(state_dict_gbl),
+            "urdf": trajectory_data["urdf"],
+            "pinocchio_model": trajectory_data["pinocchio_model"]}
 
 def delete_nodes_viewer(*nodes_path):
     client = Client()
@@ -293,7 +302,13 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None, speed_ra
         if (urdf_rgba is not None and urdf_rgba[i] is not None):
             alpha = urdf_rgba[i][3]
             urdf_path = get_colorized_urdf(urdf_path, urdf_rgba[i][:3])
-        rb.initFromURDF(urdf_path, [""], root_joint=pnc.JointModelFreeFlyer())
+        pinocchio_model = trajectory_data[i]["pinocchio_model"]
+        if (pinocchio_model is None):
+            rb.initFromURDF(urdf_path, [], root_joint=pnc.JointModelFreeFlyer())
+        else:
+            collision_model = pin.buildGeomFromUrdf(pinocchio_model, urdf_path, [], pin.GeometryType.COLLISION)
+            visual_model = pin.buildGeomFromUrdf(pinocchio_model, urdf_path, [], pin.GeometryType.VISUAL)
+            rb.__init__(model=pinocchio_model, collision_model=collision_model, visual_model=visual_model)
         client = Client()
         if not scene_name in client.gui.getSceneList():
             client.gui.createSceneWithFloor(scene_name)
