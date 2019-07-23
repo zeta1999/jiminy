@@ -51,7 +51,7 @@ namespace exo_simu
             vectorN_t const boundsMin;
             vectorN_t const boundsMax;
 
-            jointOptions_t(configHolder_t const & options):
+            jointOptions_t(configHolder_t const & options) :
             boundsFromUrdf(boost::get<bool>(options.at("boundsFromUrdf"))),
             boundsMin(boost::get<vectorN_t>(options.at("boundsMin"))),
             boundsMax(boost::get<vectorN_t>(options.at("boundsMax")))
@@ -60,9 +60,45 @@ namespace exo_simu
             }
         };
 
+        virtual configHolder_t getDefaultDynamicsOptions()
+        {
+            // Add extra options or update default values
+            configHolder_t config;
+            config["inertiaBodiesBiasStd"] = 0.0;
+            config["massBodiesBiasStd"] = 0.0;
+            config["centerOfMassPositionBodiesBiasStd"] = 0.0;
+            config["relativePositionBodiesBiasStd"] = 0.0;
+            config["isFlexibleModel"] = true;
+            config["flexibleJointNames"] = std::vector<std::string>();
+
+            return config;
+        };
+
+        struct dynamicsOptions_t
+        {
+            float64_t                const inertiaBodiesBiasStd;
+            float64_t                const massBodiesBiasStd;
+            float64_t                const centerOfMassPositionBodiesBiasStd;
+            float64_t                const relativePositionBodiesBiasStd;
+            bool                     const isFlexibleModel;
+            std::vector<std::string> const flexibleJointNames;
+
+            dynamicsOptions_t(configHolder_t const & options) :
+            inertiaBodiesBiasStd(boost::get<float64_t>(options.at("inertiaBodiesBiasStd"))),
+            massBodiesBiasStd(boost::get<float64_t>(options.at("massBodiesBiasStd"))),
+            centerOfMassPositionBodiesBiasStd(boost::get<float64_t>(options.at("centerOfMassPositionBodiesBiasStd"))),
+            relativePositionBodiesBiasStd(boost::get<float64_t>(options.at("relativePositionBodiesBiasStd"))),
+            isFlexibleModel(boost::get<bool>(options.at("isFlexibleModel"))),
+            flexibleJointNames(boost::get<std::vector<std::string> >(options.at("flexibleJointNames")))
+            {
+                // Empty.
+            }
+        };
+
         virtual configHolder_t getDefaultOptions()
         {
             configHolder_t config;
+            config["dynamics"] = getDefaultDynamicsOptions();
             config["joints"] = getDefaultJointOptions();
 
             return config;
@@ -70,9 +106,11 @@ namespace exo_simu
 
         struct modelOptions_t
         {
+            dynamicsOptions_t const dynamics;
             jointOptions_t const joints;
 
-            modelOptions_t(configHolder_t const & options):
+            modelOptions_t(configHolder_t const & options) :
+            dynamics(boost::get<configHolder_t>(options.at("dynamics"))),
             joints(boost::get<configHolder_t>(options.at("joints")))
             {
                 // Empty.

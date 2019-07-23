@@ -39,7 +39,7 @@ namespace exo_simu
         configHolder_t jointConfigOld = jointConfig;
         boost::get<bool>(jointConfig.at("boundsFromUrdf")) = true;
         returnCode = Model::initialize(urdfPath, contactFramesNames_, motorsNames_); // The joint names are unknown at this point
-        jointConfig = jointConfigOld;
+        boost::get<configHolder_t>(mdlOptionsHolder_.at("joints")) = jointConfigOld; // Be careful, the reference jointConfig may become invalid after calling 'initialize' method.
         isInitialized_ = false; // ExoModel is not initialized so far
 
         if (returnCode == result_t::SUCCESS)

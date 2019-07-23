@@ -30,7 +30,7 @@ namespace exo_simu
         {
             bool const telemetryEnable;
 
-            controllerOptions_t(configHolder_t const & options):
+            controllerOptions_t(configHolder_t const & options) :
             telemetryEnable(boost::get<bool>(options.at("telemetryEnable")))
             {
                 // Empty.

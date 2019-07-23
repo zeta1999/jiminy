@@ -33,11 +33,11 @@ namespace exo_simu
 
         struct abstractSensorOptions_t
         {
-            bool const rawData;
+            bool      const rawData;
             vectorN_t const noiseStd;
             vectorN_t const bias;
             float64_t const delay;
-            uint32_t const delayInterpolationOrder;
+            uint32_t  const delayInterpolationOrder;
 
             abstractSensorOptions_t(configHolder_t const & options) :
             rawData(boost::get<bool>(options.at("rawData"))),

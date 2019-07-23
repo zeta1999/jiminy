@@ -65,7 +65,7 @@ namespace exo_simu
             float64_t const damping;
             float64_t const transitionEps;
 
-            contactOptions_t(configHolder_t const & options):
+            contactOptions_t(configHolder_t const & options) :
             frictionViscous(boost::get<float64_t>(options.at("frictionViscous"))),
             frictionDry(boost::get<float64_t>(options.at("frictionDry"))),
             dryFrictionVelEps(boost::get<float64_t>(options.at("dryFrictionVelEps"))),
@@ -93,7 +93,7 @@ namespace exo_simu
             float64_t const boundDamping;
             float64_t const boundTransitionEps;
 
-            jointOptions_t(configHolder_t const & options):
+            jointOptions_t(configHolder_t const & options) :
             boundStiffness(boost::get<float64_t>(options.at("boundStiffness"))),
             boundDamping(boost::get<float64_t>(options.at("boundDamping"))),
             boundTransitionEps(boost::get<float64_t>(options.at("boundTransitionEps")))
@@ -138,16 +138,16 @@ namespace exo_simu
 
         struct stepperOptions_t
         {
-            int32_t const randomSeed;
+            int32_t     const randomSeed;
             std::string const solver;
-            float64_t const tolAbs;
-            float64_t const tolRel;
-            float64_t const dtMax;
-            int32_t const iterMax;
-            float64_t const sensorsUpdatePeriod;
-            float64_t const controllerUpdatePeriod;
+            float64_t   const tolAbs;
+            float64_t   const tolRel;
+            float64_t   const dtMax;
+            int32_t     const iterMax;
+            float64_t   const sensorsUpdatePeriod;
+            float64_t   const controllerUpdatePeriod;
 
-            stepperOptions_t(configHolder_t const & options):
+            stepperOptions_t(configHolder_t const & options) :
             randomSeed(boost::get<int32_t>(options.at("randomSeed"))),
             solver(boost::get<std::string>(options.at("solver"))),
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
@@ -180,7 +180,7 @@ namespace exo_simu
             bool const enableCommand;
             bool const enableEnergy;
 
-            telemetryOptions_t(configHolder_t const & options):
+            telemetryOptions_t(configHolder_t const & options) :
             enableConfiguration(boost::get<bool>(options.at("enableConfiguration"))),
             enableVelocity(boost::get<bool>(options.at("enableVelocity"))),
             enableAcceleration(boost::get<bool>(options.at("enableAcceleration"))),
@@ -206,10 +206,10 @@ namespace exo_simu
         struct engineOptions_t
         {
             telemetryOptions_t const telemetry;
-            stepperOptions_t const stepper;
-            worldOptions_t   const world;
-            jointOptions_t   const joints;
-            contactOptions_t const contacts;
+            stepperOptions_t   const stepper;
+            worldOptions_t     const world;
+            jointOptions_t     const joints;
+            contactOptions_t   const contacts;
 
             engineOptions_t(configHolder_t const & options) :
             telemetry(boost::get<configHolder_t>(options.at("telemetry"))),
@@ -228,7 +228,7 @@ namespace exo_simu
         // Internal state for the integration loop
 
         public:
-            stepperState_t(void):
+            stepperState_t(void) :
             iterLast(),
             tLast(),
             qLast(),
