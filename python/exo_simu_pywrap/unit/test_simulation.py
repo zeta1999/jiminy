@@ -62,7 +62,7 @@ simu_options["telemetry"]["enableEnergy"] = True
 simu_options["stepper"]["solver"] = "runge_kutta_dopri5" # ["runge_kutta_dopri5", "explicit_euler"]
 simu_options["stepper"]["tolRel"] = 1.0e-5
 simu_options["stepper"]["tolAbs"] = 1.0e-4
-simu_options["stepper"]["dtMax"] = 3.0e-3 # 2.0e-4 for "explicit_euler", 3.0e-3 for "runge_kutta_dopri5"
+simu_options["stepper"]["dtMax"] = 2.0e-3 # 2.0e-4 for "explicit_euler", 3.0e-3 for "runge_kutta_dopri5"
 simu_options["stepper"]["iterMax"] = 100000
 simu_options["stepper"]["sensorsUpdatePeriod"] = 0.0
 simu_options["stepper"]["controllerUpdatePeriod"] = 0.0
@@ -98,8 +98,8 @@ simulator.set_controller_options(ctrl_options)
 
 ################################ Run the simulation #####################################
 
-Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0,
-               20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0])
+Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
+               20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0])
 Kd = np.array([250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
                250.0, 150.0, 100.0, 100.0, 150.0, 100.0])
 controller = pid_feedforward(simulator, trajectory_data, Kp, Kd)
