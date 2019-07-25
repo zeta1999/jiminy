@@ -15,7 +15,7 @@ namespace exo_simu
         if (!getIsInitialized())
         {
             std::cout << "Error - Model::addSensor - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         std::string sensorType;
@@ -70,7 +70,7 @@ namespace exo_simu
         if (!getIsInitialized())
         {
             std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         sensorsGroupHolder_t::iterator sensorGroupIt;

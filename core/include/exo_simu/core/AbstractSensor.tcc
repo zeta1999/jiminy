@@ -21,7 +21,7 @@ namespace exo_simu
         dataHolder_->counters_.push_back(1);
 
         // Reset the sensors' internal state
-        AbstractSensorTpl<T>::reset(true);
+        AbstractSensorTpl<T>::reset();
     }
 
     template <typename T>
@@ -60,11 +60,11 @@ namespace exo_simu
         }
 
         // Reset the sensors' internal state
-        reset(false);
+        reset();
     }
 
     template <typename T>
-    void AbstractSensorTpl<T>::reset(bool const & resetTelemetry)
+    void AbstractSensorTpl<T>::reset(void)
     {
         dataHolder_->time_.resize(2);
         std::fill(dataHolder_->time_.begin(), dataHolder_->time_.end(), -1);
@@ -75,6 +75,9 @@ namespace exo_simu
             data = matrixN_t::Zero(getSize(), dataHolder_->num_); // Do not use setZero since the size is ill-defined
         }
         data_ = vectorN_t::Zero(getSize());
+
+        // Reset the telemetry state
+        isTelemetryConfigured_ = false;
     }
 
     template <typename T>

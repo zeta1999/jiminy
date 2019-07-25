@@ -18,9 +18,10 @@ namespace exo_simu
                   std::string                         const & name);
         ~ImuSensor(void);
 
-        void initialize(int32_t const & frameIdx);
+        result_t initialize(std::string const & frameName);
+        virtual void reset(void) override;
 
-        int32_t getFrameIdx(void) const;
+        std::string getFrameName(void) const;
 
     protected:
         result_t set(float64_t const & t,
@@ -30,7 +31,8 @@ namespace exo_simu
                      vectorN_t const & u) override;
 
     private:
-        int32_t frameIdx_;
+        std::string frameName_;
+        int32_t     frameIdx_;
     };
 
     class ForceSensor : public AbstractSensorTpl<ForceSensor>
@@ -41,10 +43,11 @@ namespace exo_simu
                     std::string                         const & name);
         ~ForceSensor(void);
 
-        void initialize(int32_t const & frameIdx);
+        result_t initialize(std::string const & frameName);
+        virtual void reset(void) override;
 
-        int32_t getFrameIdx(void) const;
-        
+        std::string getFrameName(void) const;
+
     protected:
         result_t set(float64_t const & t,
                      vectorN_t const & q,
@@ -53,7 +56,8 @@ namespace exo_simu
                      vectorN_t const & u);
 
     private:
-        int32_t frameIdx_;
+        std::string frameName_;
+        int32_t     frameIdx_;
     };
 
     class EncoderSensor : public AbstractSensorTpl<EncoderSensor>
@@ -64,12 +68,11 @@ namespace exo_simu
                       std::string                         const & name);
         ~EncoderSensor(void);
 
-        void initialize(int32_t const & jointPositionIdx,
-                        int32_t const & jointVelocityIdx);
+        result_t initialize(std::string const & motorName);
+        virtual void reset(void) override;
 
-        int32_t getJointPositionIdx(void) const;
-        int32_t getJointVelocityIdx(void) const;
-        
+        std::string getMotorName(void) const;
+
     protected:
         result_t set(float64_t const & t,
                      vectorN_t const & q,
@@ -78,8 +81,9 @@ namespace exo_simu
                      vectorN_t const & u);
 
     private:
-        int32_t jointPositionIdx_;
-        int32_t jointVelocityIdx_;
+        std::string motorName_;
+        int32_t     motorPositionIdx_;
+        int32_t     motorVelocityIdx_;
     };
 }
 

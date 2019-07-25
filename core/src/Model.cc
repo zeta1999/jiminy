@@ -25,10 +25,22 @@ namespace exo_simu
     telemetryData_(nullptr),
     sensorsGroupHolder_(),
     contactFramesNames_(),
-    jointsNames_(),
     contactFramesIdx_(),
-    jointsPositionIdx_(),
-    jointsVelocityIdx_(),
+    motorsNames_(),
+    motorsPositionIdx_(),
+    motorsVelocityIdx_(),
+    rigidJointsNames_(),
+    rigidJointsPositionIdx_(),
+    rigidJointsVelocityIdx_(),
+    flexibleJointsNames_(),
+    flexibleJointsPositionIdx_(),
+    flexibleJointsVelocityIdx_(),
+    positionFieldNames_(),
+    velocityFieldNames_(),
+    accelerationFieldNames_(),
+    motorTorqueFieldNames_(),
+    pncModelRigidOrig_(),
+    pncModelFlexibleOrig_(),
     sensorsDataHolder_(),
     nq_(0),
     nv_(0),
@@ -44,7 +56,7 @@ namespace exo_simu
 
     result_t Model::initialize(std::string              const & urdfPath,
                                std::vector<std::string> const & contactFramesNames,
-                               std::vector<std::string> const & jointsNames,
+                               std::vector<std::string> const & motorsNames,
                                bool                     const & hasFreeflyer)
     {
         result_t returnCode = result_t::SUCCESS;
@@ -54,59 +66,91 @@ namespace exo_simu
         sensorsDataHolder_.clear();
 
         // Initialize the URDF model
-        contactFramesNames_ = contactFramesNames;
-        jointsNames_ = jointsNames;
         returnCode = loadUrdfModel(urdfPath, hasFreeflyer);
-        pncData_ = pinocchio::Data(pncModel_);
+        isInitialized_ = true;
 
-        // Update the bounds if necessary
         if (returnCode == result_t::SUCCESS)
         {
-            nq_ = pncModel_.nq;
-            nv_ = pncModel_.nv;
-            nx_ = nq_ + nv_;
-            isInitialized_ = true;
+            motorsNames_ = motorsNames;
+            contactFramesNames_ = contactFramesNames;
+            contactForces_ = pinocchio::container::aligned_vector<pinocchio::Force>(
+                contactFramesNames_.size(),
+                pinocchio::Force::Zero());
+
+            //Backup the original model
+            pncModelRigidOrig_ = pncModel_;
+
+            /* Get the list of joint names of the rigid model and
+               Erase the 'universe', since it is not an actual joint. */
+            rigidJointsNames_ = pncModelRigidOrig_.names;
+            rigidJointsNames_.erase(rigidJointsNames_.begin());
+        }
+
+        // Add biases to the dynamics properties of the model
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = generateBiasedModel();
+        }
+
+        // Create the flexible model and update the bounds if necessary
+        if (returnCode == result_t::SUCCESS)
+        {
             returnCode = setOptions(mdlOptionsHolder_);
         }
 
-        // Extract some joint and frame indices
-        if (returnCode == result_t::SUCCESS)
+        // Set the initialization flag
+        if (returnCode != result_t::SUCCESS)
         {
-            returnCode = getFramesIdx(contactFramesNames_, contactFramesIdx_);
-            contactForces_ = pinocchio::container::aligned_vector<pinocchio::Force>(contactFramesNames_.size(),
-                                                                                    pinocchio::Force::Zero());
-        }
-        if (returnCode == result_t::SUCCESS)
-        {
-            returnCode = getJointsIdx(jointsNames_, jointsPositionIdx_, jointsVelocityIdx_);
+            isInitialized_ = false;
         }
 
         return returnCode;
     }
 
-    void Model::reset(bool const & resetTelemetry)
+    void Model::reset(void)
     {
+        if (getIsInitialized())
+        {
+            /* Update the biases added to the dynamics properties of the model.
+               It cannot throw an error. */
+            generateBiasedModel();
+        }
+
         // Reset the sensors
         for (sensorsGroupHolder_t::value_type & sensorGroup : sensorsGroupHolder_)
         {
             for (sensorsHolder_t::value_type & sensor : sensorGroup.second)
             {
-                sensor.second->reset(resetTelemetry);
+                sensor.second->reset();
             }
         }
 
-        // Reset the telemetry state if needed
-        if (resetTelemetry)
-        {
-            isTelemetryConfigured_ = false;
-        }
+        // Reset the telemetry state
+        isTelemetryConfigured_ = false;
     }
 
     result_t Model::configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
     {
-        telemetryData_ = std::shared_ptr<TelemetryData>(telemetryData);
+        result_t returnCode = result_t::SUCCESS;
 
-        return result_t::SUCCESS;
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::configureTelemetry - The model is not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            telemetryData_ = std::shared_ptr<TelemetryData>(telemetryData);
+            isTelemetryConfigured_ = true;
+        }
+
+        if (returnCode != result_t::SUCCESS)
+        {
+            isTelemetryConfigured_ = false;
+        }
+
+        return returnCode;
     }
 
     result_t Model::removeSensor(std::string const & sensorType,
@@ -117,7 +161,7 @@ namespace exo_simu
         if (!getIsInitialized())
         {
             std::cout << "Error - Model::removeSensor - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         sensorsGroupHolder_t::iterator sensorGroupIt;
@@ -165,7 +209,7 @@ namespace exo_simu
         if (!getIsInitialized())
         {
             std::cout << "Error - Model::removeSensors - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         sensorsGroupHolder_t::iterator sensorGroupIt;
@@ -188,6 +232,283 @@ namespace exo_simu
         return returnCode;
     }
 
+    result_t Model::generateFlexibleModel(void)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::generateFlexibleModel - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            flexibleJointsNames_.clear();
+            pncModelFlexibleOrig_ = pncModelRigidOrig_;
+            for(std::string jointName : mdlOptions_->dynamics.flexibleJointsNames)
+            {
+                int32_t jointId;
+                if(returnCode == result_t::SUCCESS)
+                {
+                    returnCode = getJointPositionIdx(pncModel_, jointName, jointId);
+                }
+
+                // Look if given joint exists in the joint list.
+                if(returnCode == result_t::SUCCESS)
+                {
+                    // Add joints to model.
+                    std::string newName =
+                        removeFieldnameSuffix(jointName, "Joint") + FLEXIBLE_JOINT_SUFFIX;
+                    flexibleJointsNames_.emplace_back(newName);
+
+                    // Ignore return code, as check has already been done.
+                    insertFlexibilityInModel(pncModelFlexibleOrig_, jointName, newName);
+                }
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::generateBiasedModel(void)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::generateBiasedModel - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        // Generate a new flexible model and associated variables if needed
+        if (returnCode == result_t::SUCCESS)
+        {
+            if(pncModelFlexibleOrig_ == pinocchio::Model())
+            {
+                returnCode = generateFlexibleModel();
+            }
+        }
+        if(returnCode == result_t::SUCCESS)
+        {
+            if (mdlOptions_->dynamics.enableFlexibleModel)
+            {
+                getJointsPositionIdx(pncModelFlexibleOrig_,
+                                     flexibleJointsNames_,
+                                     flexibleJointsPositionIdx_,
+                                     true);
+                getJointsVelocityIdx(pncModelFlexibleOrig_,
+                                     flexibleJointsNames_,
+                                     flexibleJointsVelocityIdx_,
+                                     true);
+            }
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            // Reset the model either with the original rigid or flexible model
+            if (mdlOptions_->dynamics.enableFlexibleModel)
+            {
+                pncModel_ = pncModelFlexibleOrig_;
+            }
+            else
+            {
+                pncModel_ = pncModelRigidOrig_;
+            }
+
+            for (std::string const & jointName : rigidJointsNames_)
+            {
+                int32_t const jointId = pncModel_.getJointId(jointName);
+
+                vector3_t & comRelativePositionBody =
+                    const_cast<vector3_t &>(pncModel_.inertias[jointId].lever());
+                comRelativePositionBody +=
+                    randVectorNormal(3U, mdlOptions_->dynamics.centerOfMassPositionBodiesBiasStd);
+
+                // Cannot be less than 1g for numerical stability
+                float64_t & massBody =
+                    const_cast<float64_t &>(pncModel_.inertias[jointId].mass());
+                massBody =
+                    std::max(massBody +
+                        randNormal(0.0, mdlOptions_->dynamics.massBodiesBiasStd), 1.0e-3);
+
+                // Cannot be less 1g applied at 1mm of distance from the rotation center
+                vector6_t & inertiaBody =
+                    const_cast<vector6_t &>(pncModel_.inertias[jointId].inertia().data());
+                inertiaBody =
+                    clamp(inertiaBody +
+                        randVectorNormal(6U, mdlOptions_->dynamics.inertiaBodiesBiasStd), 1.0e-9);
+
+                vector3_t & relativePositionBody =
+                    pncModel_.jointPlacements[jointId].translation();
+                relativePositionBody +=
+                    randVectorNormal(3U, mdlOptions_->dynamics.relativePositionBodiesBiasStd);
+            }
+        }
+
+        // Extract some high level features of the rigid model
+        if (returnCode == result_t::SUCCESS)
+        {
+            nq_ = pncModel_.nq;
+            nv_ = pncModel_.nv;
+            nx_ = nq_ + nv_;
+        }
+
+        // Extract some joint and frame indices in the model
+        if (returnCode == result_t::SUCCESS)
+        {
+            getJointsPositionIdx(pncModel_, rigidJointsNames_, rigidJointsPositionIdx_, false);
+            getJointsVelocityIdx(pncModel_, rigidJointsNames_, rigidJointsVelocityIdx_, false);
+            returnCode = getFramesIdx(pncModel_, contactFramesNames_, contactFramesIdx_);
+        }
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = getJointsPositionIdx(pncModel_,
+                                              motorsNames_,
+                                              motorsPositionIdx_,
+                                              true);
+        }
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = getJointsVelocityIdx(pncModel_,
+                                              motorsNames_,
+                                              motorsVelocityIdx_,
+                                              true);
+        }
+
+        /* Generate the fieldnames of the elements of the vectorial
+           representation of the configuration, velocity, acceleration
+           and motor torques. */
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = generateFieldNames();
+        }
+
+        // Initialize Pinocchio Data internal state
+        if (returnCode == result_t::SUCCESS)
+        {
+            pncData_ = pinocchio::Data(pncModel_);
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::generateFieldNames(void)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!getIsInitialized())
+        {
+            std::cout << "Error - Model::generateFieldNames - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            positionFieldNames_.clear();
+            positionFieldNames_.resize(nq_);
+            velocityFieldNames_.clear();
+            velocityFieldNames_.resize(nv_);
+            accelerationFieldNames_.clear();
+            accelerationFieldNames_.resize(nv_);
+            std::vector<std::string> const & jointNames = pncModel_.names;
+            std::vector<std::string> jointShortNames =
+                removeFieldnamesSuffix(jointNames, "Joint");
+            for (uint32_t i=0; i<jointNames.size(); ++i)
+            {
+                std::string const & jointName = jointNames[i];
+                int32_t const jointId = pncModel_.getJointId(jointName);
+
+                int32_t idx_q = pncModel_.joints[jointId].idx_q();
+
+                if (idx_q >= 0) // Otherwise the joint is not part of the vectorial representation
+                {
+                    int32_t idx_v = pncModel_.joints[jointId].idx_v();
+
+                    joint_t jointType;
+                    std::string jointPrefix;
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        returnCode = getJointTypeFromId(pncModel_, jointId, jointType);
+                    }
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        if (jointType == joint_t::FREE)
+                        {
+                            // Discard the joint name for FREE joint type since it is unique if any
+                            jointPrefix = FREE_FLYER_PREFIX_BASE_NAME;
+                            jointShortNames[i] = "";
+                        }
+                        else
+                        {
+                            jointPrefix = JOINT_PREFIX_BASE;
+                        }
+
+                        returnCode = getJointTypeFromId(pncModel_, jointId, jointType);
+                    }
+
+                    std::vector<std::string> jointTypePositionSuffixes;
+                    std::vector<std::string> jointPositionFieldnames;
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        returnCode = getJointTypePositionSuffixes(jointType,
+                                                                  jointTypePositionSuffixes);
+                    }
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        for (std::string const & suffix : jointTypePositionSuffixes)
+                        {
+                            jointPositionFieldnames.emplace_back(
+                                jointPrefix + "Position" + jointShortNames[i] + suffix);
+                        }
+                    }
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        std::copy(jointPositionFieldnames.begin(),
+                                  jointPositionFieldnames.end(),
+                                  positionFieldNames_.begin() + idx_q);
+                    }
+
+                    std::vector<std::string> jointTypeVelocitySuffixes;
+                    std::vector<std::string> jointVelocityFieldnames;
+                    std::vector<std::string> jointAccelerationFieldnames;
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        returnCode = getJointTypeVelocitySuffixes(jointType,
+                                                                  jointTypeVelocitySuffixes);
+                    }
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        for (std::string const & suffix : jointTypeVelocitySuffixes)
+                        {
+                            jointVelocityFieldnames.emplace_back(
+                                jointPrefix + "Velocity" + jointShortNames[i] + suffix);
+                            jointAccelerationFieldnames.emplace_back(
+                                jointPrefix + "Acceleration" + jointShortNames[i] + suffix);
+                        }
+                    }
+                    if (returnCode == result_t::SUCCESS)
+                    {
+                        std::copy(jointVelocityFieldnames.begin(),
+                                jointVelocityFieldnames.end(),
+                                velocityFieldNames_.begin() + idx_v);
+                        std::copy(jointAccelerationFieldnames.begin(),
+                                jointAccelerationFieldnames.end(),
+                                accelerationFieldNames_.begin() + idx_v);
+                    }
+                }
+            }
+
+            motorTorqueFieldNames_.clear();
+            for (std::string const & jointName : removeFieldnamesSuffix(motorsNames_, "Joint"))
+            {
+                motorTorqueFieldNames_.emplace_back(JOINT_PREFIX_BASE + "Torque" + jointName);
+            }
+        }
+
+        return returnCode;
+    }
+
     result_t Model::getSensorsOptions(std::string    const & sensorType,
                                       configHolder_t       & sensorsOptions) const
     {
@@ -195,8 +516,8 @@ namespace exo_simu
 
         if (!getIsInitialized())
         {
-            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            std::cout << "Error - Model::getSensorsOptions - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         sensorsGroupHolder_t::const_iterator sensorGroupIt;
@@ -205,7 +526,7 @@ namespace exo_simu
             sensorGroupIt = sensorsGroupHolder_.find(sensorType);
             if (sensorGroupIt == sensorsGroupHolder_.end())
             {
-                std::cout << "Error - Model::getSensorOptions - This type of sensor does not exist." << std::endl;
+                std::cout << "Error - Model::getSensorsOptions - This type of sensor does not exist." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
@@ -229,7 +550,7 @@ namespace exo_simu
         if (!getIsInitialized())
         {
             std::cout << "Error - Model::getSensorsOptions - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         if (returnCode == result_t::SUCCESS)
@@ -258,7 +579,7 @@ namespace exo_simu
         if (!getIsInitialized())
         {
             std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         sensorsGroupHolder_t::const_iterator sensorGroupIt;
@@ -299,8 +620,8 @@ namespace exo_simu
 
         if (!getIsInitialized())
         {
-            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            std::cout << "Error - Model::setSensorOptions - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         sensorsGroupHolder_t::iterator sensorGroupIt;
@@ -309,7 +630,7 @@ namespace exo_simu
             sensorGroupIt = sensorsGroupHolder_.find(sensorType);
             if (sensorGroupIt == sensorsGroupHolder_.end())
             {
-                std::cout << "Error - Model::getSensorOptions - This type of sensor does not exist." << std::endl;
+                std::cout << "Error - Model::setSensorOptions - This type of sensor does not exist." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
@@ -320,7 +641,7 @@ namespace exo_simu
             sensorIt = sensorGroupIt->second.find(sensorName);
             if (sensorIt == sensorGroupIt->second.end())
             {
-                std::cout << "Error - Model::getSensorOptions - No sensor with this type and name exists." << std::endl;
+                std::cout << "Error - Model::setSensorOptions - No sensor with this type and name exists." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
@@ -340,8 +661,8 @@ namespace exo_simu
 
         if (!getIsInitialized())
         {
-            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            std::cout << "Error - Model::setSensorsOptions - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         sensorsGroupHolder_t::iterator sensorGroupIt;
@@ -350,7 +671,7 @@ namespace exo_simu
             sensorGroupIt = sensorsGroupHolder_.find(sensorType);
             if (sensorGroupIt == sensorsGroupHolder_.end())
             {
-                std::cout << "Error - Model::getSensorOptions - This type of sensor does not exist." << std::endl;
+                std::cout << "Error - Model::setSensorsOptions - This type of sensor does not exist." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
@@ -381,8 +702,8 @@ namespace exo_simu
 
         if (!getIsInitialized())
         {
-            std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
-            return result_t::ERROR_INIT_FAILED;
+            std::cout << "Error - Model::setSensorsOptions - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
         }
 
         if (returnCode == result_t::SUCCESS)
@@ -392,7 +713,8 @@ namespace exo_simu
                 for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
                 {
                     sensor.second->setOptions(boost::get<configHolder_t>(
-                        boost::get<configHolder_t>(sensorsOptions.at(sensorGroup.first)).at(sensor.first))); // TODO: missing check for sensor type and name availability
+                        boost::get<configHolder_t>(
+                            sensorsOptions.at(sensorGroup.first)).at(sensor.first))); // TODO: missing check for sensor type and name availability
                 }
             }
         }
@@ -411,24 +733,45 @@ namespace exo_simu
 
         mdlOptionsHolder_ = mdlOptions;
 
-        configHolder_t & jointOptionsHolder_ = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
-        vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMin"));
-        vectorN_t & boundsMax = boost::get<vectorN_t>(jointOptionsHolder_.at("boundsMax"));
+        // Clear the flexible model and associated variables if needed
+        configHolder_t & dynOptionsHolder =
+            boost::get<configHolder_t>(mdlOptionsHolder_.at("dynamics"));
+        std::vector<std::string> const & flexibleJointsNames =
+            boost::get<std::vector<std::string> >(dynOptionsHolder.at("flexibleJointsNames"));
+
+        if(mdlOptions_
+        && (flexibleJointsNames.size() != mdlOptions_->dynamics.flexibleJointsNames.size()
+            || !std::equal(flexibleJointsNames.begin(),
+                           flexibleJointsNames.end(),
+                           mdlOptions_->dynamics.flexibleJointsNames.begin())))
+        {
+            pncModelFlexibleOrig_ = pinocchio::Model();
+        }
+        flexibleJointsPositionIdx_.clear();
+        flexibleJointsVelocityIdx_.clear();
+
         if (isInitialized_)
         {
-            if (boost::get<bool>(jointOptionsHolder_.at("boundsFromUrdf")))
+            configHolder_t & jointOptionsHolder =
+                boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
+            vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMin"));
+            vectorN_t & boundsMax = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMax"));
+
+            // Make sure the bounds of the pinocchio model are the right ones
+            if (boost::get<bool>(jointOptionsHolder.at("boundsFromUrdf")))
             {
-                boundsMin = vectorN_t::Zero(jointsPositionIdx_.size());
-                boundsMax = vectorN_t::Zero(jointsPositionIdx_.size());
-                for (uint32_t i=0; i < jointsPositionIdx_.size(); i++)
+                boundsMin = vectorN_t::Zero(motorsNames_.size());
+                boundsMax = vectorN_t::Zero(motorsNames_.size());
+                for (uint32_t i=0; i < motorsNames_.size(); ++i)
                 {
-                    boundsMin[i] = pncModel_.lowerPositionLimit[jointsPositionIdx_[i]];
-                    boundsMax[i] = pncModel_.upperPositionLimit[jointsPositionIdx_[i]];
+                    boundsMin[i] = pncModel_.lowerPositionLimit[motorsPositionIdx_[i]];
+                    boundsMax[i] = pncModel_.upperPositionLimit[motorsPositionIdx_[i]];
                 }
             }
             else
             {
-                if((int32_t) jointsPositionIdx_.size() != boundsMin.size() || (uint32_t) jointsPositionIdx_.size() != boundsMax.size())
+                if((int32_t) motorsNames_.size() != boundsMin.size()
+                || (uint32_t) motorsNames_.size() != boundsMax.size())
                 {
                     std::cout << "Error - Model::setOptions - Wrong vector size for boundsMin or boundsMax." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
@@ -491,27 +834,24 @@ namespace exo_simu
         {
             try
             {
-                pinocchio::Model modelEmpty;
+                pinocchio::Model pncModel;
                 if (hasFreeflyer)
                 {
-                    pinocchio::urdf::buildModel(urdfPath, pinocchio::JointModelFreeFlyer(), modelEmpty);
+                    pinocchio::urdf::buildModel(urdfPath,
+                                                pinocchio::JointModelFreeFlyer(),
+                                                pncModel);
                 }
                 else
                 {
-                    pinocchio::urdf::buildModel(urdfPath, modelEmpty);
+                    pinocchio::urdf::buildModel(urdfPath, pncModel);
                 }
-                pncModel_ = modelEmpty;
+                pncModel_ = pncModel;
             }
             catch (std::exception& e)
             {
                 std::cout << "Error - Model::loadUrdfModel - Something is wrong with the URDF. Impossible to build a model from it." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
-            setOptions(mdlOptionsHolder_); // Make sure bounds are the right ones
         }
 
         return returnCode;
@@ -561,126 +901,83 @@ namespace exo_simu
         return contactFramesIdx_;
     }
 
-    std::vector<std::string> const & Model::getJointsName(void) const
+    std::vector<std::string> const & Model::getMotorsNames(void) const
     {
-        return jointsNames_;
+        return motorsNames_;
     }
 
-    std::vector<int32_t> const & Model::getJointsPositionIdx(void) const
+    std::vector<int32_t> const & Model::getMotorsPositionIdx(void) const
     {
-        return jointsPositionIdx_;
+        return motorsPositionIdx_;
     }
 
-    std::vector<int32_t> const & Model::getJointsVelocityIdx(void) const
+    std::vector<int32_t> const & Model::getMotorsVelocityIdx(void) const
     {
-        return jointsVelocityIdx_;
+        return motorsVelocityIdx_;
     }
 
-    result_t Model::getFrameIdx(std::string const & frameName,
-                                int32_t           & frameIdx) const
+    std::vector<std::string> const & Model::getPositionFieldNames(void) const
     {
-        result_t returnCode = result_t::SUCCESS;
-
-        if (!pncModel_.existFrame(frameName))
-        {
-            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << frameName << "' not found in urdf." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
-            frameIdx = pncModel_.getFrameId(frameName);
-        }
-
-        return returnCode;
+        return positionFieldNames_;
     }
 
-    result_t Model::getFramesIdx(std::vector<std::string> const & framesNames,
-                                 std::vector<int32_t>           & framesIdx) const
+    std::vector<std::string> const & Model::getVelocityFieldNames(void) const
     {
-        result_t returnCode = result_t::SUCCESS;
-
-        framesIdx.resize(0);
-        for (std::string const & name : framesNames)
-        {
-            if (returnCode == result_t::SUCCESS)
-            {
-                int32_t idx;
-                returnCode = getFrameIdx(name, idx);
-                framesIdx.push_back(idx);
-            }
-        }
-
-        return returnCode;
+        return velocityFieldNames_;
     }
 
-    result_t Model::getJointIdx(std::string const & jointName,
-                                int32_t           & jointPositionIdx,
-                                int32_t           & jointVelocityIdx) const
+    std::vector<std::string> const & Model::getAccelerationFieldNames(void) const
     {
-        // It only return the index of the first element if the joint has multiple degrees of freedom
-
-        /* Obtained using the cumulative sum of number of variables for each joint previous
-            to the desired one in the kinematic chain but skipping the first joint, which
-            is always the "universe" and is irrelevant (enforced by pinocchio itself). */
-
-        result_t returnCode = result_t::SUCCESS;
-
-        if (!pncModel_.existJointName(jointName))
-        {
-            std::cout << "Error - ExoModel::getFrameIdx - Frame '" << jointName << "' not found in urdf." << std::endl;
-            returnCode = result_t::ERROR_BAD_INPUT;
-        }
-
-        if (returnCode == result_t::SUCCESS)
-        {
-            int32_t jointModelIdx = pncModel_.getJointId(jointName);
-            jointPositionIdx = 0;
-            jointVelocityIdx = 0;
-            for (auto jointIt = pncModel_.joints.begin() + 1; jointIt != pncModel_.joints.begin() + jointModelIdx; jointIt++)
-            {
-                jointPositionIdx += jointIt->nq();
-                jointVelocityIdx += jointIt->nv();
-            }
-        }
-
-        return returnCode;
+        return accelerationFieldNames_;
     }
 
-    result_t Model::getJointsIdx(std::vector<std::string> const & jointsNames,
-                                 std::vector<int32_t>           & jointsPositionIdx,
-                                 std::vector<int32_t>           & jointsVelocityIdx) const
+    std::vector<std::string> const & Model::getMotorTorqueFieldNames(void) const
     {
-        result_t returnCode = result_t::SUCCESS;
-
-        jointsPositionIdx.resize(0);
-        jointsVelocityIdx.resize(0);
-        for (std::string const & name : jointsNames)
-        {
-            if (returnCode == result_t::SUCCESS)
-            {
-                int32_t positionIdx;
-                int32_t velocityIdx;
-                returnCode = getJointIdx(name, positionIdx, velocityIdx);
-                jointsPositionIdx.push_back(positionIdx);
-                jointsVelocityIdx.push_back(velocityIdx);
-            }
-        }
-
-        return returnCode;
+        return motorTorqueFieldNames_;
     }
 
-    uint32_t Model::nq(void) const
+    std::vector<std::string> const & Model::getRigidJointsNames(void) const
+    {
+        return rigidJointsNames_;
+    }
+
+    std::vector<int32_t> const & Model::getRigidJointsPositionIdx(void) const
+    {
+        return rigidJointsPositionIdx_;
+    }
+
+    std::vector<int32_t> const & Model::getRigidJointsVelocityIdx(void) const
+    {
+        return rigidJointsVelocityIdx_;
+    }
+
+    std::vector<std::string> const & Model::getFlexibleJointsNames(void) const
+    {
+        return mdlOptions_->dynamics.flexibleJointsNames;
+    }
+
+    std::vector<int32_t> const & Model::getFlexibleJointsPositionIdx(void) const
+    {
+        return flexibleJointsPositionIdx_;
+    }
+
+    std::vector<int32_t> const & Model::getFlexibleJointsVelocityIdx(void) const
+    {
+        return flexibleJointsVelocityIdx_;
+    }
+
+
+    uint32_t const & Model::nq(void) const
     {
         return nq_;
     }
 
-    uint32_t Model::nv(void) const
+    uint32_t const & Model::nv(void) const
     {
         return nv_;
     }
 
-    uint32_t Model::nx(void) const
+    uint32_t const & Model::nx(void) const
     {
         return nx_;
     }

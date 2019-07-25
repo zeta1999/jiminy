@@ -1,6 +1,7 @@
 #ifndef SIMU_ENGINE_H
 #define SIMU_ENGINE_H
 
+#include <tuple>
 #include <string>
 #include <functional>
 
@@ -30,6 +31,9 @@ namespace exo_simu
     class Engine
     {
     protected:
+        typedef std::function<vector3_t(float64_t const & /*t*/,
+                                        vectorN_t const & /*x*/)> external_force_t;
+
         typedef std::function<bool(float64_t const & /*t*/,
                                    vectorN_t const & /*x*/)> callbackFct_t;
 
@@ -65,7 +69,7 @@ namespace exo_simu
             float64_t const damping;
             float64_t const transitionEps;
 
-            contactOptions_t(configHolder_t const & options):
+            contactOptions_t(configHolder_t const & options) :
             frictionViscous(boost::get<float64_t>(options.at("frictionViscous"))),
             frictionDry(boost::get<float64_t>(options.at("frictionDry"))),
             dryFrictionVelEps(boost::get<float64_t>(options.at("dryFrictionVelEps"))),
@@ -93,7 +97,7 @@ namespace exo_simu
             float64_t const boundDamping;
             float64_t const boundTransitionEps;
 
-            jointOptions_t(configHolder_t const & options):
+            jointOptions_t(configHolder_t const & options) :
             boundStiffness(boost::get<float64_t>(options.at("boundStiffness"))),
             boundDamping(boost::get<float64_t>(options.at("boundDamping"))),
             boundTransitionEps(boost::get<float64_t>(options.at("boundTransitionEps")))
@@ -138,16 +142,16 @@ namespace exo_simu
 
         struct stepperOptions_t
         {
-            int32_t const randomSeed;
+            int32_t     const randomSeed;
             std::string const solver;
-            float64_t const tolAbs;
-            float64_t const tolRel;
-            float64_t const dtMax;
-            int32_t const iterMax;
-            float64_t const sensorsUpdatePeriod;
-            float64_t const controllerUpdatePeriod;
+            float64_t   const tolAbs;
+            float64_t   const tolRel;
+            float64_t   const dtMax;
+            int32_t     const iterMax;
+            float64_t   const sensorsUpdatePeriod;
+            float64_t   const controllerUpdatePeriod;
 
-            stepperOptions_t(configHolder_t const & options):
+            stepperOptions_t(configHolder_t const & options) :
             randomSeed(boost::get<int32_t>(options.at("randomSeed"))),
             solver(boost::get<std::string>(options.at("solver"))),
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
@@ -180,7 +184,7 @@ namespace exo_simu
             bool const enableCommand;
             bool const enableEnergy;
 
-            telemetryOptions_t(configHolder_t const & options):
+            telemetryOptions_t(configHolder_t const & options) :
             enableConfiguration(boost::get<bool>(options.at("enableConfiguration"))),
             enableVelocity(boost::get<bool>(options.at("enableVelocity"))),
             enableAcceleration(boost::get<bool>(options.at("enableAcceleration"))),
@@ -206,10 +210,10 @@ namespace exo_simu
         struct engineOptions_t
         {
             telemetryOptions_t const telemetry;
-            stepperOptions_t const stepper;
-            worldOptions_t   const world;
-            jointOptions_t   const joints;
-            contactOptions_t const contacts;
+            stepperOptions_t   const stepper;
+            worldOptions_t     const world;
+            jointOptions_t     const joints;
+            contactOptions_t   const contacts;
 
             engineOptions_t(configHolder_t const & options) :
             telemetry(boost::get<configHolder_t>(options.at("telemetry"))),
@@ -228,7 +232,7 @@ namespace exo_simu
         // Internal state for the integration loop
 
         public:
-            stepperState_t(void):
+            stepperState_t(void) :
             iterLast(),
             tLast(),
             qLast(),
@@ -237,10 +241,6 @@ namespace exo_simu
             uLast(),
             uCommandLast(),
             energyLast(0.0),
-            qNames(),
-            vNames(),
-            aNames(),
-            uCommandNames(),
             x(),
             dxdt(),
             uControl(),
@@ -278,67 +278,19 @@ namespace exo_simu
                 if (returnCode == result_t::SUCCESS)
                 {
                     // Initialize the odestepper state buffers
-                    iterLast = 0;
+                    iterLast = -1;
                     tLast = 0;
                     qLast = x_init.head(model.nq());
                     vLast = x_init.tail(model.nv());
                     aLast = vectorN_t::Zero(model.nv());
                     uLast = vectorN_t::Zero(model.nv());
-                    uCommandLast = vectorN_t::Zero(model.getJointsVelocityIdx().size());
-
-                    // Generate the list of names
-                    std::string const jointPrefixBase = "current";
-                    std::string const freeFlyerPrefixBase = jointPrefixBase + "FreeFlyer";
-                    std::vector<std::string> const & jointNames = removeFieldnamesSuffix(model.getJointsName(), "Joint");
-                    auto getVectorFieldnames =
-                        [&](std::vector<std::string>         names,
-                            std::string              const & infoPrefix) -> std::vector<std::string>
-                        {
-                            std::string const freeFlyerPrefix = freeFlyerPrefixBase + infoPrefix;
-                            std::string const jointPrefix = jointPrefixBase + infoPrefix;
-                            std::vector<int32_t> jointsIdx;
-                            if (infoPrefix == "Position")
-                            {
-                                jointsIdx = model.getJointsPositionIdx();
-                            }
-                            else
-                            {
-                                jointsIdx = model.getJointsVelocityIdx();
-                            }
-
-                            if (model.getHasFreeFlyer())
-                            {
-                                std::vector<std::string> positionFreeFlyerNames({freeFlyerPrefix + std::string("TransX"),
-                                                                                 freeFlyerPrefix + std::string("TransY"),
-                                                                                 freeFlyerPrefix + std::string("TransZ"),
-                                                                                 freeFlyerPrefix + std::string("QuatX"),
-                                                                                 freeFlyerPrefix + std::string("QuatY"),
-                                                                                 freeFlyerPrefix + std::string("QuatZ"),
-                                                                                 freeFlyerPrefix + std::string("QuatW")});
-                                std::copy(positionFreeFlyerNames.begin(), positionFreeFlyerNames.end(), names.begin());
-                            }
-                            for (uint8_t i=0; i<jointNames.size(); ++i)
-                            {
-                                names[jointsIdx[i]] = jointPrefix + jointNames[i];
-                            }
-
-                            return names;
-                        };
-
-                    qNames = getVectorFieldnames(defaultVectorFieldnames("Q", qLast.size()), "Position");
-                    vNames = getVectorFieldnames(defaultVectorFieldnames("V", vLast.size()), "Velocity");
-                    aNames = getVectorFieldnames(defaultVectorFieldnames("A", aLast.size()), "Acceleration");
-                    uCommandNames.clear();
-                    std::string const jointPrefixTorque = jointPrefixBase + "Torque";
-                    for (std::string const & jointName : jointNames)
-                    {
-                        uCommandNames.emplace_back(jointPrefixTorque + jointName);
-                    }
+                    uCommandLast = vectorN_t::Zero(model.getMotorsNames().size());
 
                     // Initialize the internal systemDynamics buffers
                     x = x_init;
                     dxdt = vectorN_t::Zero(model.nx());
                     uControl = vectorN_t::Zero(model.nv());
+
                     fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(),
                                                                                   pinocchio::Force::Zero());
                     uBounds = vectorN_t::Zero(model.nv());
@@ -371,7 +323,7 @@ namespace exo_simu
 
         public:
             // State information about the last iteration
-            uint32_t iterLast;
+            int32_t iterLast;
             float64_t tLast;
             vectorN_t qLast;
             vectorN_t vLast;
@@ -379,11 +331,6 @@ namespace exo_simu
             vectorN_t uLast;
             vectorN_t uCommandLast;
             float64_t energyLast; ///< Energy (kinetic + potential) of the system at the last state.
-
-            std::vector<std::string> qNames;
-            std::vector<std::string> vNames;
-            std::vector<std::string> aNames;
-            std::vector<std::string> uCommandNames;
 
             // Internal buffers required for the adaptive step computation and system dynamics
             vectorN_t x;
@@ -406,13 +353,20 @@ namespace exo_simu
         result_t initialize(Model              & model,
                             AbstractController & controller,
                             callbackFct_t        callbackFct);
-        void reset(bool const & resetTelemetry = false);
+        void reset(bool const & resetDynamicForceRegister = false);
 
         result_t configureTelemetry(void);
         void updateTelemetry(void);
 
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
+
+        void registerForceImpulse(std::string const & frameName,
+                                  float64_t   const & t,
+                                  float64_t   const & dt,
+                                  vector3_t   const & F);
+        void registerForceProfile(std::string      const & frameName,
+                                  external_force_t         forceFct);
 
         configHolder_t getOptions(void) const;
         void setOptions(configHolder_t const & engineOptions);
@@ -432,6 +386,8 @@ namespace exo_simu
         void boundsDynamics(vectorN_t const & q,
                             vectorN_t const & v,
                             vectorN_t       & u);
+        vector6_t computeFrameForceOnParentJoint(int32_t   const & frameId,
+                                                 vector3_t const & fextInWorld) const;
         vectorN_t contactDynamics(int32_t const & frameId) const;
 
     public:
@@ -439,6 +395,7 @@ namespace exo_simu
 
     protected:
         bool isInitialized_;
+        bool isTelemetryConfigured_;
         Model * model_;
         AbstractController * controller_;
         configHolder_t engineOptionsHolder_;
@@ -449,6 +406,9 @@ namespace exo_simu
         std::shared_ptr<TelemetryData> telemetryData_;
         std::unique_ptr<TelemetryRecorder> telemetryRecorder_;
         stepperState_t stepperState_; // Internal state for the integration loop
+        std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> > forcesImpulse_;
+        std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> >::const_iterator forceImpulseNextIt_;
+        std::vector<std::pair<std::string, std::tuple<int32_t, external_force_t> > > forcesProfile_;
     };
 
     class explicit_euler

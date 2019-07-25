@@ -1,14 +1,5 @@
-///////////////////////////////////////////////////////////////////////////////
-///
-/// \file              python/Utilities.h
-/// \brief             Python utility functions for wdc::dynamicsteller.
-///
-/// \copyright         Wandercraft
-///
-////////////////////////////////////////////////////////////////////////////////
-
-#ifndef WDC_EXO_SIMULATOR_PYTHON_UTILITIES_H
-#define WDC_EXO_SIMULATOR_PYTHON_UTILITIES_H
+#ifndef SIMU_PYTHON_UTILITIES_H
+#define SIMU_PYTHON_UTILITIES_H
 
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
@@ -18,53 +9,6 @@ namespace exo_simu
 namespace python
 {
     namespace bp = boost::python;
-
-    ///////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \brief Convert Python list to std::vector.
-    ///
-    /// \tparam T The object type in the list and the vector.
-    ///
-    /// \param[in] listIn The Python list.
-    ///
-    /// \return The converted vector.
-    ///
-    ///////////////////////////////////////////////////////////////////////////////
-    template<typename T>
-    inline
-    std::vector<T> toStdVector(bp::list const & listPy)
-    {
-        std::vector<T> v;
-        v.reserve(len(listPy));
-        for (int32_t i = 0; i < len(listPy); i++)
-        {
-            v.push_back(bp::extract<T>(listPy[i]));
-        }
-
-        return v;
-    }
-
-    template<typename T>
-    inline
-    std::vector<std::vector<T>> toStdVectorVector(bp::list const & listPy)
-    {
-        std::vector<std::vector<T>> v;
-        v.reserve(len(listPy));
-        for (int32_t i = 0; i < len(listPy); i++)
-        {
-            v.push_back(toStdVector<T>(bp::extract<bp::list>(listPy[i])));
-        }
-
-        return v;
-    }
-
-
-    /////////////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \brief Utilities to convert scalars and Eigen vector/matrix to Python Numpy
-    ///        array by reference.
-    ///
-    /////////////////////////////////////////////////////////////////////////////////////
 
     enum pyVector_t
     {
@@ -83,39 +27,52 @@ namespace python
         return NPY_DOUBLE;
     }
 
+    // ****************************************************************************
+    // **************************** C++ TO PYTHON *********************************
+    // ****************************************************************************
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert std::vector to Python list by value.
+    ///////////////////////////////////////////////////////////////////////////////
+    template<class T>
+    struct stdVectorToListPyConverter
+    {
+        static PyObject* convert(std::vector<T> const & vec)
+        {
+            boost::python::list * l = new boost::python::list();
+            for(size_t i = 0; i < vec.size(); i++)
+            {
+                l->append(vec[i]);
+            }
+
+            return l->ptr();
+        }
+    };
+
+    template<class T>
+    bp::list stdVectorToListPy(std::vector<T> const & v)
+    {
+        bp::object get_iter = bp::iterator<std::vector<T> >();
+        bp::object iter = get_iter(v);
+        bp::list l(iter);
+        return l;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert scalar to Numpy array by reference.
+    ///////////////////////////////////////////////////////////////////////////////
     template<typename T>
-    PyObject * getPyReferenceFromScalar(T & data)
+    PyObject * getNumpyReferenceFromScalar(T & data)
     {
         npy_intp dims[1] = {npy_intp(1)};
         return PyArray_SimpleNewFromData(1, dims, getPyType(data), &data);
     }
 
-    PyObject * getPyReferenceFromVector(vectorN_t  & data,
-                                        pyVector_t   type = pyVector_t::vector)
-    {
-        if (type == pyVector_t::vector)
-        {
-            npy_intp dims[1] = {npy_intp(data.size())};
-            return PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, data.data());
-        }
-        else
-        {
-            npy_intp dims[2] = {npy_intp(1), npy_intp(data.size())};
-            PyObject * pyData = PyArray_SimpleNewFromData(2, dims, NPY_DOUBLE, data.data());
-
-            if (type == pyVector_t::matrixCol)
-            {
-                return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(pyData), NULL);
-            }
-            else
-            {
-                return pyData;
-            }
-        }
-    }
-
-    PyObject * getPyReferenceFromVector(vectorN_t  const & data,
-                                        pyVector_t         type = pyVector_t::vector)
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert Eigen vector to Numpy array by reference.
+    ///////////////////////////////////////////////////////////////////////////////
+    PyObject * getNumpyReferenceFromEigenVector(Eigen::Ref<vectorN_t const> data, // Must use Ref to support fixed size array without copy
+                                                pyVector_t                  type = pyVector_t::vector)
     {
         if (type == pyVector_t::vector)
         {
@@ -129,23 +86,19 @@ namespace python
 
             if (type == pyVector_t::matrixCol)
             {
-                return pyData;
+                return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(pyData), NULL);
             }
             else
             {
-                return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(pyData),NULL);
+                return pyData;
             }
         }
     }
 
-    PyObject * getPyReferenceFromMatrix(matrixN_t & data)
-    {
-        npy_intp dims[2] = {npy_intp(data.cols()), npy_intp(data.rows())};
-        return PyArray_Transpose(reinterpret_cast<PyArrayObject *>(
-            PyArray_SimpleNewFromData(2, dims, NPY_DOUBLE, data.data())),NULL);
-    }
-
-    PyObject * getPyReferenceFromMatrix(matrixN_t const & data)
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert Eigen matrix to Numpy array by reference.
+    ///////////////////////////////////////////////////////////////////////////////
+    PyObject * getNumpyReferenceFromEigenMatrix(Eigen::Ref<matrixN_t const> data)
     {
         npy_intp dims[2] = {npy_intp(data.cols()), npy_intp(data.rows())};
         return  PyArray_Transpose(reinterpret_cast<PyArrayObject *>(
@@ -153,70 +106,39 @@ namespace python
     }
 
     ///////////////////////////////////////////////////////////////////////////////
-    ///
-    /// \brief Convert std::vector to Python list.
-    ///
-    /// \tparam T The object type in the list and the vector.
-    ///
-    /// \param[in] vectorIn The std vector.
-    ///
-    /// \return The converted list.
-    ///
+    /// \brief  Convert an Eigen vector into a 1D python list by value.
     ///////////////////////////////////////////////////////////////////////////////
-    template<class T>
-    struct VecToList
+    bp::list eigenVectorTolistPy(vectorN_t const & v)
     {
-        static PyObject* convert(std::vector<T> const & vec)
+        bp::list l;
+        for (int32_t j = 0; j < v.rows(); j++)
         {
-            boost::python::list* l = new boost::python::list();
-            for(size_t i = 0; i < vec.size(); i++)
+            l.append(v(j));
+        }
+        return l;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert an Eigen matrix into a 2D python list by value.
+    ///////////////////////////////////////////////////////////////////////////////
+    bp::list eigenMatrixTolistPy(matrixN_t const & M)
+    {
+        bp::list l;
+        for (int32_t j = 0; j < M.rows(); j++)
+        {
+            bp::list row;
+            for (int32_t k = 0; k < M.cols(); k++)
             {
-                l->append(vec[i]);
+                row.append(M(j, k));
             }
-
-            return l->ptr();
+            l.append(row);
         }
-    };
-
-    ///////////////////////////////////////////////////////////////////////
-    /// \brief      Convert a 1D python list into an Eigen vector.
-    ///////////////////////////////////////////////////////////////////////
-    vectorN_t listPyToVector(bp::list const & listPy)
-    {
-        vectorN_t x(len(listPy));
-        for (int32_t i = 0; i < len(listPy); i++)
-        {
-            x(i) = bp::extract<real_t>(listPy[i]);
-        }
-
-        return x;
+        return l;
     }
 
-    ///////////////////////////////////////////////////////////////////////
-    /// \brief      Convert a 2D python list into an Eigen matrix.
-    ///////////////////////////////////////////////////////////////////////
-    matrixN_t listPyToMatrix(bp::list const & listPy)
-    {
-        int32_t const nRows = len(listPy);
-        assert(nRows > 0 && "empty list");
-
-        int32_t const nCols = len(bp::extract<bp::list>(listPy[0]));
-        assert(nCols > 0 && "empty row");
-
-        matrixN_t M(nRows, nCols);
-        for (int32_t i = 0; i < nRows; i++)
-        {
-            bp::list const row = bp::extract<bp::list>(listPy[i]);
-            assert(len(row) == nCols && "wrong number of columns");
-            M.row(i) = listPyToVector(row).transpose();
-        }
-
-        return M;
-    }
-
-    ///////////////////////////////////////////////////////////////////////
-    /// \brief      Convert config holder into a python dictionary.
-    ///////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert a config holder into a Python dictionary by value.
+    ///////////////////////////////////////////////////////////////////////////////
     void convertConfigHolderPy(configHolder_t const & config,
                                bp::dict             & configPy)
     {
@@ -239,9 +161,9 @@ namespace python
             {
                 configPy[name] = boost::get<int32_t>(config.at(name));
             }
-            else if (optionType == typeid(real_t))
+            else if (optionType == typeid(float64_t))
             {
-                configPy[name] = boost::get<real_t>(config.at(name));
+                configPy[name] = boost::get<float64_t>(config.at(name));
             }
             else if (optionType == typeid(std::string))
             {
@@ -249,30 +171,23 @@ namespace python
             }
             else if (optionType == typeid(vectorN_t))
             {
-                vectorN_t const v = boost::get<vectorN_t>(config.at(name));
-                bp::list l;
-
-                for (int32_t j = 0; j < v.rows(); j++)
-                {
-                    l.append(v(j));
-                }
-                configPy[name] = l;
+                configPy[name] = eigenVectorTolistPy(boost::get<vectorN_t>(config.at(name)));
             }
             else if (optionType == typeid(matrixN_t))
             {
-                matrixN_t const M = boost::get<matrixN_t>(config.at(name));
-                bp::list l;
-
-                for (int32_t j = 0; j < M.rows(); j++)
-                {
-                    bp::list row;
-                    for (int32_t k = 0; k < M.cols(); k++)
-                    {
-                        row.append(M(j, k));
-                    }
-                    l.append(row);
-                }
-                configPy[name] = l;
+                configPy[name] = eigenMatrixTolistPy(boost::get<matrixN_t>(config.at(name)));
+            }
+            else if (optionType == typeid(std::vector<std::string>))
+            {
+                configPy[name] = boost::get<std::vector<std::string> >(config.at(name));
+            }
+            else if (optionType == typeid(std::vector<vectorN_t>))
+            {
+                configPy[name] = boost::get<std::vector<vectorN_t> >(config.at(name));
+            }
+            else if (optionType == typeid(std::vector<matrixN_t>))
+            {
+                configPy[name] = boost::get<std::vector<matrixN_t> >(config.at(name));
             }
             else if (optionType == typeid(configHolder_t))
             {
@@ -287,9 +202,81 @@ namespace python
         }
     }
 
-    ///////////////////////////////////////////////////////////////////////
-    /// \brief      Load a config holder from a python dictionary.
-    ///////////////////////////////////////////////////////////////////////
+    // ****************************************************************************
+    // **************************** PYTHON TO C++ *********************************
+    // **********µ*****************************************************************
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert Python list to std::vector by value.
+    ///////////////////////////////////////////////////////////////////////////////
+    template<typename T>
+    inline std::vector<T> listPyToStdVector(bp::list const & listPy)
+    {
+        std::vector<T> v;
+        v.reserve(len(listPy));
+        for (int32_t i = 0; i < len(listPy); i++)
+        {
+            v.push_back(bp::extract<T>(listPy[i]));
+        }
+
+        return v;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert Python list to std::vector of std::vector by value.
+    ///////////////////////////////////////////////////////////////////////////////
+    template<typename T>
+    inline std::vector<std::vector<T> > listPyToStdVectorVector(bp::list const & listPy)
+    {
+        std::vector<std::vector<T>> v;
+        v.reserve(len(listPy));
+        for (int32_t i = 0; i < len(listPy); i++)
+        {
+            v.push_back(listPyToStdVector<T>(bp::extract<bp::list>(listPy[i])));
+        }
+
+        return v;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert a 1D python list into an Eigen vector by value.
+    ///////////////////////////////////////////////////////////////////////////////
+    vectorN_t listPyToEigenVector(bp::list const & listPy)
+    {
+        vectorN_t x(len(listPy));
+        for (int32_t i = 0; i < len(listPy); i++)
+        {
+            x(i) = bp::extract<float64_t>(listPy[i]);
+        }
+
+        return x;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert a 2D python list into an Eigen matrix.
+    ///////////////////////////////////////////////////////////////////////////////
+    matrixN_t listPyToEigenMatrix(bp::list const & listPy)
+    {
+        int32_t const nRows = len(listPy);
+        assert(nRows > 0 && "empty list");
+
+        int32_t const nCols = len(bp::extract<bp::list>(listPy[0]));
+        assert(nCols > 0 && "empty row");
+
+        matrixN_t M(nRows, nCols);
+        for (int32_t i = 0; i < nRows; i++)
+        {
+            bp::list const row = bp::extract<bp::list>(listPy[i]);
+            assert(len(row) == nCols && "wrong number of columns");
+            M.row(i) = listPyToEigenVector(row).transpose();
+        }
+
+        return M;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    /// \brief  Convert a Python dictionary into a config holder.
+    ///////////////////////////////////////////////////////////////////////////////
     void loadConfigHolder(bp::dict       const & configPy,
                           configHolder_t       & config)
     {
@@ -312,9 +299,9 @@ namespace python
             {
                 boost::get<int32_t>(config.at(name)) = bp::extract<int32_t>(configPy[name]);
             }
-            else if (optionType == typeid(real_t))
+            else if (optionType == typeid(float64_t))
             {
-                boost::get<real_t>(config.at(name)) = bp::extract<real_t>(configPy[name]);
+                boost::get<float64_t>(config.at(name)) = bp::extract<float64_t>(configPy[name]);
             }
             else if (optionType == typeid(std::string))
             {
@@ -322,15 +309,33 @@ namespace python
             }
             else if (optionType == typeid(vectorN_t))
             {
-                boost::get<vectorN_t>(config.at(name)) = listPyToVector(bp::extract<bp::list>(configPy[name]));
+                boost::get<vectorN_t>(config.at(name)) =
+                    listPyToEigenVector(bp::extract<bp::list>(configPy[name]));
             }
             else if (optionType == typeid(matrixN_t))
             {
-                boost::get<matrixN_t>(config.at(name)) = listPyToMatrix(bp::extract<bp::list>(configPy[name]));
+                boost::get<matrixN_t>(config.at(name)) =
+                    listPyToEigenMatrix(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(std::vector<std::string>))
+            {
+                boost::get<std::vector<std::string> >(config.at(name)) =
+                    listPyToStdVector<std::string>(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(std::vector<vectorN_t>))
+            {
+                boost::get<std::vector<vectorN_t> >(config.at(name)) =
+                    listPyToStdVector<vectorN_t>(bp::extract<bp::list>(configPy[name]));
+            }
+            else if (optionType == typeid(std::vector<matrixN_t>))
+            {
+                boost::get<std::vector<matrixN_t> >(config.at(name)) =
+                    listPyToStdVector<matrixN_t>(bp::extract<bp::list>(configPy[name]));
             }
             else if (optionType == typeid(configHolder_t))
             {
-                loadConfigHolder(bp::extract<bp::dict>(configPy[name]), boost::get<configHolder_t>(config.at(name)));
+                loadConfigHolder(bp::extract<bp::dict>(configPy[name]),
+                                 boost::get<configHolder_t>(config.at(name)));
             }
             else
             {
@@ -341,4 +346,4 @@ namespace python
 }  // end of namespace python.
 }  // end of namespace exo_simu.
 
-#endif  // WDC_EXO_SIMULATOR_PYTHON_UTILITIES_H
+#endif  // SIMU_PYTHON_UTILITIES_H

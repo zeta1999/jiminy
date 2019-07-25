@@ -25,6 +25,7 @@ namespace exo_simu
                          std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                          std::string                         const & name) :
     AbstractSensorTpl(model, dataHolder, name),
+    frameName_(),
     frameIdx_()
     {
         // Empty.
@@ -35,15 +36,30 @@ namespace exo_simu
         // Empty.
     }
 
-    void ImuSensor::initialize(int32_t const & frameIdx)
+    result_t ImuSensor::initialize(std::string const & frameName)
     {
-        frameIdx_ = frameIdx;
-        isInitialized_ = true;
+        result_t returnCode = result_t::SUCCESS;
+
+        frameName_ = frameName;
+        returnCode = getFrameIdx(model_->pncModel_, frameName_, frameIdx_);
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            isInitialized_ = true;
+        }
+
+        return returnCode;
     }
 
-    int32_t ImuSensor::getFrameIdx(void) const
+    void ImuSensor::reset(void)
     {
-        return frameIdx_;
+        AbstractSensorTpl<ImuSensor>::reset();
+        getFrameIdx(model_->pncModel_, frameName_, frameIdx_);
+    }
+
+    std::string ImuSensor::getFrameName(void) const
+    {
+        return frameName_;
     }
 
     result_t ImuSensor::set(float64_t const & t,
@@ -65,19 +81,19 @@ namespace exo_simu
             if(sensorOptions_->rawData)
             {
                 pinocchio::Motion const gyroIMU = pinocchio::getFrameVelocity(model_->pncModel_, model_->pncData_, frameIdx_);
-                Eigen::Vector3d const omega = gyroIMU.angular();
+                vector3_t const omega = gyroIMU.angular();
                 data().head(3) = omega;
                 pinocchio::Motion const acceleroIMU = pinocchio::getFrameAcceleration(model_->pncModel_, model_->pncData_, frameIdx_);
-                Eigen::Vector3d const accel = acceleroIMU.linear();
+                vector3_t const accel = acceleroIMU.linear();
                 data().tail(3) = accel;
             }
             else
             {
-                Eigen::Matrix3d const & rot = model_->pncData_.oMf[frameIdx_].rotation();
+                matrix3_t const & rot = model_->pncData_.oMf[frameIdx_].rotation();
                 quaternion_t const quat(rot); // Convert a rotation matrix to a quaternion
                 data().head(4) = quat.coeffs(); // (x,y,z,w)
                 pinocchio::Motion const gyroIMU = pinocchio::getFrameVelocity(model_->pncModel_, model_->pncData_, frameIdx_);
-                Eigen::Vector3d const omega = rot * gyroIMU.angular(); // Get angular velocity in world frame
+                vector3_t const omega = rot * gyroIMU.angular(); // Get angular velocity in world frame
                 data().tail(3) = omega;
             }
         }
@@ -100,6 +116,7 @@ namespace exo_simu
                              std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                              std::string                         const & name) :
     AbstractSensorTpl(model, dataHolder, name),
+    frameName_(),
     frameIdx_()
     {
         // Empty.
@@ -110,15 +127,30 @@ namespace exo_simu
         // Empty.
     }
 
-    void ForceSensor::initialize(int32_t const & frameIdx)
+    result_t ForceSensor::initialize(std::string const & frameName)
     {
-        frameIdx_ = frameIdx;
-        isInitialized_ = true;
+        result_t returnCode = result_t::SUCCESS;
+
+        frameName_ = frameName;
+        returnCode = getFrameIdx(model_->pncModel_, frameName_, frameIdx_);
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            isInitialized_ = true;
+        }
+
+        return returnCode;
     }
 
-    int32_t ForceSensor::getFrameIdx(void) const
+    void ForceSensor::reset(void)
     {
-        return frameIdx_;
+        AbstractSensorTpl<ForceSensor>::reset();
+        getFrameIdx(model_->pncModel_, frameName_, frameIdx_);
+    }
+
+    std::string ForceSensor::getFrameName(void) const
+    {
+        return frameName_;
     }
 
     result_t ForceSensor::set(float64_t const & t,
@@ -160,8 +192,9 @@ namespace exo_simu
                                  std::shared_ptr<SensorDataHolder_t> const & dataHolder,
                                  std::string                         const & name) :
     AbstractSensorTpl(model, dataHolder, name),
-    jointPositionIdx_(),
-    jointVelocityIdx_()
+    motorName_(),
+    motorPositionIdx_(),
+    motorVelocityIdx_()
     {
         // Empty.
     }
@@ -171,22 +204,35 @@ namespace exo_simu
         // Empty.
     }
 
-    void EncoderSensor::initialize(int32_t const & jointPositionIdx,
-                                   int32_t const & jointVelocityIdx)
+    result_t EncoderSensor::initialize(std::string const & motorName)
     {
-        jointPositionIdx_ = jointPositionIdx;
-        jointVelocityIdx_ = jointVelocityIdx;
-        isInitialized_ = true;
+        result_t returnCode = result_t::SUCCESS;
+
+        motorName_ = motorName;
+        returnCode = getJointPositionIdx(model_->pncModel_, motorName_, motorPositionIdx_);
+        if (returnCode == result_t::SUCCESS)
+        {
+            returnCode = getJointVelocityIdx(model_->pncModel_, motorName_, motorVelocityIdx_);
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            isInitialized_ = true;
+        }
+
+        return returnCode;
     }
 
-    int32_t EncoderSensor::getJointPositionIdx(void) const
+    void EncoderSensor::reset(void)
     {
-        return jointPositionIdx_;
+        AbstractSensorTpl<EncoderSensor>::reset();
+        getJointPositionIdx(model_->pncModel_, motorName_, motorPositionIdx_);
+        getJointVelocityIdx(model_->pncModel_, motorName_, motorVelocityIdx_);
     }
 
-    int32_t EncoderSensor::getJointVelocityIdx(void) const
+    std::string EncoderSensor::getMotorName(void) const
     {
-        return jointVelocityIdx_;
+        return motorName_;
     }
 
     result_t EncoderSensor::set(float64_t const & t,
@@ -207,12 +253,12 @@ namespace exo_simu
         {
             if(sensorOptions_->rawData)
             {
-                data() = q.segment<1>(jointPositionIdx_);
+                data() = q.segment<1>(motorPositionIdx_);
             }
             else
             {
-                data().head(1) = q.segment<1>(jointPositionIdx_);
-                data().tail(1) = v.segment<1>(jointVelocityIdx_);
+                data().head(1) = q.segment<1>(motorPositionIdx_);
+                data().tail(1) = v.segment<1>(motorVelocityIdx_);
             }
         }
 

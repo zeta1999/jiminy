@@ -28,16 +28,33 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (telemetryData)
+        if (!getIsInitialized())
         {
-            telemetrySender_.configureObject(telemetryData, getTelemetryName());
-            (void) registerNewVectorEntry(telemetrySender_, getFieldNames(), data_);
-            isTelemetryConfigured_ = true;
-        }
-        else
-        {
-            std::cout << "Error - AbstractSensorBase::configureTelemetry - Telemetry not initialized. Impossible to log sensor data." << std::endl;
+            std::cout << "Error - AbstractSensorBase::configureTelemetry - The sensor is not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            if (!isTelemetryConfigured_)
+            {
+                if (telemetryData)
+                {
+                    telemetrySender_.configureObject(telemetryData, getTelemetryName());
+                    (void) registerNewVectorEntry(telemetrySender_, getFieldNames(), data_);
+                    isTelemetryConfigured_ = true;
+                }
+                else
+                {
+                    std::cout << "Error - AbstractSensorBase::configureTelemetry - Telemetry not initialized. Impossible to log sensor data." << std::endl;
+                    returnCode = result_t::ERROR_INIT_FAILED;
+                }
+            }
+        }
+
+        if (returnCode != result_t::SUCCESS)
+        {
+            isTelemetryConfigured_ = false;
         }
 
         return returnCode;

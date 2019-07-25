@@ -8,9 +8,9 @@
 #include <getopt.h>
 #include <string>
 #include <time.h>
+#include <cmath>
 
 #include "exo_simu/core/Types.h"
-#include "exo_simu/core/Utilities.h"
 #include "exo_simu/core/Sensor.h"
 #include "exo_simu/core/Engine.h"
 #include "exo_simu/wdc/ExoModel.h"
@@ -103,20 +103,35 @@ int main(int argc, char *argv[])
     // Instantiate and configuration the exoskeleton model
     ExoModel model;
     configHolder_t mdlOptions = model.getOptions();
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableForceSensors")) = false;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableForceSensors")) = true;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableImuSensors")) = true;
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("telemetry")).at("enableEncoderSensors")) = false;
+
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("inertiaBodiesBiasStd")) = 0.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("massBodiesBiasStd")) = 0.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("centerOfMassPositionBodiesBiasStd")) = 0.0;
+    boost::get<float64_t>(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("relativePositionBodiesBiasStd")) = 0.0;
+
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("enableFlexibleModel")) = false;
+    boost::get<std::vector<std::string> >(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("flexibleJointsNames")) =
+        std::vector<std::string>({std::string("LeftTransverseHipJoint")});
+    boost::get<std::vector<vectorN_t> >(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("flexibleJointsStiffness")) =
+        std::vector<vectorN_t>({(vectorN_t(3) << 1.0e5, 1.0e5, 1.0e5).finished()});
+    boost::get<std::vector<vectorN_t> >(boost::get<configHolder_t>(mdlOptions.at("dynamics")).at("flexibleJointsDamping")) =
+        std::vector<vectorN_t>({(vectorN_t(3) << 1.0e1, 1.0e1, 1.0e1).finished()});
+
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
+
     std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
     configHolder_t imuSensorOptions;
     model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
     // boost::get<bool>(imuSensorOptions.at("rawData")) = true;
-    boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    // boost::get<vectorN_t>(imuSensorOptions.at("noiseStd")) = (vectorN_t(6) << 5.0e-2, 4.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
     model.setSensorsOptions(ImuSensor::type_, imuSensorOptions);
-    boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
-    boost::get<float64_t>(imuSensorOptions.at("delay")) = 2.0e-3;
-    boost::get<uint32_t>(imuSensorOptions.at("delayInterpolationOrder")) = 0U;
+    // boost::get<vectorN_t>(imuSensorOptions.at("bias")) = (vectorN_t(6) << -8.0e-2, +9.0e-2, 0.0, 0.0, 0.0, 0.0).finished();
+    // boost::get<float64_t>(imuSensorOptions.at("delay")) = 2.0e-3;
+    // boost::get<uint32_t>(imuSensorOptions.at("delayInterpolationOrder")) = 0U;
     model.setSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
 
     // Instantiate and configuration the exoskeleton controller
@@ -126,15 +141,15 @@ int main(int argc, char *argv[])
     controller.setOptions(ctrlOptions);
     controller.initialize(model, compute_command);
 
-    vectorN_t qRef = vectorN_t::Zero(model.getJointsName().size());
+    vectorN_t qRef = vectorN_t::Zero(model.getMotorsNames().size());
     vectorN_t dqRef = vectorN_t::Zero(qRef.size());
     float64_t hzdState = 2.0; // Right leg support
     std::vector<std::string> qRefNames;
     std::vector<std::string> dqRefNames;
-    for (std::string const & jointName : removeFieldnamesSuffix(model.getJointsName(), "Joint"))
+    for (std::string const & motorName : removeFieldnamesSuffix(model.getMotorsNames(), "Joint"))
     {
-        qRefNames.emplace_back("targetPosition" + jointName);
-        dqRefNames.emplace_back("targetVelocity" + jointName);
+        qRefNames.emplace_back("targetPosition" + motorName);
+        dqRefNames.emplace_back("targetVelocity" + motorName);
     }
     controller.registerNewVectorEntry(qRefNames, qRef);
     controller.registerNewVectorEntry(dqRefNames, dqRef);
@@ -171,6 +186,16 @@ int main(int argc, char *argv[])
     // =====================================================================
     // ======================= Run the simulation ==========================
     // =====================================================================
+
+    // engine.registerForceImpulse("PelvisLink", 1.5, 10.0e-3, (vector3_t() << 1.0e3, 0.0, 0.0).finished());
+    // engine.registerForceImpulse("PelvisLink", 2.2, 20.0e-3, (vector3_t() << 0.0, 1.0e3, 0.0).finished());
+    // auto forceFct =
+    //     [](float64_t const & t,
+    //        vectorN_t const & x) -> vector3_t
+    //     {
+    //         return (vector3_t() << 1.0e2*sin(2*M_PI*(t/0.5)), 1.0e2*cos(2*M_PI*(t/0.5)), 0.0).finished();
+    //     };
+    // engine.registerForceProfile("LeftSagittalHipJoint", forceFct);
 
     // Prepare options
     Eigen::VectorXd x0 = Eigen::VectorXd::Zero(41);

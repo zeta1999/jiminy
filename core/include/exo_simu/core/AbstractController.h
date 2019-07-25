@@ -30,7 +30,7 @@ namespace exo_simu
         {
             bool const telemetryEnable;
 
-            controllerOptions_t(configHolder_t const & options):
+            controllerOptions_t(configHolder_t const & options) :
             telemetryEnable(boost::get<bool>(options.at("telemetryEnable")))
             {
                 // Empty.
@@ -42,7 +42,7 @@ namespace exo_simu
         virtual ~AbstractController(void);
 
         virtual result_t initialize(Model const & model);
-        virtual void reset(bool const & resetTelemetry = false);
+        virtual void reset(bool const & resetDynamicTelemetry = false);
 
         result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
         result_t registerNewVectorEntry(std::vector<std::string> const & fieldNames,
