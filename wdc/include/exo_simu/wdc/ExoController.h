@@ -31,8 +31,6 @@ namespace exo_simu
                             commandFct_t         commandFct);
         result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);
 
-        result_t fetchSensors(void);
-
         result_t computeCommand(float64_t const & t,
                                 vectorN_t const & q,
                                 vectorN_t const & v,
@@ -43,6 +41,8 @@ namespace exo_simu
                                   vectorN_t       & u) override;
 
     private:
+        result_t fetchSensors(void);
+
         using AbstractController::initialize; // Discourage the use
 
     private:

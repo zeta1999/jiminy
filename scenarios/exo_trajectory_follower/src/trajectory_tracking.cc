@@ -13,6 +13,7 @@
 #include "exo_simu/core/Types.h"
 #include "exo_simu/core/Sensor.h"
 #include "exo_simu/core/Engine.h"
+#include "exo_simu/core/ControllerFunctor.h"
 #include "exo_simu/wdc/ExoModel.h"
 #include "exo_simu/wdc/ExoController.h"
 

@@ -163,6 +163,7 @@ namespace exo_simu
         std::string getUrdfPath(void) const;
         bool getHasFreeFlyer(void) const;
         std::map<std::string, std::vector<std::string> > getSensorsNames(void) const;
+        result_t getSensorsData(std::vector<matrixN_t> & data) const;
         result_t getSensorsData(std::string const & sensorType,
                                 matrixN_t         & data) const;
         result_t getSensorData(std::string const & sensorType,

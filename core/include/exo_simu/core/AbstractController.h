@@ -2,6 +2,7 @@
 #define SIMU_ABSTRACT_CONTROLLER_H
 
 #include "exo_simu/core/Types.h"
+#include "exo_simu/core/TelemetrySender.h"
 
 
 namespace exo_simu
@@ -9,6 +10,7 @@ namespace exo_simu
     std::string const CONTROLLER_OBJECT_NAME("HighLevelController");
 
     class Model;
+    class TelemetryData;
 
     class AbstractController
     {
@@ -41,7 +43,7 @@ namespace exo_simu
         AbstractController(void);
         virtual ~AbstractController(void);
 
-        virtual result_t initialize(Model const & model);
+        result_t initialize(Model const & model);
         virtual void reset(bool const & resetDynamicTelemetry = false);
 
         result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData);

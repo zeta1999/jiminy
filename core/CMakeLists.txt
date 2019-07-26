@@ -13,7 +13,7 @@ SET(COMPILE_FLAGS "-D PINOCCHIO_WITH_URDFDOM")
 add_definitions(${COMPILE_FLAGS})
 
 # Add sources
-set(SRC 
+set(SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractIODevice.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/MemoryDevice.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/TelemetryData.cc"
@@ -22,6 +22,7 @@ set(SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Utilities.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractSensor.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractController.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ControllerFunctor.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Sensor.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Model.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine.cc"
@@ -48,7 +49,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # Install
 install(DIRECTORY "include/exo_simu" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(TARGETS ${PROJECT_NAME} 
+install(TARGETS ${PROJECT_NAME}
     EXPORT  ${PROJECT_NAME}
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"

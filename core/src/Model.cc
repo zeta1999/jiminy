@@ -857,6 +857,23 @@ namespace exo_simu
         return returnCode;
     }
 
+    result_t Model::getSensorsData(std::vector<matrixN_t> & data) const
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        data.resize(sensorsGroupHolder_.size());
+        sensorsGroupHolder_t::const_iterator sensorGroupIt = sensorsGroupHolder_.begin();
+        for (uint32_t i = 0; i<sensorsGroupHolder_.size(); ++i)
+        {
+            if (returnCode == result_t::SUCCESS)
+            {
+                returnCode = sensorGroupIt->second.begin()->second->getAll(data[i]);
+                ++sensorGroupIt;
+            }
+        }
+        return returnCode;
+    }
+
     result_t Model::getSensorsData(std::string const & sensorType,
                                    matrixN_t         & data) const
     {

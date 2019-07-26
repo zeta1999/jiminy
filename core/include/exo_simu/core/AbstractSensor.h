@@ -113,7 +113,7 @@ namespace exo_simu
     public:
         // Disable the copy of the class
         AbstractSensorTpl(AbstractSensorTpl const & abstractSensor) = delete;
-        AbstractSensorTpl & operator = (AbstractSensorTpl const & other)  = delete;
+        AbstractSensorTpl & operator = (AbstractSensorTpl const & other) = delete;
 
     public:
         AbstractSensorTpl(Model                               const & model,

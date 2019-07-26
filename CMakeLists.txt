@@ -40,5 +40,5 @@ include_directories(SYSTEM /usr/local/lib/python2.7/dist-packages/numpy/core/inc
 add_subdirectory(core)
 add_subdirectory(wdc)
 add_subdirectory(python)
-add_subdirectory(scenarios/trajectory_tracking)
-add_subdirectory(scenarios/double_pendulum)
+add_subdirectory(scenarios/exo_trajectory_follower)
+#add_subdirectory(scenarios/double_pendulum)
