@@ -7,10 +7,10 @@
 #include <iomanip>
 #include <fstream>
 
-#include "exo_simu/core/TelemetryRecorder.h"
+#include "jiminy/core/TelemetryRecorder.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     TelemetryRecorder::TelemetryRecorder(std::shared_ptr<TelemetryData const> const & telemetryDataInstance) :
     telemetryData_(telemetryDataInstance),

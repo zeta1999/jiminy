@@ -6,10 +6,10 @@
 
 #include <iostream>
 
-#include "exo_simu/core/AbstractIODevice.h"
+#include "jiminy/core/AbstractIODevice.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     enum OpenMode operator | (enum OpenMode const & modeA, 
                               enum OpenMode const & modeB)

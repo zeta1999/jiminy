@@ -3,12 +3,12 @@
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
-#include "exo_simu/core/Utilities.h"
-#include "exo_simu/core/Model.h"
-#include "exo_simu/core/Sensor.h"
+#include "jiminy/core/Utilities.h"
+#include "jiminy/core/Model.h"
+#include "jiminy/core/Sensor.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     // ===================== ImuSensor =========================
 

@@ -1,9 +1,9 @@
 #include <iostream>
 
-#include "exo_simu/core/MemoryDevice.h"
+#include "jiminy/core/MemoryDevice.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     MemoryDevice::MemoryDevice(int64_t size) :
     buffer_(static_cast<size_t>(size)),

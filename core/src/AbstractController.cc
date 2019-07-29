@@ -1,11 +1,11 @@
 #include <iostream>
 
-#include "exo_simu/core/Utilities.h"
-#include "exo_simu/core/Model.h"
-#include "exo_simu/core/AbstractController.h"
+#include "jiminy/core/Utilities.h"
+#include "jiminy/core/Model.h"
+#include "jiminy/core/AbstractController.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     AbstractController::AbstractController(void) :
     ctrlOptions_(nullptr),

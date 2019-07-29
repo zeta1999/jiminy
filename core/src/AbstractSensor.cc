@@ -1,8 +1,8 @@
-#include "exo_simu/core/Model.h"
-#include "exo_simu/core/AbstractSensor.h"
+#include "jiminy/core/Model.h"
+#include "jiminy/core/AbstractSensor.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     AbstractSensorBase::AbstractSensorBase(Model       const & model,
                                            std::string const & name) :

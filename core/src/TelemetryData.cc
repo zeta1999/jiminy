@@ -6,10 +6,10 @@
 
 #include <iostream>
 
-#include "exo_simu/core/TelemetryData.h"
+#include "jiminy/core/TelemetryData.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     TelemetryData::TelemetryData() :
     constantsMem_("telemetryConstants", CONSTANTS_MEM_SIZE),
@@ -202,4 +202,4 @@ namespace exo_simu
         floatAddrOut = floatmemAddress + floatsHeader_->startDataSection;
         floatSizeOut = floatsHeader_->nextFreeDataOffset - floatsHeader_->startDataSection;
     }
-}// end of namespace exo_simu
+}// end of namespace jiminy
