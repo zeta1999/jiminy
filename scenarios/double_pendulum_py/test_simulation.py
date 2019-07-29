@@ -5,7 +5,7 @@ import numba as nb
 
 import pinocchio as pnc
 import jiminy
-import jiminy_py
+from jiminy_py import *
 
 ################################## User parameters #######################################
 
@@ -90,6 +90,10 @@ log_header = log_info[(log_info.index('StartColumns')+1):-1]
 print('%i log points' % log_data.shape[0])
 print(log_constants)
 pinocchio_model = model.get_pinocchio_model()
+trajectory_data_log = extract_state_from_simulation_log(log_header, log_data, urdf_path, pinocchio_model, False)
+
+# Save the log in CSV
+# simulator.write_log("/tmp/blackbox/log.data", False)
 
 ############################## Display the results ######################################
 
@@ -97,3 +101,6 @@ pinocchio_model = model.get_pinocchio_model()
 # plt.plot(log_data[:,log_header.index('Global.Time')],
 #          log_data[:,log_header.index('HighLevelController.energy')])
 # plt.show()
+
+# Display the simulation trajectory and the reference
+# play_trajectories([trajectory_data_log], speed_ratio=0.5)
