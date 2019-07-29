@@ -4,10 +4,11 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
             <geometry>
-                <sphere radius="0.005"/>
+                <mesh filename="/home/builder/wdc_workspace/src/jiminy/data/world.STL"/>
+                <!-- <sphere radius="0.005"/> -->
             </geometry>
             <material name="">
-                <color rgba="0.0 1.0 0.0 0.4"/>
+                <color rgba="1.0 0.0 0.0 1.0"/>
             </material>
         </visual>
         <inertial>
@@ -29,10 +30,11 @@
         <visual>
             <origin xyz="0 0 0.5" rpy="0 0 0" />
             <geometry>
-                <box size="0.01 0.01 1.0"/>
+                <mesh filename="/home/builder/wdc_workspace/src/jiminy/data/PendulumArm.STL"/>
+                <!-- <box size="0.02 0.02 1.0"/> -->
             </geometry>
             <material name="">
-                <color rgba="0.0 1.0 0.0 0.4"/>
+                <color rgba="0.0 1.0 0.0 1.0"/>
             </material>
         </visual>
         <inertial>
@@ -52,10 +54,11 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
             <geometry>
-                <sphere radius="0.06"/>
+                <mesh filename="/home/builder/wdc_workspace/src/jiminy/data/PendulumMass.STL"/>
+                <!-- <sphere radius="0.06"/> -->
             </geometry>
             <material name="">
-                <color rgba="0.0 1.0 0.0 0.4"/>
+                <color rgba="0.0 1.0 0.0 1.0"/>
             </material>
         </visual>
         <inertial>
@@ -77,10 +80,11 @@
         <visual>
             <origin xyz="0 0 0.25" rpy="0 0 0" />
             <geometry>
-                <box size="0.01 0.01 0.5"/>
+                <mesh filename="/home/builder/wdc_workspace/src/jiminy/data/SecondPendulumArm.STL"/>
+                <!-- <box size="0.01 0.01 0.5"/> -->
             </geometry>
             <material name="">
-                <color rgba="0.0 1.0 0.0 0.4"/>
+                <color rgba="0.0 0.0 1.0 1.0"/>
             </material>
         </visual>
         <inertial>
@@ -100,10 +104,11 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
             <geometry>
-                <sphere radius="0.06"/>
+                <mesh filename="/home/builder/wdc_workspace/src/jiminy/data/SecondPendulumMass.STL"/>
+                <!-- <sphere radius="0.06"/> -->
             </geometry>
             <material name="">
-                <color rgba="0.0 1.0 0.0 0.4"/>
+                <color rgba="0.0 0.0 1.0 1.0"/>
             </material>
         </visual>
         <inertial>

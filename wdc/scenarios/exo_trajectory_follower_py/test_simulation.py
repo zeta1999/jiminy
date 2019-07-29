@@ -143,10 +143,13 @@ log_header = log_info[(log_info.index('StartColumns')+1):-1]
 print('%i log points' % log_data.shape[0])
 print(log_constants)
 pinocchio_model = model.get_pinocchio_model()
-trajectory_data_log = extract_state_from_simulation_log(urdf_path, log_header, log_data, pinocchio_model)
+trajectory_data_log = extract_state_from_simulation_log(log_header, log_data, urdf_path, pinocchio_model, True)
 
 nb_steps = int(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evolution_robot'][-1].t)
 trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
+
+# Save the log in TSV
+# simulator.write_log("/tmp/blackbox/log.data", True)
 
 ############################## Display the results ######################################
 
@@ -164,8 +167,7 @@ trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)
 # Display some kinematics data
 # plot_kinematics(trajectory_data_log, trajectory_data_ref)
 
-# Save the log in TSV
-# simulator.write_log("/tmp/blackbox/log.data", True)
+# Load the TSV log file
 # log = LogFile("/tmp/blackbox/log.data")
 
 # Plot some data using logviewer
