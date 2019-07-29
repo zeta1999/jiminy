@@ -6,11 +6,11 @@
 
 #include <iostream>
 
-#include "exo_simu/core/TelemetryData.h"
-#include "exo_simu/core/TelemetrySender.h"
+#include "jiminy/core/TelemetryData.h"
+#include "jiminy/core/TelemetrySender.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     TelemetrySender::TelemetrySender(void) : 
     objectName_(DEFAULT_OBJECT_NAME), 
@@ -117,4 +117,4 @@ namespace exo_simu
     {
         return objectName_;
     }
-} // End of namespace exo_simu.
+} // End of namespace jiminy.

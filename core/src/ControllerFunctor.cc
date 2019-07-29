@@ -1,7 +1,7 @@
-#include "exo_simu/core/ControllerFunctor.h"
+#include "jiminy/core/ControllerFunctor.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     // Empty.
 }

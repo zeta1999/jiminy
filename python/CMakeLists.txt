@@ -18,7 +18,7 @@ set(PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
 set(PYTHON_SITELIB lib/python${PYTHON_VERSION}/site-packages)
 
 # Compile and install python bindings
-add_subdirectory(exo_simu_pywrap)
+add_subdirectory(jiminy_pywrap)
 
 # Install native python packages
-deploy_python_package(exo_simu_py)
+deploy_python_package(jiminy_py)

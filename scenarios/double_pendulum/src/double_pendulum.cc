@@ -13,69 +13,36 @@
 #include <getopt.h>
 #include <string>
 
-#include "exo_simu/core/Types.h"
-#include "exo_simu/core/Utilities.h"
-#include "exo_simu/core/Engine.h"
-#include "exo_simu/core/AbstractController.h"
+#include "jiminy/core/Types.h"
+#include "jiminy/core/Utilities.h"
+#include "jiminy/core/Engine.h"
+#include "jiminy/core/ControllerFunctor.h"
 
 
-using namespace exo_simu;
+using namespace jiminy;
 
-// Controller object.
-class PendulumController : public AbstractController
+void computeCommand(float64_t const & t,
+                    vectorN_t const & q,
+                    vectorN_t const & v,
+                    vectorN_t       & u)
 {
-protected:
-    typedef std::function<void(float64_t const & /*t*/,
-                               vectorN_t const & /*q*/,
-                               vectorN_t const & /*v*/,
-                               matrixN_t const & /*forceSensorsData*/,
-                               matrixN_t const & /*imuSensorsData*/,
-                               matrixN_t const & /*encoderSensorsData*/,
-                               vectorN_t       & /*u*/)> commandFct_t;
+    // No controller: energy should be preserved.
+    u = vectorN_t::Zero(1);
+}
 
-public:
-    PendulumController(void)
-    {
-        isInitialized_ = true;
-    }
-    ~PendulumController(void)
-    {}
-
-    void updateTelemetry(void)
-    {
-    }
-
-    result_t configureTelemetry(std::shared_ptr<TelemetryData> const & telemetryData)
-    {
-    }
-
-    void compute_command(Model     const & model,
-                         float64_t const & t,
-                         vectorN_t const & q,
-                         vectorN_t const & v,
-                         vectorN_t       & u)
-    {
-        // No controller: energy should be preserved.
-        u = vectorN_t::Zero(2);
-    }
-
-    void internalDynamics(Model     const & model,
-                          float64_t const & t,
-                          vectorN_t const & q,
-                          vectorN_t const & v,
-                          vectorN_t       & u)
-    {
-        u = vectorN_t::Zero(2);
-    }
-};
-
+void internalDynamics(float64_t const & t,
+                      vectorN_t const & q,
+                      vectorN_t const & v,
+                      vectorN_t       & u)
+{
+    u = vectorN_t::Zero(2);
+}
 
 bool callback(float64_t const & t,
               vectorN_t const & x)
 {
     return true;
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -86,7 +53,7 @@ int main(int argc, char *argv[])
     // Set URDF and log output.
     struct passwd *pw = getpwuid(getuid());
     const char *homedir = pw->pw_dir;
-    std::string urdfPath = std::string(homedir) + std::string("/wdc_workspace/src/exo_simu/examples/data/double_pendulum_rigid.urdf");
+    std::string urdfPath = std::string(homedir) + std::string("/wdc_workspace/src/jiminy/data/double_pendulum_rigid.urdf");
     std::string outputDirPath = std::string("/tmp/blackbox/");
 
     // =====================================================================
@@ -98,11 +65,9 @@ int main(int argc, char *argv[])
 
     timer.tic();
 
-    // Instantiate and configuration the exoskeleton model
-    std::vector<std::string> contacts;
-    std::vector<std::string> jointNames;
-    jointNames.push_back("PendulumJoint");
-    jointNames.push_back("SecondPendulumJoint");
+    // Instantiate and configuration the model
+    std::vector<std::string> contacts = {std::string("PendulumJoint")};
+    std::vector<std::string> jointNames = {std::string("SecondPendulumJoint")};
 
     Model model;
     configHolder_t mdlOptions = model.getOptions();
@@ -112,20 +77,26 @@ int main(int argc, char *argv[])
     model.setOptions(mdlOptions);
 
     // Instantiate and configuration the controller
-    PendulumController controller;
+    ControllerFunctor<decltype(computeCommand), decltype(internalDynamics)> controller(computeCommand, internalDynamics);
+    controller.initialize(model);
 
     // Instantiate and configuration the engine
     Engine engine;
     configHolder_t simuOptions = engine.getDefaultOptions();
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logConfiguration")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logVelocity")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logAcceleration")) = true;
-    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("logCommand")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableConfiguration")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableVelocity")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableAcceleration")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableCommand")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableEnergy")) = true;
     boost::get<vectorN_t>(boost::get<configHolder_t>(simuOptions.at("world")).at("gravity"))(2) = -9.81;
+    boost::get<std::string>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("solver")) = std::string("runge_kutta_dopri5");
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
+    boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("dtMax")) = 3.0e-3;
+    boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("iterMax")) = 100000U; // -1 for infinity
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 1.0e-3;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 1.0e-3;
+    boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("randomSeed")) = 0U; // Use time(nullptr) for random seed.
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;

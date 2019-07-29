@@ -14,16 +14,16 @@
 #include "pinocchio/algorithm/joint-configuration.hpp"
 #include "pinocchio/algorithm/energy.hpp"
 
-#include "exo_simu/core/Utilities.h"
-#include "exo_simu/core/TelemetryData.h"
-#include "exo_simu/core/TelemetryRecorder.h"
-#include "exo_simu/core/AbstractController.h"
-#include "exo_simu/core/AbstractSensor.h"
-#include "exo_simu/core/Model.h"
-#include "exo_simu/core/Engine.h"
+#include "jiminy/core/Utilities.h"
+#include "jiminy/core/TelemetryData.h"
+#include "jiminy/core/TelemetryRecorder.h"
+#include "jiminy/core/AbstractController.h"
+#include "jiminy/core/AbstractSensor.h"
+#include "jiminy/core/Model.h"
+#include "jiminy/core/Engine.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     float64_t const MAX_TIME_STEP_MAX = 3e-3;
 
@@ -427,14 +427,15 @@ namespace exo_simu
                                                     stepperState_.qLast,
                                                     stepperState_.vLast,
                                                     stepperState_.uCommandLast);
+
                         std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
                         for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
                         {
                             uint32_t jointId = motorsVelocityIdx[i];
                             float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
-                            stepperState_.uCommandLast[i] = boost::algorithm::clamp(
-                                stepperState_.uCommandLast[i], -torque_max, torque_max);
                             stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
+                            stepperState_.uControl[i] = boost::algorithm::clamp(
+                                stepperState_.uControl[i], -torque_max, torque_max);
                         }
 
                         /* Update the internal stepper state dxdt since the dynamics has changed.
@@ -605,9 +606,9 @@ namespace exo_simu
             {
                 uint32_t const & jointId = motorsVelocityIdx[i];
                 float64_t const & torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
-                stepperState_.uCommandLast[i] = boost::algorithm::clamp(
-                    stepperState_.uCommandLast[i], -torque_max, torque_max);
                 stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
+                stepperState_.uControl[i] = boost::algorithm::clamp(
+                    stepperState_.uControl[i], -torque_max, torque_max);
             }
         }
 

@@ -2,7 +2,7 @@
 cmake_minimum_required (VERSION 3.10)
 
 # Project name
-project(exo_simu)
+project(jiminy)
 
 # Set various flags
 set(WARN_FULL "-Wall -Wextra -Weffc++ -pedantic -pedantic-errors \
@@ -18,7 +18,11 @@ set(WARN_FULL "-Wall -Wextra -Weffc++ -pedantic -pedantic-errors \
 set(default_build_type "Release")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -Wfatal-errors ${WARN_FULL}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${WARN_FULL} -Wno-unused-parameter")
+
+# Shared libraries need PIC
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+include(GNUInstallDirs)
 
 # Release type
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -38,7 +42,6 @@ include_directories(SYSTEM /usr/local/lib/python2.7/dist-packages/numpy/core/inc
 
 # Sub-project name(s)
 add_subdirectory(core)
-add_subdirectory(wdc)
 add_subdirectory(python)
-add_subdirectory(scenarios/exo_trajectory_follower)
-#add_subdirectory(scenarios/double_pendulum)
+add_subdirectory(scenarios)
+add_subdirectory(wdc)

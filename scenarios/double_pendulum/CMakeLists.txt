@@ -19,7 +19,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC wdc)
+target_link_libraries(${PROJECT_NAME} PUBLIC core)
 
 # Activate c++14
 set_target_properties(${PROJECT_NAME} PROPERTIES

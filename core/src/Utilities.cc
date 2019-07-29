@@ -5,11 +5,11 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
-#include "exo_simu/core/Utilities.h"
-#include "exo_simu/core/TelemetrySender.h"
+#include "jiminy/core/Utilities.h"
+#include "jiminy/core/TelemetrySender.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     // ************************* Timer **************************
 

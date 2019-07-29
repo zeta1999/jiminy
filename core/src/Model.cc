@@ -6,11 +6,11 @@
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
-#include "exo_simu/core/TelemetryData.h"
-#include "exo_simu/core/Model.h"
+#include "jiminy/core/TelemetryData.h"
+#include "jiminy/core/Model.h"
 
 
-namespace exo_simu
+namespace jiminy
 {
     Model::Model(void) :
     pncModel_(),
@@ -24,6 +24,7 @@ namespace exo_simu
     mdlOptionsHolder_(),
     telemetryData_(nullptr),
     sensorsGroupHolder_(),
+    sensorTelemetryOptions_(),
     contactFramesNames_(),
     contactFramesIdx_(),
     motorsNames_(),
@@ -64,6 +65,7 @@ namespace exo_simu
         // Remove all sensors, if any
         sensorsGroupHolder_.clear();
         sensorsDataHolder_.clear();
+        sensorTelemetryOptions_.clear();
 
         // Initialize the URDF model
         returnCode = loadUrdfModel(urdfPath, hasFreeflyer);
@@ -109,7 +111,7 @@ namespace exo_simu
 
     void Model::reset(void)
     {
-        if (getIsInitialized())
+        if (isInitialized_)
         {
             /* Update the biases added to the dynamics properties of the model.
                It cannot throw an error. */
@@ -133,7 +135,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::configureTelemetry - The model is not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -142,6 +144,26 @@ namespace exo_simu
         if (returnCode == result_t::SUCCESS)
         {
             telemetryData_ = std::shared_ptr<TelemetryData>(telemetryData);
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            if (!isTelemetryConfigured_)
+            {
+                for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
+                {
+                    for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)
+                    {
+                        if (returnCode == result_t::SUCCESS)
+                        {
+                            if (sensorTelemetryOptions_.at(sensorGroup.first))
+                            {
+                                returnCode = sensor.second->configureTelemetry(telemetryData_);
+                            }
+                        }
+                    }
+                }
+            }
             isTelemetryConfigured_ = true;
         }
 
@@ -158,7 +180,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::removeSensor - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -196,6 +218,7 @@ namespace exo_simu
             {
                 sensorsGroupHolder_.erase(sensorType);
                 sensorsDataHolder_.erase(sensorType);
+                sensorTelemetryOptions_.erase(sensorType);
             }
         }
 
@@ -206,7 +229,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::removeSensors - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -227,6 +250,7 @@ namespace exo_simu
         {
             sensorsGroupHolder_.erase(sensorGroupIt);
             sensorsDataHolder_.erase(sensorType);
+            sensorTelemetryOptions_.erase(sensorType);
         }
 
         return returnCode;
@@ -236,7 +260,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::generateFlexibleModel - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -275,7 +299,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::generateBiasedModel - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -397,7 +421,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::generateFieldNames - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -514,7 +538,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::getSensorsOptions - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -547,7 +571,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::getSensorsOptions - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -576,7 +600,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::getSensorOptions - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -618,7 +642,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::setSensorOptions - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -659,7 +683,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::setSensorsOptions - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -700,7 +724,7 @@ namespace exo_simu
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - Model::setSensorsOptions - Model not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -716,6 +740,58 @@ namespace exo_simu
                         boost::get<configHolder_t>(
                             sensorsOptions.at(sensorGroup.first)).at(sensor.first))); // TODO: missing check for sensor type and name availability
                 }
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::getTelemetryOptions(configHolder_t & telemetryOptions) const
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!isInitialized_)
+        {
+            std::cout << "Error - Model::setSensorsOptions - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            telemetryOptions.clear();
+            for (auto const & sensorGroupTelemetryOption : sensorTelemetryOptions_)
+            {
+                std::string optionTelemetryName = "enable" + sensorGroupTelemetryOption.first + "s";
+                telemetryOptions[optionTelemetryName] = sensorGroupTelemetryOption.second;
+            }
+        }
+
+        return returnCode;
+    }
+
+    result_t Model::setTelemetryOptions(configHolder_t const & telemetryOptions)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if (!isInitialized_)
+        {
+            std::cout << "Error - Model::setTelemetryOptions - Model not initialized." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        for (auto & sensorGroupTelemetryOption : sensorTelemetryOptions_)
+        {
+            std::string optionTelemetryName = "enable" + sensorGroupTelemetryOption.first + "s";
+            configHolder_t::const_iterator sensorTelemetryOptionIt =
+                telemetryOptions.find(optionTelemetryName);
+            if (sensorTelemetryOptionIt == telemetryOptions.end())
+            {
+                std::cout << "Error - Model::setTelemetryOptions - Missing field." << std::endl;
+                returnCode = result_t::ERROR_GENERIC;
+            }
+            if (returnCode == result_t::SUCCESS)
+            {
+                sensorGroupTelemetryOption.second = boost::get<bool>(sensorTelemetryOptionIt->second);
             }
         }
 
