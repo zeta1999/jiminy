@@ -242,7 +242,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/LeftFrontalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftFrontalHipLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -251,7 +251,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/LeftFrontalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftFrontalHipLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -266,7 +266,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/RightSagittalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightSagittalHipLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -275,7 +275,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/RightSagittalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightSagittalHipLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -288,7 +288,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/LeftSagittalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftSagittalHipLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -297,7 +297,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/LeftSagittalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftSagittalHipLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -310,7 +310,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/RightSagittalKneeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightSagittalKneeLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -319,7 +319,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/RightSagittalKneeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightSagittalKneeLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -332,7 +332,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/RightHenkeAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightHenkeAnkleLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -341,7 +341,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/RightHenkeAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightHenkeAnkleLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -358,7 +358,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/LeftTransverseHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftTransverseHipLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -367,7 +367,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/LeftTransverseHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftTransverseHipLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -383,7 +383,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/LeftToeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftToeLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.776470588235 0.756862745098 0.737254901961 1.0"/>
@@ -392,7 +392,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/LeftToeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftToeLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -407,7 +407,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/LeftSagittalAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftSagittalAnkleLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -416,7 +416,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/LeftSagittalAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftSagittalAnkleLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -429,7 +429,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/LeftSagittalKneeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftSagittalKneeLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.650980392157 0.619607843137 0.588235294118 1.0"/>
@@ -438,7 +438,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/LeftSagittalKneeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftSagittalKneeLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -452,7 +452,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/RightTransverseHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightTransverseHipLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -461,7 +461,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/RightTransverseHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightTransverseHipLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -474,7 +474,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/RightSagittalAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightSagittalAnkleLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -483,7 +483,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/RightSagittalAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightSagittalAnkleLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -496,7 +496,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/LeftHenkeAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftHenkeAnkleLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -505,7 +505,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/LeftHenkeAnkleLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/LeftHenkeAnkleLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -518,7 +518,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/PelvisLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/PelvisLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -527,7 +527,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/PelvisLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/PelvisLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -543,7 +543,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/RightFrontalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightFrontalHipLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.752941176471 0.752941176471 0.752941176471 1.0"/>
@@ -552,7 +552,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/RightFrontalHipLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightFrontalHipLink.STL"/>
       </geometry>
     </collision>
   </link>
@@ -566,7 +566,7 @@ Shank setting:	418.0
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/RightToeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightToeLink.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.776470588235 0.756862745098 0.737254901961 1.0"/>
@@ -575,7 +575,7 @@ Shank setting:	418.0
     <collision>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/builder/.simulation/exo_meshes/exo_with_patient/convex/RightToeLink.STL"/>
+        <mesh filename="/home/builder/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/RightToeLink.STL"/>
       </geometry>
     </collision>
   </link>

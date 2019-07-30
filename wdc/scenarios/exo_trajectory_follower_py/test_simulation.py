@@ -1,3 +1,4 @@
+import os
 import time
 from math import *
 import numpy as np
@@ -17,9 +18,8 @@ from wdc_jiminy_py import *
 
 ################################## User parameters #######################################
 
-urdf_path = "/home/builder/.simulation/atalante_with_patient/atalante_with_patient.urdf"
-urdf_mesh_path = "/home/builder/.simulation"
-neural_network_path = "/home/builder/wdc_workspace/src/wandercode/test_data/data/trajectories/generic_walk_network_v5-4.json"
+urdf_path = os.path.join(os.environ["HOME"], "wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/atalante_with_patient.urdf")
+neural_network_path = os.path.join(os.environ["HOME"], "wdc_workspace/src/wandercode/test_data/data/trajectories/generic_walk_network_v5-4.json")
 traj_features = {"steplength":  16,
                  "duration":    0.95,
                  "stairheight": 0.0}
@@ -142,8 +142,7 @@ log_header = log_info[(log_info.index('StartColumns')+1):-1]
 
 print('%i log points' % log_data.shape[0])
 print(log_constants)
-pinocchio_model = model.get_pinocchio_model()
-trajectory_data_log = extract_state_from_simulation_log(log_header, log_data, urdf_path, pinocchio_model, True)
+trajectory_data_log = extract_state_from_simulation_log(log_header, log_data, urdf_path, model.pinocchio_model, True)
 
 nb_steps = int(trajectory_data_log['evolution_robot'][-1].t/trajectory_data['evolution_robot'][-1].t)
 trajectory_data_ref = get_n_steps(trajectory_data, nb_steps)

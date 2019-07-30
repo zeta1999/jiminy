@@ -141,10 +141,12 @@ namespace python
                          T_<Is>... sensorsData,
                          vectorN_t       & uCommand)
         {
-            // Pass the arguments by reference (be careful const qualifiers are lost)
+            // Pass the arguments by reference (be careful const qualifiers are lost).
+            // Note that unlike std::vector, bp::handle<> sensorsDataPy[N] required template specialization for N=0.
             bp::handle<> qPy(getNumpyReferenceFromEigenVector(q));
             bp::handle<> vPy(getNumpyReferenceFromEigenVector(v));
-            std::vector<bp::handle<> > sensorsDataPy({bp::handle<>(getNumpyReferenceFromEigenMatrix(sensorsData))...});
+            std::vector<bp::handle<> > sensorsDataPy(
+                {bp::handle<>(getNumpyReferenceFromEigenMatrix(sensorsData))...});
             bp::handle<> uCommandPy(getNumpyReferenceFromEigenVector(uCommand));
             funcPyPtr_(t, qPy, vPy, sensorsDataPy[Is]..., uCommandPy);
         }
@@ -231,13 +233,55 @@ namespace python
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief Expose C++ API through the visitor.
         ///////////////////////////////////////////////////////////////////////////////
+
+        template<class PyClass>
+        class PySensorVisit
+        {
+        public:
+            using TSensor = typename PyClass::wrapped_type;
+
+            static void visitAbstract(PyClass& cl)
+            {
+                cl
+                    .def("get_options", &PySensorVisitor::getOptions<TSensor>,
+                                        bp::return_value_policy<bp::return_by_value>())
+                    .def("set_options", &PySensorVisitor::setOptions<TSensor>)
+
+                    .add_property("name", bp::make_function(&AbstractSensorBase::getName,
+                                        bp::return_value_policy<bp::copy_const_reference>()))
+                    .add_property("type", bp::make_function(&AbstractSensorBase::getType,
+                                        bp::return_value_policy<bp::copy_const_reference>()))
+                    .add_property("is_initialized", bp::make_function(&AbstractSensorBase::getIsInitialized,
+                                                    bp::return_value_policy<bp::copy_const_reference>()))
+                    .add_property("fieldnames", bp::make_function(&AbstractSensorBase::getFieldNames,
+                                                bp::return_value_policy<bp::copy_const_reference>()))
+                    ;
+            }
+
+            template<class Q = TSensor>
+            static typename std::enable_if<!std::is_same<Q, AbstractSensorBase>::value, void>::type
+            visit(PyClass& cl)
+            {
+                visitAbstract(cl);
+
+                cl
+                    .def("initialize", &TSensor::initialize);
+                    ;
+            }
+
+            template<class Q = TSensor>
+            static typename std::enable_if<std::is_same<Q, AbstractSensorBase>::value, void>::type
+            visit(PyClass& cl)
+            {
+                visitAbstract(cl);
+            }
+        };
+
+    public:
         template<class PyClass>
         void visit(PyClass& cl) const
         {
-            cl
-                .def("__init__", bp::make_constructor(&PySensorVisitor::pySensorFactory<typename PyClass::wrapped_type>))
-                .def("initialize", &EncoderSensor::initialize);
-                ;
+            PySensorVisit<PyClass>::visit(cl);
         }
 
         template<typename TSensor>
@@ -247,19 +291,42 @@ namespace python
         }
 
         ///////////////////////////////////////////////////////////////////////////////
+        /// \brief      Getters and Setters
+        ///////////////////////////////////////////////////////////////////////////////
+
+        template<typename TSensor>
+        static bp::dict getOptions(TSensor & self)
+        {
+            bp::dict configPy;
+            convertConfigHolderPy(self.getOptions(), configPy);
+            return configPy;
+        }
+
+        template<typename TSensor>
+        static void setOptions(TSensor        & self,
+                               bp::dict const & configPy)
+        {
+            configHolder_t config = self.getOptions();
+            loadConfigHolder(configPy, config);
+            self.setOptions(config);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
         /// \brief Expose.
         ///////////////////////////////////////////////////////////////////////////////
         static void expose()
         {
             bp::class_<AbstractSensorBase,
                        boost::shared_ptr<AbstractSensorBase>,
-                       boost::noncopyable>("abstract_sensor", bp::no_init);
+                       boost::noncopyable>("abstract_sensor", bp::no_init)
+                .def(PySensorVisitor());
+            bp::register_ptr_to_python< std::shared_ptr<AbstractSensorBase> >(); // Required to handle shared_ptr from/to Python
 
             bp::class_<ImuSensor, bp::bases<AbstractSensorBase>,
                        boost::shared_ptr<ImuSensor>,
                        boost::noncopyable>("imu_sensor", bp::no_init)
                 .def(PySensorVisitor());
-            bp::register_ptr_to_python< std::shared_ptr<ImuSensor> >(); // Required to handle shared_ptr from/to Python
+            bp::register_ptr_to_python< std::shared_ptr<ImuSensor> >();
 
             bp::class_<ForceSensor, bp::bases<AbstractSensorBase>,
                        boost::shared_ptr<ForceSensor>,
@@ -290,38 +357,61 @@ namespace python
             cl
                 .def("initialize", &PyModelVisitor::initialize,
                                    (bp::arg("self"), "urdf_path", "contacts", "motors", "has_freeflyer"))
-                .def("add_sensor", &Model::addSensor<ImuSensor>,
-                                   (bp::arg("self"), "sensor_name", "imu_sensor"))
-                .def("add_sensor", &Model::addSensor<ForceSensor>,
-                                   (bp::arg("self"), "sensor_name", "force_sensor"))
-                .def("add_sensor", &Model::addSensor<EncoderSensor>,
-                                   (bp::arg("self"), "sensor_name", "encoder_sensor"))
-                .def("add_imu_sensor", &PyModelVisitor::addSensor<ImuSensor>,
+
+                .def("add_imu_sensor", &PyModelVisitor::createAndAddSensor<ImuSensor>,
                                        (bp::arg("self"), "sensor_name", "frame_name"))
-                .def("add_force_sensor", &PyModelVisitor::addSensor<ForceSensor>,
+                .def("add_force_sensor", &PyModelVisitor::createAndAddSensor<ForceSensor>,
                                          (bp::arg("self"), "sensor_name", "frame_name"))
-                .def("add_encoder_sensor", &PyModelVisitor::addSensor<EncoderSensor>,
+                .def("add_encoder_sensor", &PyModelVisitor::createAndAddSensor<EncoderSensor>,
                                            (bp::arg("self"), "sensor_name", "motor_name"))
                 .def("remove_sensor", &Model::removeSensor,
                                       (bp::arg("self"), "sensor_type", "sensor_name"))
                 .def("remove_sensors", &Model::removeSensors,
                                        (bp::arg("self"), "sensorType"))
-                .def("get_urdf_path", &PyModelVisitor::getUrdfPath,
-                                      bp::return_value_policy<bp::return_by_value>())
-                .def("get_pinocchio_model", &PyModelVisitor::getPinocchioModel,
-                                            bp::return_value_policy<bp::return_by_value>())
-                .def("get_motors_names", &PyModelVisitor::getMotorsNames,
-                                         bp::return_value_policy<bp::return_by_value>())
-                .def("get_joints_names", &PyModelVisitor::getJointsNames,
-                                         bp::return_value_policy<bp::return_by_value>())
-                .def("get_frames_names", &PyModelVisitor::getFramesNames,
-                                         bp::return_value_policy<bp::return_by_value>())
+                .def("get_sensor", &PyModelVisitor::getSensor,
+                                   (bp::arg("self"), "sensor_type", "sensor_name"),
+                                   bp::return_value_policy<bp::reference_existing_object>())
+
                 .def("get_model_options", &PyModelVisitor::getModelOptions,
                                           bp::return_value_policy<bp::return_by_value>())
                 .def("set_model_options", &PyModelVisitor::setModelOptions)
                 .def("get_sensors_options", &PyModelVisitor::getSensorsOptions,
                                             bp::return_value_policy<bp::return_by_value>())
                 .def("set_sensors_options", &PyModelVisitor::setSensorsOptions)
+
+                .add_property("pinocchio_model", &PyModelVisitor::getPinocchioModel)
+                .add_property("frames_names", &PyModelVisitor::getFramesNames)
+
+                .add_property("is_initialized", bp::make_function(&Model::getIsInitialized,
+                                                bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("has_freeflyer", bp::make_function(&Model::getHasFreeFlyer,
+                                               bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("urdf_path", bp::make_function(&Model::getUrdfPath,
+                                               bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("motors_names", bp::make_function(&Model::getMotorsNames,
+                                               bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("joints_names", bp::make_function(&Model::getRigidJointsNames,
+                                               bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("contact_frames_idx", bp::make_function(&Model::getContactFramesIdx,
+                                                    bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("motors_position_idx", bp::make_function(&Model::getMotorsPositionIdx,
+                                                     bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("motors_velocity_idx", bp::make_function(&Model::getMotorsVelocityIdx,
+                                                     bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("position_fieldnames", bp::make_function(&Model::getPositionFieldNames,
+                                                     bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("velocity_fieldnames", bp::make_function(&Model::getVelocityFieldNames,
+                                                     bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("acceleration_fieldnames", bp::make_function(&Model::getAccelerationFieldNames,
+                                                         bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("motor_torque_fieldnames", bp::make_function(&Model::getMotorTorqueFieldNames,
+                                                         bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("nq", bp::make_function(&Model::nq,
+                                    bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("nv", bp::make_function(&Model::nv,
+                                    bp::return_value_policy<bp::copy_const_reference>()))
+                .add_property("nx", bp::make_function(&Model::nx,
+                                    bp::return_value_policy<bp::copy_const_reference>()))
                 ;
         }
 
@@ -340,9 +430,9 @@ namespace python
         }
 
         template<typename TSensor>
-        static result_t addSensor(Model             & self,
-                                  std::string const & sensorName,
-                                  std::string const & name)
+        static result_t createAndAddSensor(Model             & self,
+                                           std::string const & sensorName,
+                                           std::string const & name)
         {
             result_t returnCode = result_t::SUCCESS;
 
@@ -361,24 +451,18 @@ namespace python
         /// \brief      Getters and Setters
         ///////////////////////////////////////////////////////////////////////////////
 
-        static std::string getUrdfPath(Model & self)
+        static AbstractSensorBase * getSensor(Model & self,
+                                              std::string const & sensorType,
+                                              std::string const & sensorName)
         {
-            return self.getUrdfPath();
+            std::shared_ptr<AbstractSensorBase> sensor;
+            self.getSensor(sensorType, sensorName, sensor);
+            return sensor.get();
         }
 
         static pinocchio::Model getPinocchioModel(Model & self)
         {
             return self.pncModel_;
-        }
-
-        static std::vector<std::string> getMotorsNames(Model & self)
-        {
-            return self.getMotorsNames();
-        }
-
-        static std::vector<std::string> getJointsNames(Model & self)
-        {
-            return self.getRigidJointsNames();
         }
 
         static std::vector<std::string> getFramesNames(Model & self)
@@ -527,12 +611,28 @@ namespace python
     };
 
     #ifdef PYTHON_CONTROLLER_FUNCTOR_MAX_SENSOR_TYPES
-    static AbstractController * PyControllerFunctorNFactory(bp::object & commandPy,
-                                                            bp::object & internalDynamicsPy)
+    static AbstractController * PyControllerFunctorNFactory(bp::object       & commandPy,
+                                                            bp::object       & internalDynamicsPy,
+                                                            int32_t    const & numSensorTypes)
     {
-        int32_t N = boost::python::extract<std::size_t>(
-            commandPy.attr("func_code").attr("co_argcount")) - 4;
+        /* 'co_varnames' is used along with 'co_argcount' to avoid accounting for
+           the 'self' argument in case of class method handle.
+           Note that it does not support Python *args and **kwargs. In such a case,
+           specify 'numSensorTypes' argument instead. */
 
+        int32_t N;
+        if (numSensorTypes < 0)
+        {
+            std::string argsFirstPy = boost::python::extract<std::string>(
+                commandPy.attr("func_code").attr("co_varnames")[0]);
+            std::size_t argsNumPy = boost::python::extract<std::size_t>(
+                    commandPy.attr("func_code").attr("co_argcount"));
+            N = argsNumPy - 4 - (argsFirstPy == std::string("self"));
+        }
+        else
+        {
+            N = numSensorTypes;
+        }
         assert(N <= PYTHON_CONTROLLER_FUNCTOR_MAX_SENSOR_TYPES || N < 0);
         if (N < 0)
         {

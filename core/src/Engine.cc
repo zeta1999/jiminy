@@ -637,9 +637,10 @@ namespace jiminy
         }
 
         // Compute command and internal dynamics
+        stepperState_.uInternal.setZero();
         controller_->internalDynamics(t, q, v, stepperState_.uInternal); // TODO: Send the values at previous iteration instead
-        boundsDynamics(q, v, stepperState_.uBounds);
-        vectorN_t u = stepperState_.uBounds + stepperState_.uInternal + stepperState_.uControl;
+        internalDynamics(q, v, stepperState_.uInternal);
+        vectorN_t u = stepperState_.uInternal + stepperState_.uControl;
 
         // Compute dynamics
         vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, v, u, fext);
@@ -648,7 +649,7 @@ namespace jiminy
            quaternions on SO3 automatically. Note that the time difference must
            not be too small to avoid failure. */
         float64_t dt = std::max(1e-5, t - stepperState_.tLast);
-        vectorN_t qNext = vectorN_t::Zero(model_->nq());
+        vectorN_t qNext(model_->nq());
         pinocchio::integrate(model_->pncModel_, q, v*dt, qNext);
         vectorN_t qDot = (qNext - q) / dt;
 
@@ -667,7 +668,7 @@ namespace jiminy
         vector3_t const & posFrameJoint = model_->pncModel_.frames[frameId].placement.translation();
 
         // Compute the forces at the origin of the parent joint frame
-        vector6_t fextLocal = vector6_t::Zero();
+        vector6_t fextLocal;
         fextLocal.head<3>() = tformFrameJointRot * tformFrameRot.transpose() * fextInWorld;
         fextLocal.tail<3>() = posFrameJoint.cross(fextLocal.head<3>());
 
@@ -683,12 +684,12 @@ namespace jiminy
         matrix3_t const & tformFrameRot = model_->pncData_.oMf[frameId].rotation();
         vector3_t const & posFrame = model_->pncData_.oMf[frameId].translation();
 
-        vectorN_t fextLocal = vectorN_t::Zero(6);
+        vector6_t fextLocal;
 
         if(posFrame(2) < 0.0)
         {
             // Initialize the contact force
-            vector3_t fextInWorld = vector3_t::Zero();
+            vector3_t fextInWorld;
 
             vector3_t motionFrame = pinocchio::getFrameVelocity(model_->pncModel_,
                                                                 model_->pncData_,
@@ -738,19 +739,23 @@ namespace jiminy
             float64_t blendingLaw = std::tanh(2 * blendingFactor);
             fextLocal *= blendingLaw;
         }
+        else
+        {
+            fextLocal.setZero();
+        }
 
         return fextLocal;
     }
 
-    void Engine::boundsDynamics(vectorN_t const & q,
-                                vectorN_t const & v,
-                                vectorN_t       & u)
+    void Engine::internalDynamics(vectorN_t const & q,
+                                  vectorN_t const & v,
+                                  vectorN_t       & u)
     {
-        // Enforce the bounds of the actuated joints of the model
-        u = vectorN_t::Zero(model_->nv());
+        // Do NOT make sure the output is Zero !
 
-        Model::jointOptions_t const & mdlJointOptions_ = model_->mdlOptions_->joints;
-        Engine::jointOptions_t const & engineJointOptions_ = engineOptions_->joints;
+        // Enforce the bounds of the actuated joints of the model
+        Model::jointOptions_t const & mdlJointOptions = model_->mdlOptions_->joints;
+        Engine::jointOptions_t const & engineJointOptions = engineOptions_->joints;
 
         std::vector<int32_t> const & motorsPositionIdx = model_->getMotorsPositionIdx();
         std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
@@ -758,29 +763,42 @@ namespace jiminy
         {
             float64_t const qJoint = q(motorsPositionIdx[i]);
             float64_t const vJoint = v(motorsVelocityIdx[i]);
-            float64_t const qJointMin = mdlJointOptions_.boundsMin(i);
-            float64_t const qJointMax = mdlJointOptions_.boundsMax(i);
+            float64_t const qJointMin = mdlJointOptions.boundsMin(i);
+            float64_t const qJointMax = mdlJointOptions.boundsMax(i);
 
             float64_t forceJoint = 0;
             float64_t qJointError = 0;
             if (qJoint > qJointMax)
             {
                 qJointError = qJoint - qJointMax;
-                float64_t damping = -engineJointOptions_.boundDamping * std::max(vJoint, 0.0);
-                forceJoint = -engineJointOptions_.boundStiffness * qJointError + damping;
+                float64_t damping = -engineJointOptions.boundDamping * std::max(vJoint, 0.0);
+                forceJoint = -engineJointOptions.boundStiffness * qJointError + damping;
             }
             else if (qJoint < qJointMin)
             {
                 qJointError = qJointMin - qJoint;
-                float64_t damping = -engineJointOptions_.boundDamping * std::min(vJoint, 0.0);
-                forceJoint = engineJointOptions_.boundStiffness * qJointError + damping;
+                float64_t damping = -engineJointOptions.boundDamping * std::min(vJoint, 0.0);
+                forceJoint = engineJointOptions.boundStiffness * qJointError + damping;
             }
 
-            float64_t blendingFactor = qJointError / engineJointOptions_.boundTransitionEps;
+            float64_t blendingFactor = qJointError / engineJointOptions.boundTransitionEps;
             float64_t blendingLaw = std::tanh(2 * blendingFactor);
             forceJoint *= blendingLaw;
 
             u(motorsVelocityIdx[i]) += forceJoint;
+        }
+
+        // Compute the flexibilities
+        Model::dynamicsOptions_t const & mdlDynOptions = model_->mdlOptions_->dynamics;
+        std::vector<int32_t> const & jointPositionId = model_->getFlexibleJointsPositionIdx();
+        std::vector<int32_t> const & jointVelocityId = model_->getFlexibleJointsVelocityIdx();
+        for (uint32_t i=0; i<jointVelocityId.size(); ++i)
+        {
+            float64_t theta;
+            quaternion_t quat(q.segment<4>(jointPositionId[i]).data()); // Only way to initialize with [x,y,z,w] order
+            vectorN_t axis = pinocchio::quaternion::log3(quat, theta);
+            u.segment<3>(jointVelocityId[i]).array() += -mdlDynOptions.flexibleJointsStiffness[i].array() * axis.array()
+                - mdlDynOptions.flexibleJointsDamping[i].array() * v.segment<3>(jointVelocityId[i]).array();
         }
     }
 

@@ -860,29 +860,29 @@ namespace jiminy
         return returnCode;
     }
 
-    bool Model::getIsInitialized(void) const
+    bool const & Model::getIsInitialized(void) const
     {
         return isInitialized_;
     }
 
-    bool Model::getIsTelemetryConfigured(void) const
+    bool const & Model::getIsTelemetryConfigured(void) const
     {
         return isTelemetryConfigured_;
     }
 
-    std::string Model::getUrdfPath(void) const
+    std::string const & Model::getUrdfPath(void) const
     {
         return urdfPath_;
     }
 
-    bool Model::getHasFreeFlyer(void) const
+    bool const & Model::getHasFreeFlyer(void) const
     {
         return hasFreeflyer_;
     }
 
-    std::map<std::string, std::vector<std::string> > Model::getSensorsNames(void) const
+    std::unordered_map<std::string, std::vector<std::string> > Model::getSensorsNames(void) const
     {
-        std::map<std::string, std::vector<std::string> > sensorNames;
+        std::unordered_map<std::string, std::vector<std::string> > sensorNames;
         for (sensorsGroupHolder_t::value_type const & sensorGroup : sensorsGroupHolder_)
         {
             for (sensorsHolder_t::value_type const & sensor : sensorGroup.second)

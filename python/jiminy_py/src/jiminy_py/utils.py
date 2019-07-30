@@ -7,15 +7,13 @@ import shutil
 import time
 from copy import copy
 from threading import Thread, Lock
-import json
-from collections import OrderedDict
-import xmltodict
 from bisect import bisect_right
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
+import jiminy # must be imported before libpinocchio_pywrap to find it
+
 import pinocchio as pnc
-sys.path.append(os.path.dirname(pnc.__file__)) # Required to be able to find libpinocchio_pywrap.so
 from pinocchio.utils import *
 from pinocchio.robot_wrapper import RobotWrapper
 import libpinocchio_pywrap as pin
@@ -219,7 +217,7 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None,
     for i in range(len(trajectory_data)):
         rb = RobotWrapper()
         robot_name = scene_name + '/' + "robot_" + str(i)
-        delete_nodes_viewer(robot_name)
+        delete_nodes_viewer(scene_name + '/' + robot_name)
         alpha = 1.0
         urdf_path = trajectory_data[i]["urdf"]
         if (urdf_rgba is not None and urdf_rgba[i] is not None):
@@ -232,7 +230,7 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None,
                 root_joint = pnc.JointModelFreeFlyer()
             else:
                 root_joint = None
-            rb.initFromURDF(urdf_path, root_joint=root_joint)
+            initFromURDF(rb, urdf_path, root_joint=root_joint)
         else:
             collision_model = pin.buildGeomFromUrdf(pinocchio_model, urdf_path, [], pin.GeometryType.COLLISION)
             visual_model = pin.buildGeomFromUrdf(pinocchio_model, urdf_path, [], pin.GeometryType.VISUAL)
@@ -305,10 +303,12 @@ def get_colorized_urdf(urdf_path, rgb):
         if not os.access(colorized_mesh_path, os.F_OK):
             os.makedirs(colorized_mesh_path)
         shutil.copy2(mesh_fullpath, colorized_mesh_fullpath)
-        colorized_contents = colorized_contents.replace(mesh_fullpath, colorized_mesh_fullpath, 1)
+        colorized_contents = colorized_contents.replace('"' + mesh_fullpath + '"',
+                                                        '"' + colorized_mesh_fullpath + '"', 1)
     colorized_contents = re.sub("<color rgba=\"[\d. ]*\"", color_tag, colorized_contents)
 
     with open(colorized_urdf_path, "w") as colorized_urdf_file:
         colorized_urdf_file.write(colorized_contents)
 
     return colorized_urdf_path
+

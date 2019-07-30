@@ -245,7 +245,6 @@ namespace jiminy
             dxdt(),
             uControl(),
             fext(),
-            uBounds(),
             uInternal(),
             isInitialized()
             {
@@ -293,7 +292,6 @@ namespace jiminy
 
                     fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(),
                                                                                   pinocchio::Force::Zero());
-                    uBounds = vectorN_t::Zero(model.nv());
                     uInternal = vectorN_t::Zero(model.nv());
 
                     // Set the initialization flag
@@ -339,7 +337,6 @@ namespace jiminy
 
             // Internal buffers to speed up the evaluation of the system dynamics
             pinocchio::container::aligned_vector<pinocchio::Force> fext;
-            vectorN_t uBounds;
             vectorN_t uInternal;
 
         private:
@@ -383,9 +380,9 @@ namespace jiminy
         void systemDynamics(float64_t const & t,
                             vectorN_t const & x,
                             vectorN_t       & dxdt);
-        void boundsDynamics(vectorN_t const & q,
-                            vectorN_t const & v,
-                            vectorN_t       & u);
+        void internalDynamics(vectorN_t const & q,
+                              vectorN_t const & v,
+                              vectorN_t       & u);
         vector6_t computeFrameForceOnParentJoint(int32_t   const & frameId,
                                                  vector3_t const & fextInWorld) const;
         vectorN_t contactDynamics(int32_t const & frameId) const;
@@ -406,7 +403,7 @@ namespace jiminy
         std::shared_ptr<TelemetryData> telemetryData_;
         std::unique_ptr<TelemetryRecorder> telemetryRecorder_;
         stepperState_t stepperState_; // Internal state for the integration loop
-        std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> > forcesImpulse_;
+        std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> > forcesImpulse_; // MUST use ordered map (wrt. the application time)
         std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> >::const_iterator forceImpulseNextIt_;
         std::vector<std::pair<std::string, std::tuple<int32_t, external_force_t> > > forcesProfile_;
     };

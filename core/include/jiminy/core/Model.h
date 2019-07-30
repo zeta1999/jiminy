@@ -160,11 +160,11 @@ namespace jiminy
         result_t setSensorsOptions(configHolder_t const & sensorsOptions);
         result_t getTelemetryOptions(configHolder_t & telemetryOptions) const;
         result_t setTelemetryOptions(configHolder_t const & telemetryOptions);
-        bool getIsInitialized(void) const;
-        bool getIsTelemetryConfigured(void) const;
-        std::string getUrdfPath(void) const;
-        bool getHasFreeFlyer(void) const;
-        std::map<std::string, std::vector<std::string> > getSensorsNames(void) const;
+        bool const & getIsInitialized(void) const;
+        bool const & getIsTelemetryConfigured(void) const;
+        std::string const & getUrdfPath(void) const;
+        bool const & getHasFreeFlyer(void) const;
+        std::unordered_map<std::string, std::vector<std::string> > getSensorsNames(void) const;
         result_t getSensorsData(std::vector<matrixN_t> & data) const;
         result_t getSensorsData(std::string const & sensorType,
                                 matrixN_t         & data) const;
@@ -223,7 +223,7 @@ namespace jiminy
 
         std::shared_ptr<TelemetryData> telemetryData_;
         sensorsGroupHolder_t sensorsGroupHolder_;
-        std::map<std::string, bool> sensorTelemetryOptions_;
+        std::unordered_map<std::string, bool> sensorTelemetryOptions_;
 
         std::vector<std::string> contactFramesNames_;       // Name of the frames of the contact points of the model
         std::vector<int32_t> contactFramesIdx_;             // Indices of the contact frames in the frame list of the model
@@ -245,7 +245,7 @@ namespace jiminy
     private:
         pinocchio::Model pncModelRigidOrig_;
         pinocchio::Model pncModelFlexibleOrig_;
-        std::map<std::string, std::shared_ptr<SensorDataHolder_t> > sensorsDataHolder_;
+        std::unordered_map<std::string, std::shared_ptr<SensorDataHolder_t> > sensorsDataHolder_;
         uint32_t nq_;
         uint32_t nv_;
         uint32_t nx_;

@@ -7,7 +7,7 @@
 #ifndef WDC_OPTIMAL_TYPES_H
 #define WDC_OPTIMAL_TYPES_H
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 #include <Eigen/Core>
@@ -54,11 +54,11 @@ namespace jiminy
 
     typedef boost::make_recursive_variant<bool_t, uint32_t, int32_t, float64_t, std::string, vectorN_t, matrixN_t,
                                           std::vector<std::string>, std::vector<vectorN_t>, std::vector<matrixN_t>,
-                                          std::map<std::string, boost::recursive_variant_> >::type configField_t;
-    typedef std::map<std::string, configField_t> configHolder_t;
+                                          std::unordered_map<std::string, boost::recursive_variant_> >::type configField_t;
+    typedef std::unordered_map<std::string, configField_t> configHolder_t;
 
-    typedef std::map<std::string, std::shared_ptr<AbstractSensorBase> > sensorsHolder_t;
-    typedef std::map<std::string, sensorsHolder_t> sensorsGroupHolder_t;
+    typedef std::unordered_map<std::string, std::shared_ptr<AbstractSensorBase> > sensorsHolder_t;
+    typedef std::unordered_map<std::string, sensorsHolder_t> sensorsGroupHolder_t;
 }
 
 #endif  // WDC_OPTIMAL_TYPES_H
