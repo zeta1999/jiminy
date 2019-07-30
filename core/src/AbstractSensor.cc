@@ -28,7 +28,7 @@ namespace jiminy
     {
         result_t returnCode = result_t::SUCCESS;
 
-        if (!getIsInitialized())
+        if (!isInitialized_)
         {
             std::cout << "Error - AbstractSensorBase::configureTelemetry - The sensor is not initialized." << std::endl;
             returnCode = result_t::ERROR_INIT_FAILED;
@@ -71,17 +71,17 @@ namespace jiminy
         sensorOptions_ = std::make_unique<abstractSensorOptions_t const>(sensorOptionsHolder_);
     }
 
-    bool AbstractSensorBase::getIsInitialized(void) const
+    bool const & AbstractSensorBase::getIsInitialized(void) const
     {
         return isInitialized_;
     }
 
-    bool AbstractSensorBase::getIsTelemetryConfigured(void) const
+    bool const & AbstractSensorBase::getIsTelemetryConfigured(void) const
     {
         return isTelemetryConfigured_;
     }
 
-    std::string AbstractSensorBase::getName(void) const
+    std::string const & AbstractSensorBase::getName(void) const
     {
         return name_;
     }

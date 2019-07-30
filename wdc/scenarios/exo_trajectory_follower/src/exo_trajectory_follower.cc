@@ -54,9 +54,9 @@ int main(int argc, char *argv[])
 
     // Default argument(s)
     struct passwd *pw = getpwuid(getuid());
-    const char *homedir = pw->pw_dir;
-    std::string urdfPath = std::string(homedir) + std::string("/.simulation/atalante_with_patient/atalante_with_patient.urdf");
-    std::string outputDirPath = std::string("/tmp/blackbox/");
+    std::string homedir(pw->pw_dir);
+    std::string urdfPath = homedir + std::string("/wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/atalante_with_patient.urdf");
+    std::string outputDirPath("/tmp/blackbox/");
 
     // Parsing of the user argument(s)
     const char* const short_opts = "u:o:h";
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
     model.setOptions(mdlOptions);
     model.initialize(urdfPath);
 
-    std::map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
+    std::unordered_map<std::string, std::vector<std::string> > sensorsNames = model.getSensorsNames();
     configHolder_t imuSensorOptions;
     model.getSensorOptions(ImuSensor::type_, sensorsNames.at(ImuSensor::type_)[0], imuSensorOptions);
     // boost::get<bool>(imuSensorOptions.at("rawData")) = true;

@@ -97,7 +97,7 @@ namespace jiminy
     }
 
     template <typename T>
-    std::string AbstractSensorTpl<T>::getType(void) const
+    std::string const & AbstractSensorTpl<T>::getType(void) const
     {
         return type_;
     }

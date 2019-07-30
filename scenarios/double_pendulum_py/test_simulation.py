@@ -1,3 +1,4 @@
+import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,12 +10,12 @@ from jiminy_py import *
 
 ################################## User parameters #######################################
 
-urdf_path = "/home/builder/wdc_workspace/src/jiminy/data/double_pendulum_rigid.urdf"
+urdf_path = os.path.join(os.environ["HOME"], "wdc_workspace/src/jiminy/data/double_pendulum/double_pendulum.urdf")
 
 ############################# Initialize the simulation #################################
 
 # Instantiate the model
-contacts = ["PendulumJoint"]
+contacts = []
 motors = ["SecondPendulumJoint"]
 model = jiminy.model()
 model.initialize(urdf_path, contacts, motors, False)
@@ -89,8 +90,8 @@ log_header = log_info[(log_info.index('StartColumns')+1):-1]
 
 print('%i log points' % log_data.shape[0])
 print(log_constants)
-pinocchio_model = model.get_pinocchio_model()
-trajectory_data_log = extract_state_from_simulation_log(log_header, log_data, urdf_path, pinocchio_model, False)
+trajectory_data_log = extract_state_from_simulation_log(
+    log_header, log_data, urdf_path, model.pinocchio_model, False)
 
 # Save the log in CSV
 # simulator.write_log("/tmp/blackbox/log.data", False)

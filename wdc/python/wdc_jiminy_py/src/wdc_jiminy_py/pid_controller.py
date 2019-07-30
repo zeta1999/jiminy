@@ -22,7 +22,7 @@ class _traj_ref_type(object):
 
 # Impossible to use from bisect import bisect_left because of numba jit ...
 @nb.jit(nopython=True, nogil=True)
-def bisect_left(arr, target):
+def _bisect_left(arr, target):
     n = len(arr)
     left = 0
     right = n - 1
@@ -56,7 +56,7 @@ def _compute_command(Kp, Kd, traj_ref, t_rel, qe, v,
         forceSensorsData, imuSensorsData, encoderSensorsData, uCommand,
         q_ref, dq_ref, u_ref):
     # Determine the relative time in the current state
-    t_ind_inf = bisect_left(traj_ref.t, t_rel)
+    t_ind_inf = _bisect_left(traj_ref.t, t_rel)
     t_ind_sup = t_ind_inf + 1
     ratio = (t_rel - traj_ref.t[t_ind_inf])/(traj_ref.t[t_ind_sup] - traj_ref.t[t_ind_inf])
 
@@ -122,9 +122,9 @@ class pid_feedforward:
         qRefNames = []
         dqRefNames = []
         q_ref_names = ["targetPosition" + (joint_name[:-5] if joint_name.endswith('Joint') else joint_name)
-                       for joint_name in list(model.get_motors_names())]
+                       for joint_name in model.motors_names]
         dq_ref_names = ["targetVelocity" + (joint_name[:-5] if joint_name.endswith('Joint') else joint_name)
-                        for joint_name in list(model.get_motors_names())]
+                        for joint_name in model.motors_names]
         controller.register_entry(q_ref_names, self.q_ref)
         controller.register_entry(dq_ref_names, self.dq_ref)
         controller.register_entry("HzdState", self.hzd_state)
@@ -133,7 +133,7 @@ class pid_feedforward:
         self.time_offset = 0
         self.current_state = self.state_machine.keys()[0]
         self.hzd_state = np.array(self.state_machine[self.current_state]['HzdState'], dtype='float64')
-        self.traj_ref = self.get_traj_ref()
+        self.traj_ref = self._get_traj_ref()
         if self.q_ref is None:
             self.q_ref = self.traj_ref.q[:, 0].copy()
         else:
@@ -148,7 +148,7 @@ class pid_feedforward:
             self.u_ref[:] = self.traj_ref.u[:, 0].copy()
 
 
-    def get_traj_ref(self, state=None):
+    def _get_traj_ref(self, state=None):
         if state is None:
             state = self.current_state
         return _traj_ref_type(self.state_machine[state]['t'],
@@ -157,17 +157,17 @@ class pid_feedforward:
                               self.state_machine[state]['ddq'],
                               self.state_machine[state]['u'])
 
-    def state_machine_switch_next(self):
+    def _state_machine_switch_next(self):
         self.time_offset += self.traj_ref.t[-1]
         self.current_state = [elem for elem in SUPPORT_FOOT_ENUM
                               if self.current_state not in elem][0]
-        self.traj_ref = self.get_traj_ref()
+        self.traj_ref = self._get_traj_ref()
         # print("Switching to next state: %s" % self.current_state)
 
-    def state_machine_switch_prev(self):
+    def _state_machine_switch_prev(self):
         self.current_state = [elem for elem in SUPPORT_FOOT_ENUM
                               if self.current_state not in elem][0]
-        self.traj_ref = self.get_traj_ref()
+        self.traj_ref = self._get_traj_ref()
         self.time_offset -= self.traj_ref.t[-1]
         # print("Switching to previous state: %s" % self.current_state)
 
@@ -176,11 +176,11 @@ class pid_feedforward:
         # Be careful, the adaptive odeint steppers can go back in time if necessary.
         t_rel = t_cur - self.time_offset
         if t_rel > self.traj_ref.t[-1]:
-            self.state_machine_switch_next()
+            self._state_machine_switch_next()
             t_rel = t_cur - self.time_offset
             self.hzd_state[()] = self.state_machine[self.current_state]['HzdState'] # [()] for direct assignment of Numpy scalar
         elif t_rel < 0:
-            self.state_machine_switch_prev()
+            self._state_machine_switch_prev()
             t_rel = t_cur - self.time_offset
             self.hzd_state[()] = self.state_machine[self.current_state]['HzdState'] # [()] for direct assignment of Numpy scalar
 

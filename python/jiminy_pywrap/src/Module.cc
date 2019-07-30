@@ -39,6 +39,7 @@ namespace python
 
         // Enable some automatic C++ to Python converters
         bp::to_python_converter<std::vector<std::string>, stdVectorToListPyConverter<std::string> >();
+        bp::to_python_converter<std::vector<int32_t>, stdVectorToListPyConverter<int32_t> >();
         bp::to_python_converter<std::vector<vectorN_t>, stdVectorToListPyConverter<vectorN_t> >();
         bp::to_python_converter<std::vector<matrixN_t>, stdVectorToListPyConverter<matrixN_t> >();
         bp::to_python_converter<std::vector<matrixN_t>, stdVectorToListPyConverter<matrixN_t> >();
@@ -49,6 +50,7 @@ namespace python
         jiminy::python::PyAbstractControllerVisitor::expose();
         bp::def("controller_functor",
                 PyControllerFunctorNFactory,
+                (bp::arg("command_handle"), "internal_dynamics_handle", bp::arg("nb_sensor_types")=-1),
                 bp::return_value_policy<bp::manage_new_object>());
         jiminy::python::PyEngineVisitor::expose();
     }

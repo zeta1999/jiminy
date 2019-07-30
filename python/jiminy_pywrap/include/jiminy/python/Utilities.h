@@ -207,10 +207,23 @@ namespace python
     // **********µ*****************************************************************
 
     ///////////////////////////////////////////////////////////////////////////////
-    /// \brief  Convert Python list to std::vector by value.
+    /// \brief  Convert Python list/tuple to std::vector by value.
     ///////////////////////////////////////////////////////////////////////////////
     template<typename T>
     inline std::vector<T> listPyToStdVector(bp::list const & listPy)
+    {
+        std::vector<T> v;
+        v.reserve(len(listPy));
+        for (int32_t i = 0; i < len(listPy); i++)
+        {
+            v.push_back(bp::extract<T>(listPy[i]));
+        }
+
+        return v;
+    }
+
+    template<typename T>
+    inline std::vector<T> listPyToStdVector(bp::tuple const & listPy)
     {
         std::vector<T> v;
         v.reserve(len(listPy));

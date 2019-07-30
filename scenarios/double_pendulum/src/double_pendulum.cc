@@ -52,9 +52,9 @@ int main(int argc, char *argv[])
 
     // Set URDF and log output.
     struct passwd *pw = getpwuid(getuid());
-    const char *homedir = pw->pw_dir;
-    std::string urdfPath = std::string(homedir) + std::string("/wdc_workspace/src/jiminy/data/double_pendulum_rigid.urdf");
-    std::string outputDirPath = std::string("/tmp/blackbox/");
+    std::string homedir(pw->pw_dir);
+    std::string urdfPath = homedir + std::string("/wdc_workspace/src/jiminy/data/double_pendulum/double_pendulum.urdf");
+    std::string outputDirPath("/tmp/blackbox/");
 
     // =====================================================================
     // ============ Instantiate and configure the simulation ===============
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
     timer.tic();
 
     // Instantiate and configuration the model
-    std::vector<std::string> contacts = {std::string("PendulumJoint")};
+    std::vector<std::string> contacts;
     std::vector<std::string> jointNames = {std::string("SecondPendulumJoint")};
 
     Model model;

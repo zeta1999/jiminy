@@ -66,11 +66,10 @@ namespace jiminy
         configHolder_t getOptions(void);
         virtual void setOptions(configHolder_t const & sensorOptions);
         virtual void setOptionsAll(configHolder_t const & sensorOptions) = 0;
-        bool getIsInitialized(void) const;
-        bool getIsTelemetryConfigured(void) const;
-        virtual std::string getName(void) const;
-        virtual std::string getType(void) const = 0;
-        virtual std::string getTelemetryName(void) const = 0;
+        bool const & getIsInitialized(void) const;
+        bool const & getIsTelemetryConfigured(void) const;
+        virtual std::string const & getName(void) const;
+        virtual std::string const & getType(void) const = 0;
         virtual std::vector<std::string> const & getFieldNames(void) const = 0;
 
         virtual result_t get(Eigen::Ref<vectorN_t> data) = 0;
@@ -83,6 +82,8 @@ namespace jiminy
         virtual void updateTelemetryAll(void) = 0;
 
     protected:
+        virtual std::string getTelemetryName(void) const = 0;
+
         virtual matrixN_t::ColXpr data(void) = 0;
         virtual result_t set(float64_t const & t,
                              vectorN_t const & q,
@@ -125,7 +126,7 @@ namespace jiminy
 
         virtual void setOptions(configHolder_t const & sensorOptions) override;
         virtual void setOptionsAll(configHolder_t const & sensorOptions) override;
-        virtual std::string getType(void) const override;
+        virtual std::string const & getType(void) const override;
         std::vector<std::string> const & getFieldNames(void) const;
         uint32_t getSize(void) const;
 

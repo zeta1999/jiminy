@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import xmltodict
+
 from jiminy_py import *
 
 from wdc_dynamicsteller import DynamicsTeller, rootjoint
