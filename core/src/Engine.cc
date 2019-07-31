@@ -207,6 +207,23 @@ namespace jiminy
 
     void Engine::updateTelemetry(void)
     {
+        /* Update internal state of the stepper.
+           Note that explicit kinematic computation is not needed to get
+           the system energy since they were already done in RNEA. */
+        vectorN_t const & q = stepperState_.x.head(model_->nq());
+        vectorN_t const & v = stepperState_.x.tail(model_->nv());
+        vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
+        stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a); // Update uLast directly to avoid temporary
+        float64_t energy = pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false)
+            + pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
+        stepperState_.updateLast(stepperState_.t,
+                                 q,
+                                 v,
+                                 a,
+                                 stepperState_.uLast,
+                                 stepperState_.uCommandLast,
+                                 energy); // uCommandLast are already up-to-date
+
         // Update the telemetry internal state
         if (engineOptions_->telemetry.enableConfiguration)
         {
@@ -348,7 +365,7 @@ namespace jiminy
     }
 
     result_t Engine::simulate(vectorN_t const & x_init,
-                              float64_t const & t_end)
+                              float64_t const & tEnd)
     {
         result_t returnCode = result_t::SUCCESS;
 
@@ -358,7 +375,7 @@ namespace jiminy
             returnCode = result_t::ERROR_INIT_FAILED;
         }
 
-        if(t_end < 2e-2)
+        if(tEnd < 2e-2)
         {
             std::cout << "Error - Engine::simulate - The duration of the simulation cannot be shorter than 20ms." << std::endl;
             returnCode = result_t::ERROR_BAD_INPUT;
@@ -373,7 +390,7 @@ namespace jiminy
             /* Stop the simulation if the end time has been reached, if
                the callback returns false, or if the number of integration
                steps exceeds 1e5. */
-            if (std::abs(t_end - stepperState_.t) < EPS
+            if (std::abs(tEnd - stepperState_.t) < EPS
             || !callbackFct_(stepperState_.t, stepperState_.x))
             {
                 break;
@@ -388,13 +405,14 @@ namespace jiminy
                 break;
             }
 
-            returnCode = step(t_end);
+            returnCode = step(-1, tEnd); // Automatic dt adjustment
         }
 
         return returnCode;
     }
 
-    result_t Engine::step(float64_t t_end)
+    result_t Engine::step(float64_t const & dtDesired,
+                          float64_t         tEnd)
     {
         if(!isInitialized_)
         {
@@ -421,175 +439,186 @@ namespace jiminy
         failed_step_checker fail_checker;
 
         float64_t t = stepperState_.t;
-        float64_t t_next = t;
-        if (t_end < 0)
+        float64_t tNext = t;
+        if (tEnd < 0)
         {
-            t_end = t + MAX_TIME_STEP_MAX;
-        }
-
-        if (stepperUpdatePeriod_ > 0)
-        {
-            // Update the sensor data if necessary (only for finite update frequency)
-            if (engineOptions_->stepper.sensorsUpdatePeriod > 0)
+            if (dtDesired > EPS)
             {
-                float64_t t_next_update_sensor =
-                    std::round(t / engineOptions_->stepper.sensorsUpdatePeriod) *
-                    engineOptions_->stepper.sensorsUpdatePeriod;
-                if (std::abs(t - t_next_update_sensor) < 1e-8)
-                {
-                    model_->setSensorsData(stepperState_.tLast,
-                                           stepperState_.qLast,
-                                           stepperState_.vLast,
-                                           stepperState_.aLast,
-                                           stepperState_.uLast);
-                }
+                tEnd = t + dtDesired;
             }
-
-            // Update the controller command if necessary (only for finite update frequency)
-            if (engineOptions_->stepper.controllerUpdatePeriod > 0)
+            else
             {
-                float64_t t_next_update_controller =
-                    std::round(t / engineOptions_->stepper.controllerUpdatePeriod) *
-                        engineOptions_->stepper.controllerUpdatePeriod;
-                if (std::abs(t - t_next_update_controller) < 1e-8)
-                {
-                    controller_->computeCommand(stepperState_.tLast,
-                                                stepperState_.qLast,
-                                                stepperState_.vLast,
-                                                stepperState_.uCommandLast);
-
-                    std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
-                    for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
-                    {
-                        uint32_t jointId = motorsVelocityIdx[i];
-                        float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
-                        stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
-                        stepperState_.uControl[i] = boost::algorithm::clamp(
-                            stepperState_.uControl[i], -torque_max, torque_max);
-                    }
-
-                    /* Update the internal stepper state dxdt since the dynamics has changed.
-                        Make sure the next impulse force iterator has NOT been updated at this point ! */
-                    if (engineOptions_->stepper.odeSolver != "explicit_euler")
-                    {
-                        systemDynamics(t, stepperState_.x, stepperState_.dxdt);
-                    }
-                }
+                tEnd = t + MAX_TIME_STEP_MAX;
             }
         }
 
-        // Get the next impulse force application time and update the iterator if necessary
-        float64_t tForceImpulseNext = t_end;
-        if (forceImpulseNextIt_ != forcesImpulse_.end())
+        do
         {
-            float64_t tForceImpulseNextTmp = forceImpulseNextIt_->first;
-            float64_t dtForceImpulseNext = std::get<1>(forceImpulseNextIt_->second);
-            if (t > tForceImpulseNextTmp + dtForceImpulseNext)
+            if (stepperUpdatePeriod_ > 0)
             {
-                ++forceImpulseNextIt_;
-                tForceImpulseNextTmp = forceImpulseNextIt_->first;
+                // Update the sensor data if necessary (only for finite update frequency)
+                if (engineOptions_->stepper.sensorsUpdatePeriod > 0)
+                {
+                    float64_t tNextUpdateSensor =
+                        std::round(t / engineOptions_->stepper.sensorsUpdatePeriod) *
+                        engineOptions_->stepper.sensorsUpdatePeriod;
+                    if (std::abs(t - tNextUpdateSensor) < 1e-8)
+                    {
+                        model_->setSensorsData(stepperState_.tLast,
+                                            stepperState_.qLast,
+                                            stepperState_.vLast,
+                                            stepperState_.aLast,
+                                            stepperState_.uLast);
+                    }
+                }
+
+                // Update the controller command if necessary (only for finite update frequency)
+                if (engineOptions_->stepper.controllerUpdatePeriod > 0)
+                {
+                    float64_t tNextUpdateController =
+                        std::round(t / engineOptions_->stepper.controllerUpdatePeriod) *
+                            engineOptions_->stepper.controllerUpdatePeriod;
+                    if (std::abs(t - tNextUpdateController) < 1e-8)
+                    {
+                        controller_->computeCommand(stepperState_.tLast,
+                                                    stepperState_.qLast,
+                                                    stepperState_.vLast,
+                                                    stepperState_.uCommandLast);
+
+                        std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
+                        for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
+                        {
+                            uint32_t jointId = motorsVelocityIdx[i];
+                            float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
+                            stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
+                            stepperState_.uControl[i] = boost::algorithm::clamp(
+                                stepperState_.uControl[i], -torque_max, torque_max);
+                        }
+
+                        /* Update the internal stepper state dxdt since the dynamics has changed.
+                            Make sure the next impulse force iterator has NOT been updated at this point ! */
+                        if (engineOptions_->stepper.odeSolver != "explicit_euler")
+                        {
+                            systemDynamics(t, stepperState_.x, stepperState_.dxdt);
+                        }
+                    }
+                }
             }
 
+            // Get the next impulse force application time and update the iterator if necessary
+            float64_t tForceImpulseNext = tEnd;
             if (forceImpulseNextIt_ != forcesImpulse_.end())
             {
-                if (tForceImpulseNextTmp > t)
+                float64_t tForceImpulseNextTmp = forceImpulseNextIt_->first;
+                float64_t dtForceImpulseNext = std::get<1>(forceImpulseNextIt_->second);
+                if (t > tForceImpulseNextTmp + dtForceImpulseNext)
                 {
-                    tForceImpulseNext = tForceImpulseNextTmp;
+                    ++forceImpulseNextIt_;
+                    tForceImpulseNextTmp = forceImpulseNextIt_->first;
                 }
-                else
+
+                if (forceImpulseNextIt_ != forcesImpulse_.end())
                 {
-                    if (forceImpulseNextIt_ != std::prev(forcesImpulse_.end()))
+                    if (tForceImpulseNextTmp > t)
                     {
-                        tForceImpulseNext = std::next(forceImpulseNextIt_)->first;
+                        tForceImpulseNext = tForceImpulseNextTmp;
+                    }
+                    else
+                    {
+                        if (forceImpulseNextIt_ != std::prev(forcesImpulse_.end()))
+                        {
+                            tForceImpulseNext = std::next(forceImpulseNextIt_)->first;
+                        }
                     }
                 }
             }
-        }
 
-        if (stepperUpdatePeriod_ > 0)
-        {
-            // Get the target time at next iteration
-            t_next += min(stepperUpdatePeriod_,
-                             t_end - t,
+            if (stepperUpdatePeriod_ > 0)
+            {
+                // Get the target time at next iteration
+                tNext += min(stepperUpdatePeriod_,
+                             tEnd - t,
                              tForceImpulseNext - t);
+                if (dtDesired > 0.0)
+                {
+                    tNext = std::min(tNext,
+                                     stepperState_.t + dtDesired);
+                }
 
-            // Compute the next step using adaptive step method
-            while (t < t_next)
-            {
-                // adjust stepsize to end up exactly at the next breakpoint
-                float64_t current_dt = std::min(stepperState_.dt, t_next - t);
-                if (success == boost::apply_visitor(
-                    [&](auto && one)
+                // Compute the next step using adaptive step method
+                while (t < tNext)
+                {
+                    // adjust stepsize to end up exactly at the next breakpoint
+                    float64_t dtCurrent = std::min(stepperState_.dt, tNext - t);
+                    if (success == boost::apply_visitor(
+                        [&](auto && one)
+                        {
+                            return one.try_step(rhsBind,
+                                                stepperState_.x,
+                                                stepperState_.dxdt,
+                                                t,
+                                                dtCurrent);
+                        }, stepper_))
                     {
-                        return one.try_step(rhsBind,
-                                            stepperState_.x,
-                                            stepperState_.dxdt,
-                                            t,
-                                            current_dt);
-                    }, stepper_))
-                {
-                    fail_checker.reset(); // reset the fail counter, see #173
-                    stepperState_.dt = std::max(stepperState_.dt, current_dt); // continue with the original step size if dt was reduced due to the next breakpoint
-                }
-                else
-                {
-                    fail_checker();  // check for possible overflow of failed steps in step size adjustment
-                    stepperState_.dt = current_dt;
-                }
-                stepperState_.dt = std::min(stepperState_.dt, engineOptions_->stepper.dtMax); // Make sure it never exceeds dtMax
-            }
-
-            // Update the current time
-            t = t_next;
-        }
-        else
-        {
-            // Make sure it ends exactly at the t_end, never exceeds dtMax, and stop to apply impulse forces
-            stepperState_.dt = min(stepperState_.dt,
-                                   engineOptions_->stepper.dtMax,
-                                   t_end - t,
-                                   tForceImpulseNext - t);
-
-            // Compute the next step using adaptive step method
-            controlled_step_result res = fail;
-            while (res == fail)
-            {
-                res = boost::apply_visitor(
-                    [&](auto && one)
+                        fail_checker.reset(); // reset the fail counter, see #173
+                        stepperState_.dt = std::max(stepperState_.dt, dtCurrent); // continue with the original step size if dt was reduced due to the next breakpoint
+                    }
+                    else
                     {
-                        return one.try_step(rhsBind,
-                                            stepperState_.x,
-                                            stepperState_.dxdt,
-                                            t,
-                                            stepperState_.dt);
-                    }, stepper_);
-                if (res == success)
-                {
-                    fail_checker.reset(); // reset the fail counter
+                        fail_checker();  // check for possible overflow of failed steps in step size adjustment
+                        stepperState_.dt = dtCurrent;
+                    }
+                    stepperState_.dt = std::min(stepperState_.dt, engineOptions_->stepper.dtMax); // Make sure it never exceeds dtMax
                 }
-                else
+
+                // Update the current time
+                t = tNext;
+            }
+            else
+            {
+                // Make sure it ends exactly at the tEnd, never exceeds dtMax, and stop to apply impulse forces
+                stepperState_.dt = min(stepperState_.dt,
+                                       engineOptions_->stepper.dtMax,
+                                       tEnd - t,
+                                       tForceImpulseNext - t);
+                if (dtDesired > 0.0)
                 {
-                    fail_checker();  // check for possible overflow of failed steps in step size adjustment
+                    stepperState_.dt = std::min(stepperState_.dt,
+                                                stepperState_.t + dtDesired - t);
+                }
+
+                // Compute the next step using adaptive step method
+                controlled_step_result res = fail;
+                while (res == fail)
+                {
+                    res = boost::apply_visitor(
+                        [&](auto && one)
+                        {
+                            return one.try_step(rhsBind,
+                                                stepperState_.x,
+                                                stepperState_.dxdt,
+                                                t,
+                                                stepperState_.dt);
+                        }, stepper_);
+                    if (res == success)
+                    {
+                        fail_checker.reset(); // reset the fail counter
+                    }
+                    else
+                    {
+                        fail_checker();  // check for possible overflow of failed steps in step size adjustment
+                    }
                 }
             }
-        }
-
-        /* Update internal state of the stepper.
-           Note that explicit kinematic computation is not needed to get
-           the system energy since they were already done in RNEA. */
-        vectorN_t const & q = stepperState_.x.head(model_->nq());
-        vectorN_t const & v = stepperState_.x.tail(model_->nv());
-        vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
-        stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a); // Update uLast directly to avoid temporary
-        float64_t energy = pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false)
-            + pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
-        stepperState_.updateLast(t, q, v, a, stepperState_.uLast, stepperState_.uCommandLast, energy); // uCommandLast are already up-to-date
-
-        // Monitor current iteration number, and log the current time, state, command, and sensors data.
-        updateTelemetry();
+        } while(dtDesired > 0.0 && stepperState_.t + dtDesired - t > EPS);
 
         // Update the current time
         stepperState_.t = t;
+
+        /* Monitor current iteration number, and log the current time, state,
+           command, and sensors data.
+           Make sure that 'stepperState_.t' is up-to-date. */
+        updateTelemetry();
 
         return result_t::SUCCESS;
     }

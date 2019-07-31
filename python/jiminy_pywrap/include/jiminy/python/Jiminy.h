@@ -664,7 +664,8 @@ namespace python
                                    (bp::arg("self"), "model", "controller", "callback_handle"))
                 .def("simulate", &Engine::simulate,
                                  (bp::arg("self"), "x_init", "end_time"))
-                .def("step", &PyEngineVisitor::step)
+                .def("step", &PyEngineVisitor::step,
+                             (bp::arg("self"), bp::arg("dt_desired")=-1))
                 .def("reset", &PyEngineVisitor::reset,
                               (bp::arg("self"), "x_init"))
                 .add_property("stepper_state", bp::make_function(&Engine::getStepperState,
@@ -711,10 +712,11 @@ namespace python
             return self.reset(x_init);
         }
 
-        static result_t step(Engine          & self)
+        static result_t step(Engine          & self,
+                             float64_t const & dtDesired)
         {
             // Only way to handle C++ default values
-            return self.step();
+            return self.step(dtDesired);
         }
 
         static void writeLog(Engine            & self,
