@@ -182,8 +182,8 @@ namespace jiminy
                         return mid;
                     }
                 };
-            int32_t const inputIndexLeft = bisectLeft();
 
+            int32_t const inputIndexLeft = bisectLeft();
             if (timeDesired >= 0.0 && uint32_t(inputIndexLeft + 1) < dataHolder_->time_.size())
             {
                 if (inputIndexLeft < 0)

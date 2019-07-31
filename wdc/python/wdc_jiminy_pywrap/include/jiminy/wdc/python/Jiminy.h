@@ -64,9 +64,9 @@ namespace python
                 .add_property("has_freeflyer", bp::make_function(&Model::getHasFreeFlyer,
                                                bp::return_value_policy<bp::copy_const_reference>()))
                 .add_property("urdf_path", bp::make_function(&Model::getUrdfPath,
-                                               bp::return_value_policy<bp::copy_const_reference>()))
+                                           bp::return_value_policy<bp::copy_const_reference>()))
                 .add_property("motors_names", bp::make_function(&Model::getMotorsNames,
-                                               bp::return_value_policy<bp::copy_const_reference>()))
+                                              bp::return_value_policy<bp::copy_const_reference>()))
                 .add_property("joints_names", bp::make_function(&Model::getRigidJointsNames,
                                                bp::return_value_policy<bp::copy_const_reference>()))
                 .add_property("contact_frames_idx", bp::make_function(&Model::getContactFramesIdx,
@@ -143,9 +143,9 @@ namespace python
                                        (bp::arg("self"), "fieldname", "value"))
                 .def("register_entry", &PyAbstractControllerVisitor::registerNewVectorEntry)
                 .def("remove_entries", &PyAbstractControllerVisitor::removeEntries)
-                .def("get_controller_options", &PyAbstractControllerVisitor::getControllerOptions,
-                                               bp::return_value_policy<bp::return_by_value>())
-                .def("set_controller_options", &PyAbstractControllerVisitor::setControllerOptions)
+                .def("get_options", &PyAbstractControllerVisitor::getOptions,
+                                    bp::return_value_policy<bp::return_by_value>())
+                .def("set_options", &PyAbstractControllerVisitor::setOptions)
                 ;
         }
 

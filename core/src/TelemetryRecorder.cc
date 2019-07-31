@@ -79,6 +79,11 @@ namespace jiminy
         return returnCode;
     }
 
+    bool const & TelemetryRecorder::getIsInitialized(void)
+    {
+        return isInitialized_;
+    }
+
     void TelemetryRecorder::reset(void)
     {
         // Close the current MemoryDevice, if any and if it was opened.

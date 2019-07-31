@@ -154,76 +154,6 @@ namespace python
         bp::object funcPyPtr_;
     };
 
-    // ******************************** PyEngine **************************************
-
-    class PyEngine // Composition Over Inheritance
-    {
-    public:
-        // Disable the copy of the class
-        PyEngine(void) = delete;
-        PyEngine(PyEngine const & simulator) = delete;
-        PyEngine & operator = (PyEngine const & other) = delete;
-
-    public:
-        PyEngine(Model              & model,
-                 AbstractController & controller) :
-        model_(&model),
-        controller_(&controller),
-        engine_()
-        {
-            // Empty.
-        }
-
-        ~PyEngine(void)
-        {
-            // Empty.
-        }
-
-        result_t simulate(vectorN_t     const & x_init,
-                          float64_t     const & end_time,
-                          callbackFct_t         callbackFct)
-        {
-            result_t returnCode = result_t::SUCCESS;
-
-            returnCode = engine_.initialize(*model_, *controller_, callbackFct);
-
-            if (returnCode == result_t::SUCCESS)
-            {
-                returnCode = engine_.simulate(x_init, end_time);
-            }
-
-            return returnCode;
-        }
-
-        static boost::shared_ptr<PyEngine> pyEngineFactory(Model              & model,
-                                                           AbstractController & controller)
-        {
-            if (pyEnginePtr_.use_count())
-            {
-                boost::shared_ptr<PyEngine> pyEngineSharedPtr = pyEnginePtr_.lock();
-                pyEngineSharedPtr->model_ = &model;
-                pyEngineSharedPtr->controller_ = &controller;
-                pyEngineSharedPtr->engine_.reset(true);
-                pyEngineSharedPtr->controller_->reset(true);
-                return pyEngineSharedPtr;
-            }
-            else
-            {
-                return boost::shared_ptr<PyEngine>(new PyEngine(model, controller));
-            }
-        }
-
-    public:
-        Model * model_; // Raw pointer to avoid managing its deletion
-        AbstractController * controller_;
-        Engine engine_;
-
-    private:
-        static boost::weak_ptr<PyEngine> pyEnginePtr_;
-    };
-
-    boost::weak_ptr<PyEngine> PyEngine::pyEnginePtr_ = boost::weak_ptr<PyEngine>();
-
     // ***************************** PySensorVisitor ***********************************
 
     struct PySensorVisitor
@@ -248,9 +178,9 @@ namespace python
                     .def("set_options", &PySensorVisitor::setOptions<TSensor>)
 
                     .add_property("name", bp::make_function(&AbstractSensorBase::getName,
-                                        bp::return_value_policy<bp::copy_const_reference>()))
+                                          bp::return_value_policy<bp::copy_const_reference>()))
                     .add_property("type", bp::make_function(&AbstractSensorBase::getType,
-                                        bp::return_value_policy<bp::copy_const_reference>()))
+                                          bp::return_value_policy<bp::copy_const_reference>()))
                     .add_property("is_initialized", bp::make_function(&AbstractSensorBase::getIsInitialized,
                                                     bp::return_value_policy<bp::copy_const_reference>()))
                     .add_property("fieldnames", bp::make_function(&AbstractSensorBase::getFieldNames,
@@ -535,7 +465,6 @@ namespace python
         }
     };
 
-
     // ***************************** PyAbstractControllerVisitor ***********************************
 
     struct PyAbstractControllerVisitor
@@ -555,9 +484,9 @@ namespace python
                                        (bp::arg("self"), "fieldname", "value"))
                 .def("register_entry", &PyAbstractControllerVisitor::registerNewVectorEntry)
                 .def("remove_entries", &PyAbstractControllerVisitor::removeEntries)
-                .def("get_controller_options", &PyAbstractControllerVisitor::getControllerOptions,
-                                               bp::return_value_policy<bp::return_by_value>())
-                .def("set_controller_options", &PyAbstractControllerVisitor::setControllerOptions)
+                .def("get_options", &PyAbstractControllerVisitor::getOptions,
+                                    bp::return_value_policy<bp::return_by_value>())
+                .def("set_options", &PyAbstractControllerVisitor::setOptions)
                 ;
         }
 
@@ -583,15 +512,15 @@ namespace python
             self.reset(true);
         }
 
-        static bp::dict getControllerOptions(AbstractController & self)
+        static bp::dict getOptions(AbstractController & self)
         {
             bp::dict configPy;
             convertConfigHolderPy(self.getOptions(), configPy);
             return configPy;
         }
 
-        static void setControllerOptions(AbstractController       & self,
-                                         bp::dict           const & configPy)
+        static void setOptions(AbstractController       & self,
+                               bp::dict           const & configPy)
         {
             configHolder_t config = self.getOptions();
             loadConfigHolder(configPy, config);
@@ -669,6 +598,55 @@ namespace python
 
     // ***************************** PyEngineVisitor ***********************************
 
+    struct PyStepperVisitor
+        : public bp::def_visitor<PyStepperVisitor>
+    {
+    public:
+        ///////////////////////////////////////////////////////////////////////////////
+        /// \brief Expose C++ API through the visitor.
+        ///////////////////////////////////////////////////////////////////////////////
+        template<class PyClass>
+        void visit(PyClass& cl) const
+        {
+            cl
+                .def_readonly("iter_last", &stepperState_t::iterLast)
+                .def_readonly("t_last", &stepperState_t::tLast)
+                .add_property("q_last", bp::make_getter(&stepperState_t::qLast,
+                                        bp::return_value_policy<bp::copy_non_const_reference>()))
+                .add_property("v_last", bp::make_getter(&stepperState_t::vLast,
+                                        bp::return_value_policy<bp::copy_non_const_reference>()))
+                .add_property("a_last", bp::make_getter(&stepperState_t::aLast,
+                                        bp::return_value_policy<bp::copy_non_const_reference>()))
+                .add_property("u_last", bp::make_getter(&stepperState_t::uLast,
+                                        bp::return_value_policy<bp::copy_non_const_reference>()))
+                .add_property("u_command_last", bp::make_getter(&stepperState_t::uCommandLast,
+                                                bp::return_value_policy<bp::copy_non_const_reference>()))
+                .def_readonly("energy_last", &stepperState_t::energyLast)
+                .def_readonly("t", &stepperState_t::t)
+                .def_readonly("dt", &stepperState_t::dt)
+                .add_property("x", bp::make_getter(&stepperState_t::x,
+                                   bp::return_value_policy<bp::copy_non_const_reference>()))
+                .add_property("dxdt", bp::make_getter(&stepperState_t::dxdt,
+                                      bp::return_value_policy<bp::copy_non_const_reference>()))
+                .add_property("u_control", bp::make_getter(&stepperState_t::uControl,
+                                           bp::return_value_policy<bp::copy_non_const_reference>()))
+                .add_property("u_internal", bp::make_getter(&stepperState_t::uInternal,
+                                            bp::return_value_policy<bp::copy_non_const_reference>()))
+                ;
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        /// \brief Expose.
+        ///////////////////////////////////////////////////////////////////////////////
+        static void expose()
+        {
+            bp::class_<stepperState_t,
+                       boost::shared_ptr<stepperState_t>,
+                       boost::noncopyable>("stepper_state", bp::no_init)
+                .def(PyStepperVisitor());
+        }
+    };
+
     struct PyEngineVisitor
         : public bp::def_visitor<PyEngineVisitor>
     {
@@ -680,107 +658,117 @@ namespace python
         void visit(PyClass& cl) const
         {
             cl
-                .def("__init__", bp::make_constructor(&PyEngine::pyEngineFactory,
-                                 bp::default_call_policies(),
-                                 (bp::arg("model"), "controller")))
-                .def("run", &PyEngineVisitor::simulate,
-                            (bp::arg("self"), "x_init", "end_time"))
-                .def("run", &PyEngineVisitor::simulateWithCallback,
-                            (bp::arg("self"), "x_init", "end_time", "callback_handle"))
-                .def("get_log", &PyEngineVisitor::getLog,
-                                bp::return_value_policy<bp::return_by_value>())
+                .def("initialize", &PyEngineVisitor::initialize,
+                                   (bp::arg("self"), "model", "controller"))
+                .def("initialize", &PyEngineVisitor::initializeWithCallback,
+                                   (bp::arg("self"), "model", "controller", "callback_handle"))
+                .def("simulate", &Engine::simulate,
+                                 (bp::arg("self"), "x_init", "end_time"))
+                .def("step", &PyEngineVisitor::step)
+                .def("reset", &PyEngineVisitor::reset,
+                              (bp::arg("self"), "x_init"))
+                .add_property("stepper_state", bp::make_function(&Engine::getStepperState,
+                                               bp::return_internal_reference<>()))
+                .def("get_log", &PyEngineVisitor::getLog)
                 .def("write_log", &PyEngineVisitor::writeLog,
-                                 (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
-                .def("register_force_impulse", &PyEngineVisitor::registerForceImpulse,
+                                  (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
+                .def("register_force_impulse", &Engine::registerForceImpulse,
                                                (bp::arg("self"), "frame_name", "t", "dt", "F"))
                 .def("register_force_profile", &PyEngineVisitor::registerForceProfile,
                                                (bp::arg("self"), "frame_name", "force_handle"))
-                .def("get_engine_options", &PyEngineVisitor::getEngineOptions,
-                                           bp::return_value_policy<bp::return_by_value>())
-                .def("set_engine_options", &PyEngineVisitor::setEngineOptions)
+                .def("remove_forces", &PyEngineVisitor::removeForces)
+                .def("get_options", &PyEngineVisitor::getOptions,
+                                    bp::return_value_policy<bp::return_by_value>())
+                .def("set_options", &PyEngineVisitor::setOptions)
                 ;
         }
 
-        ///////////////////////////////////////////////////////////////////////////////
-        /// \brief      Run the simulation
-        ///////////////////////////////////////////////////////////////////////////////
-        static void simulate(PyEngine         & self,
-                             vectorN_t  const & x_init,
-                             float64_t  const & end_time)
+        static result_t initialize(Engine             & self,
+                                   Model              & model,
+                                   AbstractController & controller)
         {
             callbackFct_t callbackFct = [](float64_t const & t,
                                            vectorN_t const & x) -> bool
             {
                 return true;
             };
-            self.simulate(x_init, end_time, callbackFct);
+            return self.initialize(model, controller, std::move(callbackFct));
         }
 
-        static void simulateWithCallback(PyEngine         & self,
-                                         vectorN_t  const & x_init,
-                                         float64_t  const & end_time,
-                                         bp::object const & callbackPy)
+        static result_t initializeWithCallback(Engine             & self,
+                                               Model              & model,
+                                               AbstractController & controller,
+                                               bp::object const   & callbackPy)
         {
             TimeStateFctPyWrapper<bool> callbackFct(callbackPy);
-            self.simulate(x_init, end_time, std::move(callbackFct));
+            return self.initialize(model, controller, std::move(callbackFct));
         }
 
-        static void writeLog(PyEngine          & self,
+        static result_t reset(Engine          & self,
+                              vectorN_t const & x_init)
+        {
+            // Only way to handle C++ default values
+            return self.reset(x_init);
+        }
+
+        static result_t step(Engine          & self)
+        {
+            // Only way to handle C++ default values
+            return self.step();
+        }
+
+        static void writeLog(Engine            & self,
                              std::string const & filename,
                              bool        const & isModeBinary)
         {
             if (isModeBinary)
             {
-                self.engine_.writeLogBinary(filename);
+                self.writeLogBinary(filename);
             }
             else
             {
-                self.engine_.writeLogTxt(filename);
+                self.writeLogTxt(filename);
             }
         }
 
-        static void registerForceImpulse(PyEngine          & self,
-                                         std::string const & frameName,
-                                         float64_t   const & t,
-                                         float64_t   const & dt,
-                                         vector3_t   const & F)
-        {
-            self.engine_.registerForceImpulse(frameName, t, dt, F);
-        }
-
-        static void registerForceProfile(PyEngine          & self,
+        static void registerForceProfile(Engine            & self,
                                          std::string const & frameName,
                                          bp::object  const & forcePy)
         {
             TimeStateFctPyWrapper<vector3_t> forceFct(forcePy);
-            self.engine_.registerForceProfile(frameName, std::move(forceFct));
+            self.registerForceProfile(frameName, std::move(forceFct));
+        }
+
+        static void removeForces(Engine & self)
+        {
+            self.reset(true);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
         /// \brief      Getters and Setters
         ///////////////////////////////////////////////////////////////////////////////
 
-        static bp::tuple getLog(PyEngine & self)
+        static bp::tuple getLog(Engine & self)
         {
             std::vector<std::string> header;
             matrixN_t log;
-            self.engine_.getLogData(header, log);
+            self.getLogData(header, log);
             return bp::make_tuple(header, log);
         }
 
-        static bp::dict getEngineOptions(PyEngine & self)
+        static bp::dict getOptions(Engine & self)
         {
             bp::dict configPy;
-            convertConfigHolderPy(self.engine_.getOptions(), configPy);
+            convertConfigHolderPy(self.getOptions(), configPy);
             return configPy;
         }
 
-        static void setEngineOptions(PyEngine       & self,
-                                     bp::dict const & configPy)
+        static result_t setOptions(Engine         & self,
+                                   bp::dict const & configPy)
         {
-            configHolder_t config = self.engine_.getOptions();
+            configHolder_t config = self.getOptions();
             loadConfigHolder(configPy, config);
-            self.engine_.setOptions(config);
+            return self.setOptions(config);
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -788,9 +776,9 @@ namespace python
         ///////////////////////////////////////////////////////////////////////////////
         static void expose()
         {
-            bp::class_<PyEngine,
-                       boost::shared_ptr<PyEngine>,
-                       boost::noncopyable>("simulator", bp::no_init)
+            bp::class_<Engine,
+                       boost::shared_ptr<Engine>,
+                       boost::noncopyable>("engine")
                 .def(PyEngineVisitor());
         }
     };

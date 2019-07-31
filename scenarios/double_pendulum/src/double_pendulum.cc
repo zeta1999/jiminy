@@ -27,7 +27,7 @@ void computeCommand(float64_t const & t,
                     vectorN_t       & u)
 {
     // No controller: energy should be preserved.
-    u = vectorN_t::Zero(1);
+    u.setZero();
 }
 
 void internalDynamics(float64_t const & t,
@@ -35,7 +35,7 @@ void internalDynamics(float64_t const & t,
                       vectorN_t const & v,
                       vectorN_t       & u)
 {
-    u = vectorN_t::Zero(2);
+    u.setZero();
 }
 
 bool callback(float64_t const & t,
@@ -67,14 +67,13 @@ int main(int argc, char *argv[])
 
     // Instantiate and configuration the model
     std::vector<std::string> contacts;
-    std::vector<std::string> jointNames = {std::string("SecondPendulumJoint")};
+    std::vector<std::string> motorNames = {std::string("SecondPendulumJoint")};
 
     Model model;
     configHolder_t mdlOptions = model.getOptions();
     boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("joints")).at("boundsFromUrdf")) = true;
     model.setOptions(mdlOptions);
-    model.initialize(urdfPath, contacts, jointNames, false);
-    model.setOptions(mdlOptions);
+    model.initialize(urdfPath, contacts, motorNames, false);
 
     // Instantiate and configuration the controller
     ControllerFunctor<decltype(computeCommand), decltype(internalDynamics)> controller(computeCommand, internalDynamics);
@@ -89,7 +88,7 @@ int main(int argc, char *argv[])
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableCommand")) = true;
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableEnergy")) = true;
     boost::get<vectorN_t>(boost::get<configHolder_t>(simuOptions.at("world")).at("gravity"))(2) = -9.81;
-    boost::get<std::string>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("solver")) = std::string("runge_kutta_dopri5");
+    boost::get<std::string>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("odeSolver")) = std::string("runge_kutta_dopri5");
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("dtMax")) = 3.0e-3;

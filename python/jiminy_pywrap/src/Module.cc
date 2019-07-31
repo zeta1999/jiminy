@@ -52,6 +52,7 @@ namespace python
                 PyControllerFunctorNFactory,
                 (bp::arg("command_handle"), "internal_dynamics_handle", bp::arg("nb_sensor_types")=-1),
                 bp::return_value_policy<bp::manage_new_object>());
+        jiminy::python::PyStepperVisitor::expose();
         jiminy::python::PyEngineVisitor::expose();
     }
 }
