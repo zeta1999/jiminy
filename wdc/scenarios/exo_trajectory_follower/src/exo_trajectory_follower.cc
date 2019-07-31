@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableCommand")) = true;
     boost::get<bool>(boost::get<configHolder_t>(simuOptions.at("telemetry")).at("enableEnergy")) = true;
     boost::get<vectorN_t>(boost::get<configHolder_t>(simuOptions.at("world")).at("gravity"))(2) = -9.81;
-    boost::get<std::string>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("solver")) = std::string("runge_kutta_dopri5");
+    boost::get<std::string>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("odeSolver")) = std::string("runge_kutta_dopri5");
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolRel")) = 1.0e-5;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("tolAbs")) = 1.0e-4;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("dtMax")) = 3.0e-3;

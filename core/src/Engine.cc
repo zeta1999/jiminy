@@ -10,9 +10,7 @@
 #include "pinocchio/algorithm/frames.hpp"
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/aba.hpp"
-#include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/algorithm/joint-configuration.hpp"
-#include "pinocchio/algorithm/energy.hpp"
 
 #include "jiminy/core/Utilities.h"
 #include "jiminy/core/TelemetryData.h"
@@ -42,6 +40,8 @@ namespace jiminy
     telemetrySender_(),
     telemetryData_(nullptr),
     telemetryRecorder_(nullptr),
+    stepper_(),
+    stepperUpdatePeriod_(),
     stepperState_(),
     forcesImpulse_(),
     forceImpulseNextIt_(forcesImpulse_.begin()),
@@ -80,10 +80,7 @@ namespace jiminy
         }
         model_ = &model;
 
-        if (returnCode == result_t::SUCCESS)
-        {
-            returnCode = stepperState_.initialize(*model_, vectorN_t::Zero(model_->nx()));
-        }
+        stepperState_.initialize(*model_);
 
         if (!controller.getIsInitialized())
         {
@@ -121,6 +118,7 @@ namespace jiminy
         // Initialize the random number generators
         resetRandGenerators(engineOptions_->stepper.randomSeed);
 
+        // Reset the dynamic force register if requested
         if (resetDynamicForceRegister)
         {
             forcesImpulse_.clear();
@@ -139,8 +137,11 @@ namespace jiminy
         /* Preconfigure the telemetry with quantities known at compile time.
            Note that registration is only locked at the beginning of the
            simulation to enable dynamic registration until then. */
-        isTelemetryConfigured_ = false;
-        configureTelemetry();
+        if (isInitialized_)
+        {
+            isTelemetryConfigured_ = false;
+            configureTelemetry();
+        }
     }
 
     result_t Engine::configureTelemetry(void)
@@ -242,61 +243,35 @@ namespace jiminy
         telemetryRecorder_->flushDataSnapshot(stepperState_.tLast);
     }
 
-    result_t Engine::simulate(vectorN_t const & x_init,
-                              float64_t const & end_time)
-    {
-        result_t returnCode = result_t::SUCCESS;
 
-        if(!isInitialized_)
+    result_t Engine::reset(vectorN_t const & x_init,
+                           bool      const & resetDynamicForceRegister)
+    {
+        if (!getIsInitialized())
         {
-            std::cout << "Error - Engine::simulate - Engine not initialized. Impossible to run the simulation." << std::endl;
+            std::cout << "Error - Engine::reset - The engine is not initialized." << std::endl;
             return result_t::ERROR_INIT_FAILED;
         }
 
+        // Check the dimension of the initial rigid state
         std::vector<int32_t> const & rigidJointsPositionIdx = model_->getRigidJointsPositionIdx();
         std::vector<int32_t> const & rigidJointsVelocityIdx = model_->getRigidJointsVelocityIdx();
         if(x_init.rows() != (uint32_t) (rigidJointsPositionIdx.size() + rigidJointsVelocityIdx.size()))
         {
-            std::cout << "Error - Engine::simulate - Size of x_init inconsistent with model size." << std::endl;
+            std::cout << "Error - Engine::reset - Size of x_init inconsistent with model size." << std::endl;
             return result_t::ERROR_BAD_INPUT;
         }
 
-        if(end_time < 5e-2)
+        // Propagate the gravity value at Pinocchio model level
+        if (model_->getIsInitialized())
         {
-            std::cout << "Error - Engine::simulate - The duration of the simulation cannot be shorter than 50ms." << std::endl;
-            return result_t::ERROR_BAD_INPUT;
+            model_->pncModel_.gravity = engineOptions_->world.gravity;
         }
 
-        // Define the stepper iterators. (Do NOT use bind since it passes the arguments by value)
-        auto rhsBind =
-            [this](vectorN_t const & x,
-                   vectorN_t       & dxdt,
-                   float64_t const & t)
-            {
-                this->systemDynamics(t, x, dxdt);
-            };
+        // Reset the model, controller, engine, and registered impulse forces if requested
+        reset(resetDynamicForceRegister);
 
-        stepper_t stepper;
-        if (engineOptions_->stepper.solver == "runge_kutta_dopri5")
-        {
-            stepper = make_controlled(engineOptions_->stepper.tolAbs,
-                                      engineOptions_->stepper.tolRel,
-                                      runge_kutta_stepper_t());
-        }
-        else if (engineOptions_->stepper.solver == "explicit_euler")
-        {
-            stepper = explicit_euler();
-        }
-        else
-        {
-            std::cout << "Error - Engine::simulate - The requested solver is not available." << std::endl;
-            return result_t::ERROR_BAD_INPUT;
-        }
-
-        // Reset the model, controller, and engine
-        reset();
-
-        // Initialize the flexible state based on the rigid initial state
+        // Compute the initial flexible state based on the initial rigid state
         vectorN_t x0 = vectorN_t::Zero(model_->nx());
         for (uint32_t i=0; i<rigidJointsPositionIdx.size(); ++i)
         {
@@ -311,75 +286,87 @@ namespace jiminy
             x0[jointId + 3] = 1.0;
         }
 
-        // Initialize the stepper internal state
-        forceImpulseNextIt_ = forcesImpulse_.begin();
-        for (auto & forceProfile : forcesProfile_)
-        {
-            getFrameIdx(model_->pncModel_, forceProfile.first, std::get<0>(forceProfile.second));
-        }
-        stepperState_.initialize(*model_, x0);
-        systemDynamics(0, stepperState_.x, stepperState_.dxdt);
-
-        // Reset the telemetry recorder, write the header, and lock the registration of new variables
-        telemetryRecorder_->initialize();
-
-        // Compute the breakpoints' period (for command or observation) during the integration loop
-        float64_t updatePeriod = 0.0;
-        if (engineOptions_->stepper.sensorsUpdatePeriod < EPS)
-        {
-            updatePeriod = engineOptions_->stepper.controllerUpdatePeriod;
-        }
-        else if (engineOptions_->stepper.controllerUpdatePeriod < EPS)
-        {
-            updatePeriod = engineOptions_->stepper.sensorsUpdatePeriod;
-        }
-        else
-        {
-            updatePeriod = std::min(engineOptions_->stepper.sensorsUpdatePeriod,
-                                    engineOptions_->stepper.controllerUpdatePeriod);
-        }
-
-        // Set the initial time step
+        // Compute the initial time step
         float64_t dt = 0.0;
-        if (updatePeriod > EPS)
+        if (stepperUpdatePeriod_ > EPS)
         {
-            dt = updatePeriod; // The initial time step is the update period
+            dt = stepperUpdatePeriod_; // The initial time step is the update period
         }
         else
         {
             dt = engineOptions_->stepper.dtMax; // Use the maximum allowed time step as default
         }
 
+        // Reset the impulse for iterator counter
+        forceImpulseNextIt_ = forcesImpulse_.begin();
+        for (auto & forceProfile : forcesProfile_)
+        {
+            getFrameIdx(model_->pncModel_, forceProfile.first, std::get<0>(forceProfile.second));
+        }
+
+        /* Reset the telemetry recorder, write the header, and lock
+           the registration of new variables */
+        telemetryRecorder_->initialize();
+
+        // Initialize the stepper internal state
+        stepperState_.initialize(*model_, x0, dt);
+        systemDynamics(0, stepperState_.x, stepperState_.dxdt);
+
+        // Initialize the external contact forces
+        std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
+        for(uint32_t i=0; i < contactFramesIdx.size(); i++)
+        {
+            model_->contactForces_[i] = pinocchio::Force(contactDynamics(contactFramesIdx[i]));
+        }
+
+        // Initialize the sensor data
+        model_->setSensorsData(stepperState_.tLast,
+                               stepperState_.qLast,
+                               stepperState_.vLast,
+                               stepperState_.aLast,
+                               stepperState_.uLast);
+
+        // Initialize the controller's dynamically registered variables
+        controller_->computeCommand(stepperState_.tLast,
+                                    stepperState_.qLast,
+                                    stepperState_.vLast,
+                                    stepperState_.uCommandLast);
+
+        /* Initialize the monitoring of the current iteration number,
+           and log the initial time, state, command, and sensors data. */
+        updateTelemetry();
+
+        return result_t::SUCCESS;
+    }
+
+    result_t Engine::simulate(vectorN_t const & x_init,
+                              float64_t const & t_end)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        if(!isInitialized_)
+        {
+            std::cout << "Error - Engine::simulate - Engine not initialized. Impossible to run the simulation." << std::endl;
+            returnCode = result_t::ERROR_INIT_FAILED;
+        }
+
+        if(t_end < 2e-2)
+        {
+            std::cout << "Error - Engine::simulate - The duration of the simulation cannot be shorter than 20ms." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        // Reset the model, controller, and engine
+        reset(x_init, false);
+
         // Integration loop based on boost::numeric::odeint::detail::integrate_times
-        float64_t current_time = 0.0;
-        float64_t next_time = 0.0;
-        failed_step_checker fail_checker; // to throw a runtime_error if step size adjustment fail
         while (true)
         {
-            // Update internal state of the stepper
-            vectorN_t const & q = stepperState_.x.head(model_->nq());
-            vectorN_t const & v = stepperState_.x.tail(model_->nv());
-            vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
-            stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a); // Update uLast directly to avoid temporary
-            // Get system energy, kinematic computation are not needed since they were already done in RNEA.
-            float64_t energy =
-                pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false)
-                + pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
-            stepperState_.updateLast(current_time,
-                                     q,
-                                     v,
-                                     a,
-                                     stepperState_.uLast,
-                                     stepperState_.uCommandLast,
-                                     energy); // uCommandLast are already up-to-date
-
-            // Monitor current iteration number, and log the current time, state, command, and sensors data.
-            updateTelemetry();
-
             /* Stop the simulation if the end time has been reached, if
                the callback returns false, or if the number of integration
                steps exceeds 1e5. */
-            if (std::abs(end_time - current_time) < EPS || !callbackFct_(current_time, stepperState_.x))
+            if (std::abs(t_end - stepperState_.t) < EPS
+            || !callbackFct_(stepperState_.t, stepperState_.x))
             {
                 break;
             }
@@ -388,161 +375,220 @@ namespace jiminy
             {
                 break;
             }
-            else if ((stepperState_.x.array() != stepperState_.x.array()).any()) // nan is NOT equal to itself
+
+            if (returnCode == result_t::SUCCESS)
             {
-                std::cout << "Error - Engine::simulate - The low-level solver failed. Consider increasing accuracy." << std::endl;
-                return result_t::ERROR_GENERIC;
+                returnCode = step(t_end);
             }
+        }
 
-            if (updatePeriod > 0)
+        return returnCode;
+    }
+
+    result_t Engine::step(float64_t t_end)
+    {
+        if(!isInitialized_)
+        {
+            std::cout << "Error - Engine::do_step - Engine not initialized. Impossible to perform a simulation step." << std::endl;
+            return result_t::ERROR_INIT_FAILED;
+        }
+
+        // Check if there is something wrong with the integration
+        if ((stepperState_.x.array() != stepperState_.x.array()).any()) // nan is NOT equal to itself
+        {
+            std::cout << "Error - Engine::simulate - The low-level ode solver failed. Consider increasing accuracy." << std::endl;
+            return result_t::ERROR_GENERIC;
+        }
+
+        // Define the stepper iterators. (Do NOT use 'bind' since it passes the arguments by value)
+        auto rhsBind =
+            [this](vectorN_t const & x,
+                   vectorN_t       & dxdt,
+                   float64_t const & t)
             {
-                // Get the current time
-                current_time = next_time;
+                this->systemDynamics(t, x, dxdt);
+            };
 
-                // Update the sensor data if necessary (only for finite update frequency)
-                if (engineOptions_->stepper.sensorsUpdatePeriod > 0)
-                {
-                    float64_t next_time_update_sensor =
-                        std::round(current_time / engineOptions_->stepper.sensorsUpdatePeriod) *
-                        engineOptions_->stepper.sensorsUpdatePeriod;
-                    if (std::abs(current_time - next_time_update_sensor) < 1e-8)
-                    {
-                        model_->setSensorsData(stepperState_.tLast,
-                                               stepperState_.qLast,
-                                               stepperState_.vLast,
-                                               stepperState_.aLast,
-                                               stepperState_.uLast);
-                    }
-                }
+        failed_step_checker fail_checker;
 
-                // Update the controller command if necessary (only for finite update frequency)
-                if (engineOptions_->stepper.controllerUpdatePeriod > 0)
-                {
-                    float64_t next_time_update_controller =
-                        std::round(current_time / engineOptions_->stepper.controllerUpdatePeriod) *
-                            engineOptions_->stepper.controllerUpdatePeriod;
-                    if (std::abs(current_time - next_time_update_controller) < 1e-8)
-                    {
-                        controller_->computeCommand(stepperState_.tLast,
-                                                    stepperState_.qLast,
-                                                    stepperState_.vLast,
-                                                    stepperState_.uCommandLast);
+        float64_t t = stepperState_.t;
+        float64_t t_next = t;
+        if (t_end < 0)
+        {
+            t_end = t + MAX_TIME_STEP_MAX;
+        }
 
-                        std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
-                        for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
-                        {
-                            uint32_t jointId = motorsVelocityIdx[i];
-                            float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
-                            stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
-                            stepperState_.uControl[i] = boost::algorithm::clamp(
-                                stepperState_.uControl[i], -torque_max, torque_max);
-                        }
-
-                        /* Update the internal stepper state dxdt since the dynamics has changed.
-                           Make sure the next impulse force iterator has NOT been updated at this point ! */
-                        if (engineOptions_->stepper.solver != "explicit_euler")
-                        {
-                            systemDynamics(current_time, stepperState_.x, stepperState_.dxdt);
-                        }
-                    }
-                }
-            }
-
-            // Get the next impulse force application time and update the iterator if necessary
-            float64_t tForceImpulseNext = end_time;
-            if (forceImpulseNextIt_ != forcesImpulse_.end())
+        if (stepperUpdatePeriod_ > 0)
+        {
+            // Update the sensor data if necessary (only for finite update frequency)
+            if (engineOptions_->stepper.sensorsUpdatePeriod > 0)
             {
-                float64_t tForceImpulseNextTmp = forceImpulseNextIt_->first;
-                float64_t dtForceImpulseNext = std::get<1>(forceImpulseNextIt_->second);
-                if (current_time > tForceImpulseNextTmp + dtForceImpulseNext)
+                float64_t t_next_update_sensor =
+                    std::round(t / engineOptions_->stepper.sensorsUpdatePeriod) *
+                    engineOptions_->stepper.sensorsUpdatePeriod;
+                if (std::abs(t - t_next_update_sensor) < 1e-8)
                 {
-                    ++forceImpulseNextIt_;
-                    tForceImpulseNextTmp = forceImpulseNextIt_->first;
-                }
-
-                if (forceImpulseNextIt_ != forcesImpulse_.end())
-                {
-                    if (tForceImpulseNextTmp > current_time)
-                    {
-                        tForceImpulseNext = tForceImpulseNextTmp;
-                    }
-                    else
-                    {
-                        if (forceImpulseNextIt_ != std::prev(forcesImpulse_.end()))
-                        {
-                            tForceImpulseNext = std::next(forceImpulseNextIt_)->first;
-                        }
-                    }
+                    model_->setSensorsData(stepperState_.tLast,
+                                           stepperState_.qLast,
+                                           stepperState_.vLast,
+                                           stepperState_.aLast,
+                                           stepperState_.uLast);
                 }
             }
 
-            if (updatePeriod > 0)
+            // Update the controller command if necessary (only for finite update frequency)
+            if (engineOptions_->stepper.controllerUpdatePeriod > 0)
             {
-                // Get the target time at next iteration
-                next_time += min(updatePeriod,
-                                 end_time - current_time,
-                                 tForceImpulseNext - current_time);
-
-                // Compute the next step using adaptive step method
-                while (current_time < next_time)
+                float64_t t_next_update_controller =
+                    std::round(t / engineOptions_->stepper.controllerUpdatePeriod) *
+                        engineOptions_->stepper.controllerUpdatePeriod;
+                if (std::abs(t - t_next_update_controller) < 1e-8)
                 {
-                    // adjust stepsize to end up exactly at the next breakpoint
-                    float64_t current_dt = std::min(dt, next_time - current_time);
-                    if (success == boost::apply_visitor(
-                        [&](auto && one)
-                        {
-                            return one.try_step(rhsBind,
-                                                stepperState_.x,
-                                                stepperState_.dxdt,
-                                                current_time,
-                                                current_dt);
-                        }, stepper))
-                    {
-                        fail_checker.reset(); // reset the fail counter, see #173
-                        dt = std::max(dt, current_dt); // continue with the original step size if dt was reduced due to the next breakpoint
-                    }
-                    else
-                    {
-                        fail_checker();  // check for possible overflow of failed steps in step size adjustment
-                        dt = current_dt;
-                    }
-                    dt = std::min(dt, engineOptions_->stepper.dtMax); // Make sure it never exceeds dtMax
-                }
-            }
-            else
-            {
-                // Make sure it ends exactly at the end_time, never exceeds dtMax, and stop to apply impulse forces
-                dt = min(dt,
-                         engineOptions_->stepper.dtMax,
-                         end_time - current_time,
-                         tForceImpulseNext - current_time);
+                    controller_->computeCommand(stepperState_.tLast,
+                                                stepperState_.qLast,
+                                                stepperState_.vLast,
+                                                stepperState_.uCommandLast);
 
-                // Compute the next step using adaptive step method
-                controlled_step_result res = fail;
-                while (res == fail)
-                {
-                    res = boost::apply_visitor(
-                        [&](auto && one)
-                        {
-                            return one.try_step(rhsBind,
-                                                stepperState_.x,
-                                                stepperState_.dxdt,
-                                                current_time,
-                                                dt);
-                        }, stepper);
-                    if (res == success)
+                    std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
+                    for (uint32_t i=0; i < motorsVelocityIdx.size(); i++)
                     {
-                        fail_checker.reset(); // reset the fail counter
+                        uint32_t jointId = motorsVelocityIdx[i];
+                        float64_t torque_max = model_->pncModel_.effortLimit(jointId); // effortLimit is given in the velocity vector space
+                        stepperState_.uControl[jointId] = stepperState_.uCommandLast[i];
+                        stepperState_.uControl[i] = boost::algorithm::clamp(
+                            stepperState_.uControl[i], -torque_max, torque_max);
                     }
-                    else
+
+                    /* Update the internal stepper state dxdt since the dynamics has changed.
+                        Make sure the next impulse force iterator has NOT been updated at this point ! */
+                    if (engineOptions_->stepper.odeSolver != "explicit_euler")
                     {
-                        fail_checker();  // check for possible overflow of failed steps in step size adjustment
+                        systemDynamics(t, stepperState_.x, stepperState_.dxdt);
                     }
                 }
             }
         }
 
-        return returnCode;
+        // Get the next impulse force application time and update the iterator if necessary
+        float64_t tForceImpulseNext = t_end;
+        if (forceImpulseNextIt_ != forcesImpulse_.end())
+        {
+            float64_t tForceImpulseNextTmp = forceImpulseNextIt_->first;
+            float64_t dtForceImpulseNext = std::get<1>(forceImpulseNextIt_->second);
+            if (t > tForceImpulseNextTmp + dtForceImpulseNext)
+            {
+                ++forceImpulseNextIt_;
+                tForceImpulseNextTmp = forceImpulseNextIt_->first;
+            }
+
+            if (forceImpulseNextIt_ != forcesImpulse_.end())
+            {
+                if (tForceImpulseNextTmp > t)
+                {
+                    tForceImpulseNext = tForceImpulseNextTmp;
+                }
+                else
+                {
+                    if (forceImpulseNextIt_ != std::prev(forcesImpulse_.end()))
+                    {
+                        tForceImpulseNext = std::next(forceImpulseNextIt_)->first;
+                    }
+                }
+            }
+        }
+
+        if (stepperUpdatePeriod_ > 0)
+        {
+            // Get the target time at next iteration
+            t_next += min(stepperUpdatePeriod_,
+                             t_end - t,
+                             tForceImpulseNext - t);
+
+            // Compute the next step using adaptive step method
+            while (t < t_next)
+            {
+                // adjust stepsize to end up exactly at the next breakpoint
+                float64_t current_dt = std::min(stepperState_.dt, t_next - t);
+                if (success == boost::apply_visitor(
+                    [&](auto && one)
+                    {
+                        return one.try_step(rhsBind,
+                                            stepperState_.x,
+                                            stepperState_.dxdt,
+                                            t,
+                                            current_dt);
+                    }, stepper_))
+                {
+                    fail_checker.reset(); // reset the fail counter, see #173
+                    stepperState_.dt = std::max(stepperState_.dt, current_dt); // continue with the original step size if dt was reduced due to the next breakpoint
+                }
+                else
+                {
+                    fail_checker();  // check for possible overflow of failed steps in step size adjustment
+                    stepperState_.dt = current_dt;
+                }
+                stepperState_.dt = std::min(stepperState_.dt, engineOptions_->stepper.dtMax); // Make sure it never exceeds dtMax
+            }
+
+            // Update the current time
+            t = t_next;
+        }
+        else
+        {
+            // Make sure it ends exactly at the t_end, never exceeds dtMax, and stop to apply impulse forces
+            stepperState_.dt = min(stepperState_.dt,
+                                   engineOptions_->stepper.dtMax,
+                                   t_end - t,
+                                   tForceImpulseNext - t);
+
+            // Compute the next step using adaptive step method
+            controlled_step_result res = fail;
+            while (res == fail)
+            {
+                res = boost::apply_visitor(
+                    [&](auto && one)
+                    {
+                        return one.try_step(rhsBind,
+                                            stepperState_.x,
+                                            stepperState_.dxdt,
+                                            t,
+                                            stepperState_.dt);
+                    }, stepper_);
+                if (res == success)
+                {
+                    fail_checker.reset(); // reset the fail counter
+                }
+                else
+                {
+                    fail_checker();  // check for possible overflow of failed steps in step size adjustment
+                }
+            }
+        }
+
+        /* Update internal state of the stepper.
+           Note that explicit kinematic computation is not needed to get
+           the system energy since they were already done in RNEA. */
+        vectorN_t const & q = stepperState_.x.head(model_->nq());
+        vectorN_t const & v = stepperState_.x.tail(model_->nv());
+        vectorN_t const & a = stepperState_.dxdt.tail(model_->nv());
+        stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a); // Update uLast directly to avoid temporary
+        float64_t energy = pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false)
+            + pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
+        stepperState_.updateLast(t,
+                                 q,
+                                 v,
+                                 a,
+                                 stepperState_.uLast,
+                                 stepperState_.uCommandLast,
+                                 energy); // uCommandLast are already up-to-date
+
+        // Monitor current iteration number, and log the current time, state, command, and sensors data.
+        updateTelemetry();
+
+        // Update the current time
+        stepperState_.t = t;
+
+        return result_t::SUCCESS;
     }
 
     void Engine::registerForceImpulse(std::string const & frameName,
@@ -561,6 +607,178 @@ namespace jiminy
         forcesProfile_.emplace_back(frameName, std::make_tuple(0, forceFct));
     }
 
+    configHolder_t Engine::getOptions(void) const
+    {
+        return engineOptionsHolder_;
+    }
+
+    result_t Engine::setOptions(configHolder_t const & engineOptions)
+    {
+        result_t returnCode = result_t::SUCCESS;
+
+        // Make sure the dtMax is not out of bounds
+        configHolder_t stepperOptions = boost::get<configHolder_t>(engineOptions.at("stepper"));
+        float64_t const & dtMax = boost::get<float64_t>(stepperOptions.at("dtMax"));
+        if (MAX_TIME_STEP_MAX < dtMax || dtMax < MIN_TIME_STEP_MAX)
+        {
+            std::cout << "Error - Engine::setOptions - 'dtMax' option is out of bounds." << std::endl;
+            returnCode = result_t::ERROR_BAD_INPUT;
+        }
+
+        // Make sure the selected ode solver is available and instantiate it
+        if (returnCode == result_t::SUCCESS)
+        {
+            std::string const & odeSolver = boost::get<std::string>(stepperOptions.at("odeSolver"));
+            if (odeSolver == "runge_kutta_dopri5")
+            {
+                stepper_ = make_controlled(boost::get<float64_t>(stepperOptions.at("tolAbs")),
+                                           boost::get<float64_t>(stepperOptions.at("tolRel")),
+                                           runge_kutta_stepper_t());
+            }
+            else if (odeSolver == "explicit_euler")
+            {
+                stepper_ = explicit_euler();
+            }
+            else
+            {
+                std::cout << "Error - Engine::setOptions - The requested 'odeSolver' is not available." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        // Make sure the controller and sensor update periods are multiple of each other
+        float64_t const & sensorsUpdatePeriod =
+            boost::get<float64_t>(stepperOptions.at("sensorsUpdatePeriod"));
+        float64_t const & controllerUpdatePeriod =
+            boost::get<float64_t>(stepperOptions.at("controllerUpdatePeriod"));
+        if (returnCode == result_t::SUCCESS)
+        {
+            if (sensorsUpdatePeriod > EPS && controllerUpdatePeriod > EPS
+            && std::fmod(sensorsUpdatePeriod, controllerUpdatePeriod) > EPS
+            && std::fmod(sensorsUpdatePeriod, controllerUpdatePeriod) > EPS)
+            {
+                std::cout << "Error - Engine::setOptions - The controller and sensor update frequencies must be multiple of each other if not infinite." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        // Compute the breakpoints' period (for command or observation) during the integration loop
+        if (returnCode == result_t::SUCCESS)
+        {
+            if (sensorsUpdatePeriod < EPS)
+            {
+                stepperUpdatePeriod_ = controllerUpdatePeriod;
+            }
+            else if (controllerUpdatePeriod < EPS)
+            {
+                stepperUpdatePeriod_ = sensorsUpdatePeriod;
+            }
+            else
+            {
+                stepperUpdatePeriod_ = std::min(sensorsUpdatePeriod, controllerUpdatePeriod);
+            }
+        }
+
+        // Make sure the user-defined gravity force has the right dimension
+        if (returnCode == result_t::SUCCESS)
+        {
+            configHolder_t worldOptions = boost::get<configHolder_t>(engineOptions.at("world"));
+            vectorN_t gravity = boost::get<vectorN_t>(worldOptions.at("gravity"));
+            if (gravity.size() != 6)
+            {
+                std::cout << "Error - Engine::setOptions - The size of the gravity force vector must be 6." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+        }
+
+        if (returnCode == result_t::SUCCESS)
+        {
+            // Update the internal options
+            engineOptionsHolder_ = engineOptions;
+
+            // Create a fast struct accessor
+            engineOptions_ = std::make_unique<engineOptions_t const>(engineOptionsHolder_);
+        }
+
+        return returnCode;
+    }
+
+    bool Engine::getIsInitialized(void) const
+    {
+        return isInitialized_;
+    }
+
+    Model const & Engine::getModel(void) const
+    {
+        return *model_;
+    }
+
+    stepperState_t const & Engine::getStepperState(void) const
+    {
+        return stepperState_;
+    }
+
+    void Engine::getLogData(std::vector<std::string> & header,
+                            matrixN_t                & logData)
+    {
+        std::vector<float32_t> timestamps;
+        std::vector<std::vector<int32_t> > intData;
+        std::vector<std::vector<float32_t> > floatData;
+        telemetryRecorder_->getData(header, timestamps, intData, floatData);
+
+        // Never empty since it contains at least the initial state
+        logData.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
+        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(
+            timestamps.data(), timestamps.size()).cast<float64_t>();
+        for (uint32_t i=0; i<intData.size(); i++)
+        {
+            logData.block(i, 1, 1, intData[i].size()) =
+                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(
+                    intData[i].data(), intData[i].size()).cast<float64_t>();
+        }
+        for (uint32_t i=0; i<floatData.size(); i++)
+        {
+            logData.block(i, 1 + intData[0].size(), 1, floatData[i].size()) =
+                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(
+                    floatData[i].data(), floatData[i].size()).cast<float64_t>();
+        }
+    }
+
+    void Engine::writeLogTxt(std::string const & filename)
+    {
+        std::vector<std::string> header;
+        matrixN_t log;
+        getLogData(header, log);
+
+        std::ofstream myfile = std::ofstream(filename,
+                                             std::ios::out |
+                                             std::ofstream::trunc);
+
+        auto indexConstantEnd = std::find(header.begin(), header.end(), START_COLUMNS);
+        std::copy(header.begin() + 1,
+                  indexConstantEnd - 1,
+                  std::ostream_iterator<std::string>(myfile, ", ")); // Discard the first one (start constant flag)
+        std::copy(indexConstantEnd - 1,
+                  indexConstantEnd,
+                  std::ostream_iterator<std::string>(myfile, "\n"));
+        std::copy(indexConstantEnd + 1,
+                  header.end() - 2,
+                  std::ostream_iterator<std::string>(myfile, ", "));
+        std::copy(header.end() - 2,
+                  header.end() - 1,
+                  std::ostream_iterator<std::string>(myfile, "\n")); // Discard the last one (start data flag)
+
+        Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
+        myfile << log.format(CSVFormat);
+
+        myfile.close();
+    }
+
+    void Engine::writeLogBinary(std::string const & filename)
+    {
+        telemetryRecorder_->writeDataBinary(filename);
+    }
+
     void Engine::systemDynamics(float64_t const & t,
                                 vectorN_t const & x,
                                 vectorN_t       & dxdt)
@@ -576,7 +794,7 @@ namespace jiminy
         pinocchio::forwardKinematics(model_->pncModel_, model_->pncData_, q, v);
         pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
 
-        // Compute the external forces
+        // Compute the external contact forces
         pinocchio::container::aligned_vector<pinocchio::Force> fext(
             model_->pncModel_.joints.size(), pinocchio::Force::Zero());
         std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
@@ -800,101 +1018,5 @@ namespace jiminy
             u.segment<3>(jointVelocityId[i]).array() += -mdlDynOptions.flexibleJointsStiffness[i].array() * axis.array()
                 - mdlDynOptions.flexibleJointsDamping[i].array() * v.segment<3>(jointVelocityId[i]).array();
         }
-    }
-
-    configHolder_t Engine::getOptions(void) const
-    {
-        return engineOptionsHolder_;
-    }
-
-    void Engine::setOptions(configHolder_t const & engineOptions)
-    {
-        // Update the internal options
-        engineOptionsHolder_ = engineOptions;
-
-        // Make sure some parameters are in the required bounds
-        float64_t & dtMax = boost::get<float64_t>(
-            boost::get<configHolder_t>(engineOptionsHolder_.at("stepper")).at("dtMax"));
-        dtMax = std::min(std::max(dtMax, MIN_TIME_STEP_MAX), MAX_TIME_STEP_MAX);
-
-        // Create a fast struct accessor
-        engineOptions_ = std::make_unique<engineOptions_t const>(engineOptionsHolder_);
-
-        // Propagate the options at Model level
-        if (isInitialized_)
-        {
-            model_->pncModel_.gravity = engineOptions_->world.gravity; // It is reversed (Third Newton law)
-        }
-    }
-
-    bool Engine::getIsInitialized(void) const
-    {
-        return isInitialized_;
-    }
-
-    Model const & Engine::getModel(void) const
-    {
-        return *model_;
-    }
-
-    void Engine::getLogData(std::vector<std::string> & header,
-                            matrixN_t                & logData)
-    {
-        std::vector<float32_t> timestamps;
-        std::vector<std::vector<int32_t> > intData;
-        std::vector<std::vector<float32_t> > floatData;
-        telemetryRecorder_->getData(header, timestamps, intData, floatData);
-
-        // Never empty since it contains at least the initial state
-        logData.resize(timestamps.size(), 1 + intData[0].size() + floatData[0].size());
-        logData.col(0) = Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(
-            timestamps.data(), timestamps.size()).cast<float64_t>();
-        for (uint32_t i=0; i<intData.size(); i++)
-        {
-            logData.block(i, 1, 1, intData[i].size()) =
-                Eigen::Matrix<int32_t, 1, Eigen::Dynamic>::Map(
-                    intData[i].data(), intData[i].size()).cast<float64_t>();
-        }
-        for (uint32_t i=0; i<floatData.size(); i++)
-        {
-            logData.block(i, 1 + intData[0].size(), 1, floatData[i].size()) =
-                Eigen::Matrix<float32_t, 1, Eigen::Dynamic>::Map(
-                    floatData[i].data(), floatData[i].size()).cast<float64_t>();
-        }
-    }
-
-    void Engine::writeLogTxt(std::string const & filename)
-    {
-        std::vector<std::string> header;
-        matrixN_t log;
-        getLogData(header, log);
-
-        std::ofstream myfile = std::ofstream(filename,
-                                             std::ios::out |
-                                             std::ofstream::trunc);
-
-        auto indexConstantEnd = std::find(header.begin(), header.end(), START_COLUMNS);
-        std::copy(header.begin() + 1,
-                  indexConstantEnd - 1,
-                  std::ostream_iterator<std::string>(myfile, ", ")); // Discard the first one (start constant flag)
-        std::copy(indexConstantEnd - 1,
-                  indexConstantEnd,
-                  std::ostream_iterator<std::string>(myfile, "\n"));
-        std::copy(indexConstantEnd + 1,
-                  header.end() - 2,
-                  std::ostream_iterator<std::string>(myfile, ", "));
-        std::copy(header.end() - 2,
-                  header.end() - 1,
-                  std::ostream_iterator<std::string>(myfile, "\n")); // Discard the last one (start data flag)
-
-        Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
-        myfile << log.format(CSVFormat);
-
-        myfile.close();
-    }
-
-    void Engine::writeLogBinary(std::string const & filename)
-    {
-        telemetryRecorder_->writeDataBinary(filename);
     }
 }

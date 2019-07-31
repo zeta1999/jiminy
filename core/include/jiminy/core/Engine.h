@@ -10,6 +10,9 @@
 #include <boost/numeric/odeint.hpp>
 #include <boost/numeric/odeint/external/eigen/eigen_algebra.hpp>
 
+#include "pinocchio/algorithm/rnea.hpp"
+#include "pinocchio/algorithm/energy.hpp"
+
 #include "jiminy/core/Types.h"
 #include "jiminy/core/Model.h"
 #include "jiminy/core/TelemetrySender.h"
@@ -26,7 +29,147 @@ namespace jiminy
     class AbstractController;
     class TelemetryData;
     class TelemetryRecorder;
-    class explicit_euler;
+
+    class explicit_euler
+    {
+    public:
+        typedef vectorN_t state_type;
+        typedef vectorN_t deriv_type;
+        typedef float64_t value_type;
+        typedef float64_t time_type;
+        typedef unsigned short order_type;
+
+        using stepper_category = controlled_stepper_tag;
+
+        static order_type order(void)
+        {
+            return 1;
+        }
+
+        template<class System>
+        controlled_step_result try_step(System       system,
+                                        state_type & x,
+                                        deriv_type & dxdt,
+                                        time_type  & t,
+                                        time_type  & dt) const
+        {
+            t += dt;
+            system(x, dxdt, t);
+            x += dt * dxdt;
+            return controlled_step_result::success;
+        }
+    };
+
+    struct stepperState_t
+    {
+    // Internal state for the integration loop
+
+    public:
+        stepperState_t(void) :
+        iterLast(),
+        tLast(),
+        qLast(),
+        vLast(),
+        aLast(),
+        uLast(),
+        uCommandLast(),
+        energyLast(0.0),
+        t(0.0),
+        dt(0.0),
+        x(),
+        dxdt(),
+        uControl(),
+        fext(),
+        uInternal(),
+        isInitialized()
+        {
+            // Empty.
+        }
+
+        bool const & getIsInitialized(void) const
+        {
+            return isInitialized;
+        }
+
+        void initialize(Model & model)
+        {
+            initialize(model, vectorN_t::Zero(model.nx()), MIN_TIME_STEP_MAX);
+        }
+
+        void initialize(Model           & model,
+                        vectorN_t const & x_init,
+                        float64_t const & dt_init)
+        {
+            // Initialize the ode stepper state buffers
+            iterLast = 0;
+            tLast = 0.0;
+            qLast = x_init.head(model.nq());
+            vLast = x_init.tail(model.nv());
+            aLast = vectorN_t::Zero(model.nv());
+            uCommandLast = vectorN_t::Zero(model.getMotorsNames().size());
+            uLast = pinocchio::rnea(model.pncModel_, model.pncData_, qLast, vLast, aLast);
+            energyLast = pinocchio::kineticEnergy(model.pncModel_, model.pncData_, qLast, vLast, false)
+                + pinocchio::potentialEnergy(model.pncModel_, model.pncData_, qLast, false);
+
+            // Initialize the internal systemDynamics buffers
+            t = 0.0;
+            dt = dt_init;
+            x = x_init;
+            dxdt = vectorN_t::Zero(model.nx());
+            uControl = vectorN_t::Zero(model.nv());
+
+            fext = pinocchio::container::aligned_vector<pinocchio::Force>(
+                model.pncModel_.joints.size(),
+                pinocchio::Force::Zero());
+            uInternal = vectorN_t::Zero(model.nv());
+
+            // Set the initialization flag
+            isInitialized = true;
+        }
+
+        void updateLast(float64_t const & time,
+                        vectorN_t const & q,
+                        vectorN_t const & v,
+                        vectorN_t const & a,
+                        vectorN_t const & u,
+                        vectorN_t const & uCommand,
+                        float64_t const & energy)
+        {
+            tLast = time;
+            qLast = q;
+            vLast = v;
+            aLast = a;
+            uLast = u;
+            uCommandLast = uCommand;
+            energyLast = energy;
+            ++iterLast;
+        }
+
+    public:
+        // State information about the last iteration
+        uint32_t iterLast;
+        float64_t tLast;
+        vectorN_t qLast;
+        vectorN_t vLast;
+        vectorN_t aLast;
+        vectorN_t uLast;
+        vectorN_t uCommandLast;
+        float64_t energyLast; ///< Energy (kinetic + potential) of the system at the last state.
+
+        // Internal buffers required for the adaptive step computation and system dynamics
+        float64_t t;
+        float64_t dt;
+        vectorN_t x;
+        vectorN_t dxdt;
+        vectorN_t uControl;
+
+        // Internal buffers to speed up the evaluation of the system dynamics
+        pinocchio::container::aligned_vector<pinocchio::Force> fext;
+        vectorN_t uInternal;
+
+    private:
+        bool isInitialized;
+    };
 
     class Engine
     {
@@ -109,7 +252,7 @@ namespace jiminy
         configHolder_t getDefaultWorldOptions()
         {
             configHolder_t config;
-            config["gravity"] = (vectorN_t(6) << 0.0,0.0,-9.81,0.0,0.0,0.0).finished();
+            config["gravity"] = (vectorN_t(6) << 0.0, 0.0, -9.81, 0.0, 0.0, 0.0).finished();
 
             return config;
         };
@@ -129,7 +272,7 @@ namespace jiminy
         {
             configHolder_t config;
             config["randomSeed"] = 0;
-            config["solver"] = std::string("runge_kutta_dopri5"); // ["runge_kutta_dopri5", "explicit_euler"]
+            config["odeSolver"] = std::string("runge_kutta_dopri5"); // ["runge_kutta_dopri5", "explicit_euler"]
             config["tolAbs"] = 1.0e-5;
             config["tolRel"] = 1.0e-4;
             config["dtMax"] = 1.0e-3;
@@ -143,7 +286,7 @@ namespace jiminy
         struct stepperOptions_t
         {
             int32_t     const randomSeed;
-            std::string const solver;
+            std::string const odeSolver;
             float64_t   const tolAbs;
             float64_t   const tolRel;
             float64_t   const dtMax;
@@ -153,7 +296,7 @@ namespace jiminy
 
             stepperOptions_t(configHolder_t const & options) :
             randomSeed(boost::get<int32_t>(options.at("randomSeed"))),
-            solver(boost::get<std::string>(options.at("solver"))),
+            odeSolver(boost::get<std::string>(options.at("odeSolver"))),
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
             tolRel(boost::get<float64_t>(options.at("tolRel"))),
             dtMax(boost::get<float64_t>(options.at("dtMax"))),
@@ -226,123 +369,6 @@ namespace jiminy
             }
         };
 
-    protected:
-        struct stepperState_t
-        {
-        // Internal state for the integration loop
-
-        public:
-            stepperState_t(void) :
-            iterLast(),
-            tLast(),
-            qLast(),
-            vLast(),
-            aLast(),
-            uLast(),
-            uCommandLast(),
-            energyLast(0.0),
-            x(),
-            dxdt(),
-            uControl(),
-            fext(),
-            uInternal(),
-            isInitialized()
-            {
-                // Empty.
-            }
-
-            bool getIsInitialized(void) const
-            {
-                return isInitialized;
-            }
-
-
-            result_t initialize(Model const & model)
-            {
-                vectorN_t x_init = vectorN_t::Zero(model.nx());
-                return initialize(model, x_init);
-            }
-
-            result_t initialize(Model     const & model,
-                                vectorN_t const & x_init)
-            {
-                result_t returnCode = result_t::SUCCESS;
-
-                if (!model.getIsInitialized())
-                {
-                    std::cout << "Error - stepperState_t::initialize - Something is wrong with the Model." << std::endl;
-                    returnCode = result_t::ERROR_INIT_FAILED;
-                }
-
-                if (returnCode == result_t::SUCCESS)
-                {
-                    // Initialize the odestepper state buffers
-                    iterLast = -1;
-                    tLast = 0;
-                    qLast = x_init.head(model.nq());
-                    vLast = x_init.tail(model.nv());
-                    aLast = vectorN_t::Zero(model.nv());
-                    uLast = vectorN_t::Zero(model.nv());
-                    uCommandLast = vectorN_t::Zero(model.getMotorsNames().size());
-
-                    // Initialize the internal systemDynamics buffers
-                    x = x_init;
-                    dxdt = vectorN_t::Zero(model.nx());
-                    uControl = vectorN_t::Zero(model.nv());
-
-                    fext = pinocchio::container::aligned_vector<pinocchio::Force>(model.pncModel_.joints.size(),
-                                                                                  pinocchio::Force::Zero());
-                    uInternal = vectorN_t::Zero(model.nv());
-
-                    // Set the initialization flag
-                    isInitialized = true;
-                }
-
-                return returnCode;
-            }
-
-            void updateLast(float64_t const & t,
-                            vectorN_t const & q,
-                            vectorN_t const & v,
-                            vectorN_t const & a,
-                            vectorN_t const & u,
-                            vectorN_t const & uCommand,
-                            float64_t const & energy)
-            {
-                tLast = t;
-                qLast = q;
-                vLast = v;
-                aLast = a;
-                uLast = u;
-                uCommandLast = uCommand;
-                energyLast = energy;
-                ++iterLast;
-            }
-
-        public:
-            // State information about the last iteration
-            int32_t iterLast;
-            float64_t tLast;
-            vectorN_t qLast;
-            vectorN_t vLast;
-            vectorN_t aLast;
-            vectorN_t uLast;
-            vectorN_t uCommandLast;
-            float64_t energyLast; ///< Energy (kinetic + potential) of the system at the last state.
-
-            // Internal buffers required for the adaptive step computation and system dynamics
-            vectorN_t x;
-            vectorN_t dxdt;
-            vectorN_t uControl;
-
-            // Internal buffers to speed up the evaluation of the system dynamics
-            pinocchio::container::aligned_vector<pinocchio::Force> fext;
-            vectorN_t uInternal;
-
-        private:
-            bool isInitialized;
-        };
-
     public:
         Engine(void);
         ~Engine(void);
@@ -355,8 +381,11 @@ namespace jiminy
         result_t configureTelemetry(void);
         void updateTelemetry(void);
 
+        result_t reset(vectorN_t const & x_init,
+                       bool const & resetDynamicForceRegister = false);
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
+        result_t step(float64_t end_time = -1); // Naming for consistency with OdeInt. Pass-by-value on purpose.
 
         void registerForceImpulse(std::string const & frameName,
                                   float64_t   const & t,
@@ -366,10 +395,11 @@ namespace jiminy
                                   external_force_t         forceFct);
 
         configHolder_t getOptions(void) const;
-        void setOptions(configHolder_t const & engineOptions);
+        result_t setOptions(configHolder_t const & engineOptions);
         bool getIsInitialized(void) const;
         bool getIsTelemetryConfigured(void) const;
         Model const & getModel(void) const;
+        stepperState_t const & getStepperState(void) const;
         std::vector<vectorN_t> const & getContactForces(void) const;
         void getLogData(std::vector<std::string> & header,
                         matrixN_t                & logData);
@@ -402,40 +432,12 @@ namespace jiminy
         TelemetrySender telemetrySender_;
         std::shared_ptr<TelemetryData> telemetryData_;
         std::unique_ptr<TelemetryRecorder> telemetryRecorder_;
+        stepper_t stepper_;
+        float64_t stepperUpdatePeriod_;
         stepperState_t stepperState_; // Internal state for the integration loop
         std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> > forcesImpulse_; // MUST use ordered map (wrt. the application time)
         std::map<float64_t, std::tuple<std::string, float64_t, vector3_t> >::const_iterator forceImpulseNextIt_;
         std::vector<std::pair<std::string, std::tuple<int32_t, external_force_t> > > forcesProfile_;
-    };
-
-    class explicit_euler
-    {
-    public:
-        typedef vectorN_t state_type;
-        typedef vectorN_t deriv_type;
-        typedef float64_t value_type;
-        typedef float64_t time_type;
-        typedef unsigned short order_type;
-
-        using stepper_category = controlled_stepper_tag;
-
-        static order_type order(void)
-        {
-            return 1;
-        }
-
-        template<class System>
-        controlled_step_result try_step(System       system,
-                                        state_type & x,
-                                        deriv_type & dxdt,
-                                        time_type  & t,
-                                        time_type  & dt) const
-        {
-            t += dt;
-            system(x, dxdt, t);
-            x += dt * dxdt;
-            return controlled_step_result::success;
-        }
     };
 }
 
