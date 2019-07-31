@@ -134,7 +134,7 @@ namespace jiminy
     }
 
     result_t AbstractController::registerNewVectorEntry(std::vector<std::string> const & fieldNames,
-                                                        Eigen::Ref<vectorN_t>    const & values)
+                                                        Eigen::Ref<vectorN_t>            values)
     {
         // Delayed variable registration (Taken into account by 'configureTelemetry')
 

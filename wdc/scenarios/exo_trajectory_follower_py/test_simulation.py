@@ -103,7 +103,7 @@ model_options["dynamics"]["centerOfMassPositionBodiesBiasStd"] = 0.0
 model_options["dynamics"]["relativePositionBodiesBiasStd"] = 0.0
 model_options["dynamics"]["enableFlexibleModel"] = True
 model_options["dynamics"]["flexibleJointsNames"] = ["RightTransverseHipJoint"]
-model_options["dynamics"]["flexibleJointsStiffness"] = [np.array([[1.0e4, 1.0e4, 1.0e4]]).T]
+model_options["dynamics"]["flexibleJointsStiffness"] = [np.array([[1.0e5, 1.0e5, 1.0e5]]).T]
 model_options["dynamics"]["flexibleJointsDamping"] = [np.array([[1.0e1, 1.0e1, 1.0e1]]).T]
 
 # for sensorOptions in sensors_options['ImuSensor'].values():

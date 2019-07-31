@@ -116,6 +116,7 @@ namespace jiminy
             dt = dt_init;
             x = x_init;
             dxdt = vectorN_t::Zero(model.nx());
+            computePositionDerivative(model.pncModel_, qLast, vLast, dxdt.head(model.nq()));
             uControl = vectorN_t::Zero(model.nv());
 
             fext = pinocchio::container::aligned_vector<pinocchio::Force>(

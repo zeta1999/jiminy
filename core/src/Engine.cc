@@ -262,14 +262,11 @@ namespace jiminy
             return result_t::ERROR_BAD_INPUT;
         }
 
-        // Propagate the gravity value at Pinocchio model level
-        if (model_->getIsInitialized())
-        {
-            model_->pncModel_.gravity = engineOptions_->world.gravity;
-        }
-
         // Reset the model, controller, engine, and registered impulse forces if requested
         reset(resetDynamicForceRegister);
+
+        // Propagate the gravity value at Pinocchio model level
+        model_->pncModel_.gravity = engineOptions_->world.gravity;
 
         // Compute the initial flexible state based on the initial rigid state
         vectorN_t x0 = vectorN_t::Zero(model_->nx());
@@ -286,17 +283,6 @@ namespace jiminy
             x0[jointId + 3] = 1.0;
         }
 
-        // Compute the initial time step
-        float64_t dt = 0.0;
-        if (stepperUpdatePeriod_ > EPS)
-        {
-            dt = stepperUpdatePeriod_; // The initial time step is the update period
-        }
-        else
-        {
-            dt = engineOptions_->stepper.dtMax; // Use the maximum allowed time step as default
-        }
-
         // Reset the impulse for iterator counter
         forceImpulseNextIt_ = forcesImpulse_.begin();
         for (auto & forceProfile : forcesProfile_)
@@ -308,9 +294,31 @@ namespace jiminy
            the registration of new variables */
         telemetryRecorder_->initialize();
 
+        // Initialize the ode solver
+        if (engineOptions_->stepper.odeSolver == "runge_kutta_dopri5")
+        {
+            stepper_ = make_controlled(engineOptions_->stepper.tolAbs,
+                                       engineOptions_->stepper.tolRel,
+                                       runge_kutta_stepper_t());
+        }
+        else if (engineOptions_->stepper.odeSolver == "explicit_euler")
+        {
+            stepper_ = explicit_euler();
+        }
+
+        // Compute the initial time step
+        float64_t dt;
+        if (stepperUpdatePeriod_ > EPS)
+        {
+            dt = stepperUpdatePeriod_; // The initial time step is the update period
+        }
+        else
+        {
+            dt = engineOptions_->stepper.dtMax; // Use the maximum allowed time step as default
+        }
+
         // Initialize the stepper internal state
         stepperState_.initialize(*model_, x0, dt);
-        systemDynamics(0, stepperState_.x, stepperState_.dxdt);
 
         // Initialize the external contact forces
         std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
@@ -357,7 +365,7 @@ namespace jiminy
         }
 
         // Reset the model, controller, and engine
-        reset(x_init, false);
+        returnCode = reset(x_init, false);
 
         // Integration loop based on boost::numeric::odeint::detail::integrate_times
         while (true)
@@ -371,15 +379,16 @@ namespace jiminy
                 break;
             }
             else if (engineOptions_->stepper.iterMax > 0
-            && stepperState_.iterLast >= engineOptions_->stepper.iterMax)
+            && stepperState_.iterLast >= (uint32_t) engineOptions_->stepper.iterMax)
+            {
+                break;
+            }
+            else if (returnCode != result_t::SUCCESS)
             {
                 break;
             }
 
-            if (returnCode == result_t::SUCCESS)
-            {
-                returnCode = step(t_end);
-            }
+            returnCode = step(t_end);
         }
 
         return returnCode;
@@ -574,13 +583,7 @@ namespace jiminy
         stepperState_.uLast = pinocchio::rnea(model_->pncModel_, model_->pncData_, q, v, a); // Update uLast directly to avoid temporary
         float64_t energy = pinocchio::kineticEnergy(model_->pncModel_, model_->pncData_, q, v, false)
             + pinocchio::potentialEnergy(model_->pncModel_, model_->pncData_, q, false);
-        stepperState_.updateLast(t,
-                                 q,
-                                 v,
-                                 a,
-                                 stepperState_.uLast,
-                                 stepperState_.uCommandLast,
-                                 energy); // uCommandLast are already up-to-date
+        stepperState_.updateLast(t, q, v, a, stepperState_.uLast, stepperState_.uCommandLast, energy); // uCommandLast are already up-to-date
 
         // Monitor current iteration number, and log the current time, state, command, and sensors data.
         updateTelemetry();
@@ -629,17 +632,7 @@ namespace jiminy
         if (returnCode == result_t::SUCCESS)
         {
             std::string const & odeSolver = boost::get<std::string>(stepperOptions.at("odeSolver"));
-            if (odeSolver == "runge_kutta_dopri5")
-            {
-                stepper_ = make_controlled(boost::get<float64_t>(stepperOptions.at("tolAbs")),
-                                           boost::get<float64_t>(stepperOptions.at("tolRel")),
-                                           runge_kutta_stepper_t());
-            }
-            else if (odeSolver == "explicit_euler")
-            {
-                stepper_ = explicit_euler();
-            }
-            else
+            if (odeSolver != "runge_kutta_dopri5" && odeSolver != "explicit_euler")
             {
                 std::cout << "Error - Engine::setOptions - The requested 'odeSolver' is not available." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
@@ -862,14 +855,9 @@ namespace jiminy
 
         // Compute dynamics
         vectorN_t a = pinocchio::aba(model_->pncModel_, model_->pncData_, q, v, u, fext);
-
-        /* Hack to compute the configuration vector derivative, including the
-           quaternions on SO3 automatically. Note that the time difference must
-           not be too small to avoid failure. */
-        float64_t dt = std::max(1e-5, t - stepperState_.tLast);
-        vectorN_t qNext(model_->nq());
-        pinocchio::integrate(model_->pncModel_, q, v*dt, qNext);
-        vectorN_t qDot = (qNext - q) / dt;
+        float64_t dt = t - stepperState_.tLast;
+        vectorN_t qDot(model_->nq());
+        computePositionDerivative(model_->pncModel_, q, v, qDot, dt);
 
         // Fill up dxdt
         dxdt.resize(model_->nx());
