@@ -668,8 +668,6 @@ namespace python
                              (bp::arg("self"), bp::arg("dt_desired")=-1))
                 .def("reset", &PyEngineVisitor::reset,
                               (bp::arg("self"), "x_init"))
-                .add_property("stepper_state", bp::make_function(&Engine::getStepperState,
-                                               bp::return_internal_reference<>()))
                 .def("get_log", &PyEngineVisitor::getLog)
                 .def("write_log", &PyEngineVisitor::writeLog,
                                   (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
@@ -681,6 +679,11 @@ namespace python
                 .def("get_options", &PyEngineVisitor::getOptions,
                                     bp::return_value_policy<bp::return_by_value>())
                 .def("set_options", &PyEngineVisitor::setOptions)
+
+                .add_property("stepper_state", bp::make_function(&Engine::getStepperState,
+                                               bp::return_internal_reference<>()))
+                .add_property("model", bp::make_function(&Engine::getModel,
+                                       bp::return_internal_reference<>()))
                 ;
         }
 

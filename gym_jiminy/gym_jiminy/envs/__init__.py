@@ -1,0 +1,1 @@
+from gym_jiminy.envs.cartpole import JiminyCartPoleEnv

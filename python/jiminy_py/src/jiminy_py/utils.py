@@ -6,6 +6,7 @@ import re
 import shutil
 import time
 from copy import copy
+import subprocess
 from threading import Thread, Lock
 from bisect import bisect_right
 import numpy as np
@@ -312,3 +313,26 @@ def get_colorized_urdf(urdf_path, rgb):
 
     return colorized_urdf_path
 
+def get_gepetto_client(open_if_needed=False):
+    try:
+        return Client(), None
+    except:
+        try:
+            return Client(), None
+        except:
+            if (open_if_needed):
+                FNULL = open(os.devnull, 'w')
+                proc = subprocess.Popen(['gepetto-gui'],
+                                       shell=False,
+                                       stdout=FNULL,
+                                       stderr=FNULL)
+                time.sleep(1)
+                try:
+                    return Client(), proc
+                except:
+                    try:
+                        return Client(), proc
+                    except:
+                        print("Impossible to open Gepetto-viewer")
+
+    return None, None
