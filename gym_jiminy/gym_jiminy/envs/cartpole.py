@@ -119,7 +119,7 @@ class JiminyCartPoleEnv(gym.Env):
         self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,1))
         self.engine_py.reset(self.state)
         self.steps_beyond_done = None
-        return np.array(self.state)
+        return self.state[:,0]
 
     def render(self, mode='human'):
         self.engine_py.render()
@@ -130,15 +130,17 @@ class JiminyCartPoleEnv(gym.Env):
     def step(self, action):
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
 
-        self.engine_py.step(np.array([[action * self.force_mag]]))
+        # self.engine_py.step(np.array([[action * self.force_mag]]))
+        self.engine_py._action[0] = action * self.force_mag # Bypass check and ue direct assignment for performance efficiency
+        self.engine_py._engine.step()
+        self.state = self.engine_py.state.A1 # Convert matrix vector to actual 1D np array BY REFERENCE !
 
-        x, x_dot, theta, theta_dot = self.engine_py.state
+        x, x_dot, theta, theta_dot = self.state
 
         done =  x < -self.x_threshold \
                 or x > self.x_threshold \
                 or theta < -self.theta_threshold_radians \
                 or theta > self.theta_threshold_radians
-        done = bool(done)
 
         if not done:
             reward = 1.0
@@ -152,4 +154,4 @@ class JiminyCartPoleEnv(gym.Env):
             self.steps_beyond_done += 1
             reward = 0.0
 
-        return np.array(self.engine_py.state), reward, done, {}
+        return self.state, reward, done, {}

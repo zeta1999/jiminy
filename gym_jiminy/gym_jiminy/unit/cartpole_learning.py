@@ -73,17 +73,15 @@ def cartpole():
     while True:
         run += 1
         state = env.reset()
-        state = np.reshape(state, [1, observation_space])
+        state = np.reshape(state, [1, observation_space]) # Reshape BY REFERENCE !
         step = 0
         while True:
-            elapsed = []
             step += 1
-            env.render()
-            t = time.time()
+            # env.render()
             action = dqn_solver.act(state)
             state_next, reward, terminal, info = env.step(action)
             reward = reward if not terminal else -reward
-            state_next = np.reshape(state_next, [1, observation_space])
+            state_next = np.reshape(state_next, [1, observation_space]) # Reshape BY REFERENCE !
             dqn_solver.remember(state, action, reward, state_next, terminal)
             state = state_next
             if terminal:

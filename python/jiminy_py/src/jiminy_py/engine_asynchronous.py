@@ -99,7 +99,7 @@ class engine_asynchronous(object):
 
     @property
     def state(self):
-        return self._engine.stepper_state.x
+        return self._engine.stepper_state.x # By value ! slow !
 
     @property
     def observation(self):

@@ -1,12 +1,11 @@
-build/
 *.asv
 *.m~
 *.exe
 *.mlappinstall
 *.mltbx
-helpsearch*/
 *ert_rtw/
 *slprj/
 *codegen/
 *.autosave
 *.slxc
+*.pyc
