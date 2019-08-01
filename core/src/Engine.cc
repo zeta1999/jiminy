@@ -23,7 +23,9 @@
 
 namespace jiminy
 {
-    float64_t const MAX_TIME_STEP_MAX = 3e-3;
+    float64_t const MIN_TIME_STEP = 1e-6;
+    float64_t const MAX_TIME_STEP = 4e-3;
+
 
     Engine::Engine(void):
     engineOptions_(nullptr),
@@ -325,7 +327,7 @@ namespace jiminy
 
         // Compute the initial time step
         float64_t dt;
-        if (stepperUpdatePeriod_ > EPS)
+        if (stepperUpdatePeriod_ > MIN_TIME_STEP)
         {
             dt = stepperUpdatePeriod_; // The initial time step is the update period
         }
@@ -390,7 +392,7 @@ namespace jiminy
             /* Stop the simulation if the end time has been reached, if
                the callback returns false, or if the number of integration
                steps exceeds 1e5. */
-            if (std::abs(tEnd - stepperState_.t) < EPS
+            if (tEnd - stepperState_.t < MIN_TIME_STEP
             || !callbackFct_(stepperState_.t, stepperState_.x))
             {
                 break;
@@ -442,43 +444,43 @@ namespace jiminy
         float64_t tNext = t;
         if (tEnd < 0)
         {
-            if (dtDesired > EPS)
+            if (dtDesired < MIN_TIME_STEP)
             {
-                tEnd = t + dtDesired;
+                tEnd = t + MAX_TIME_STEP;
             }
             else
             {
-                tEnd = t + MAX_TIME_STEP_MAX;
+                tEnd = t + dtDesired;
             }
         }
 
         do
         {
-            if (stepperUpdatePeriod_ > 0)
+            if (stepperUpdatePeriod_ > EPS)
             {
                 // Update the sensor data if necessary (only for finite update frequency)
-                if (engineOptions_->stepper.sensorsUpdatePeriod > 0)
+                if (engineOptions_->stepper.sensorsUpdatePeriod > EPS)
                 {
-                    float64_t tNextUpdateSensor =
-                        std::round(t / engineOptions_->stepper.sensorsUpdatePeriod) *
-                        engineOptions_->stepper.sensorsUpdatePeriod;
-                    if (std::abs(t - tNextUpdateSensor) < 1e-8)
+                    float const & sensorsUpdatePeriod = engineOptions_->stepper.sensorsUpdatePeriod;
+                    float dtNextSensorsUpdatePeriod = sensorsUpdatePeriod - std::fmod(t, sensorsUpdatePeriod);
+                    if (dtNextSensorsUpdatePeriod < MIN_TIME_STEP
+                    || sensorsUpdatePeriod - dtNextSensorsUpdatePeriod < MIN_TIME_STEP)
                     {
                         model_->setSensorsData(stepperState_.tLast,
-                                            stepperState_.qLast,
-                                            stepperState_.vLast,
-                                            stepperState_.aLast,
-                                            stepperState_.uLast);
+                                               stepperState_.qLast,
+                                               stepperState_.vLast,
+                                               stepperState_.aLast,
+                                               stepperState_.uLast);
                     }
                 }
 
                 // Update the controller command if necessary (only for finite update frequency)
-                if (engineOptions_->stepper.controllerUpdatePeriod > 0)
+                if (engineOptions_->stepper.controllerUpdatePeriod > EPS)
                 {
-                    float64_t tNextUpdateController =
-                        std::round(t / engineOptions_->stepper.controllerUpdatePeriod) *
-                            engineOptions_->stepper.controllerUpdatePeriod;
-                    if (std::abs(t - tNextUpdateController) < 1e-8)
+                    float const & controllerUpdatePeriod = engineOptions_->stepper.controllerUpdatePeriod;
+                    float dtNextControllerUpdatePeriod = controllerUpdatePeriod - std::fmod(t, controllerUpdatePeriod);
+                    if (dtNextControllerUpdatePeriod < MIN_TIME_STEP
+                    || controllerUpdatePeriod - dtNextControllerUpdatePeriod < MIN_TIME_STEP)
                     {
                         controller_->computeCommand(stepperState_.tLast,
                                                     stepperState_.qLast,
@@ -533,13 +535,23 @@ namespace jiminy
                 }
             }
 
-            if (stepperUpdatePeriod_ > 0)
+            if (stepperUpdatePeriod_ > EPS)
             {
                 // Get the target time at next iteration
-                tNext += min(stepperUpdatePeriod_,
-                             tEnd - t,
-                             tForceImpulseNext - t);
-                if (dtDesired > 0.0)
+                float dtNextUpdatePeriod = stepperUpdatePeriod_ - std::fmod(t, stepperUpdatePeriod_);
+                if (dtNextUpdatePeriod < MIN_TIME_STEP)
+                {
+                    tNext += min(stepperUpdatePeriod_,
+                                 tEnd - t,
+                                 tForceImpulseNext - t);
+                }
+                else
+                {
+                    tNext += min(dtNextUpdatePeriod,
+                                 tEnd - t,
+                                 tForceImpulseNext - t);
+                }
+                if (dtDesired > EPS)
                 {
                     tNext = std::min(tNext,
                                      stepperState_.t + dtDesired);
@@ -581,7 +593,7 @@ namespace jiminy
                                        engineOptions_->stepper.dtMax,
                                        tEnd - t,
                                        tForceImpulseNext - t);
-                if (dtDesired > 0.0)
+                if (dtDesired > EPS)
                 {
                     stepperState_.dt = std::min(stepperState_.dt,
                                                 stepperState_.t + dtDesired - t);
@@ -610,7 +622,7 @@ namespace jiminy
                     }
                 }
             }
-        } while(dtDesired > 0.0 && stepperState_.t + dtDesired - t > EPS);
+        } while(dtDesired > 0.0 && stepperState_.t + dtDesired - t > MIN_TIME_STEP);
 
         // Update the current time
         stepperState_.t = t;
@@ -651,7 +663,7 @@ namespace jiminy
         // Make sure the dtMax is not out of bounds
         configHolder_t stepperOptions = boost::get<configHolder_t>(engineOptions.at("stepper"));
         float64_t const & dtMax = boost::get<float64_t>(stepperOptions.at("dtMax"));
-        if (MAX_TIME_STEP_MAX < dtMax || dtMax < MIN_TIME_STEP_MAX)
+        if (MAX_TIME_STEP < dtMax || dtMax < MIN_TIME_STEP)
         {
             std::cout << "Error - Engine::setOptions - 'dtMax' option is out of bounds." << std::endl;
             returnCode = result_t::ERROR_BAD_INPUT;
@@ -675,11 +687,17 @@ namespace jiminy
             boost::get<float64_t>(stepperOptions.at("controllerUpdatePeriod"));
         if (returnCode == result_t::SUCCESS)
         {
-            if (sensorsUpdatePeriod > EPS && controllerUpdatePeriod > EPS
+            if ((EPS < sensorsUpdatePeriod && sensorsUpdatePeriod < MIN_TIME_STEP)
+            || (EPS < controllerUpdatePeriod && controllerUpdatePeriod < MIN_TIME_STEP))
+            {
+                std::cout << "Error - Engine::setOptions - The controller and sensor update periods must be infinite for larger than " << MIN_TIME_STEP << "s." << std::endl;
+                returnCode = result_t::ERROR_BAD_INPUT;
+            }
+            else if (sensorsUpdatePeriod > EPS && controllerUpdatePeriod > EPS
             && std::fmod(sensorsUpdatePeriod, controllerUpdatePeriod) > EPS
             && std::fmod(sensorsUpdatePeriod, controllerUpdatePeriod) > EPS)
             {
-                std::cout << "Error - Engine::setOptions - The controller and sensor update frequencies must be multiple of each other if not infinite." << std::endl;
+                std::cout << "Error - Engine::setOptions - The controller and sensor update periods must be multiple of each other if not infinite." << std::endl;
                 returnCode = result_t::ERROR_BAD_INPUT;
             }
         }
@@ -687,11 +705,11 @@ namespace jiminy
         // Compute the breakpoints' period (for command or observation) during the integration loop
         if (returnCode == result_t::SUCCESS)
         {
-            if (sensorsUpdatePeriod < EPS)
+            if (sensorsUpdatePeriod < MIN_TIME_STEP)
             {
                 stepperUpdatePeriod_ = controllerUpdatePeriod;
             }
-            else if (controllerUpdatePeriod < EPS)
+            else if (controllerUpdatePeriod < MIN_TIME_STEP)
             {
                 stepperUpdatePeriod_ = sensorsUpdatePeriod;
             }
@@ -830,14 +848,14 @@ namespace jiminy
 
         /* Update the sensor data if necessary (only for infinite update frequency).
            Impossible to have access to the current acceleration and efforts. */
-        if (engineOptions_->stepper.sensorsUpdatePeriod < EPS)
+        if (engineOptions_->stepper.sensorsUpdatePeriod < MIN_TIME_STEP)
         {
             model_->setSensorsData(t, q, v, stepperState_.aLast, stepperState_.uLast);
         }
 
         /* Update the controller command if necessary (only for infinite update frequency).
            Be careful, in this particular case uCommandLast is not guarantee to be the last command. */
-        if (engineOptions_->stepper.controllerUpdatePeriod < EPS)
+        if (engineOptions_->stepper.controllerUpdatePeriod < MIN_TIME_STEP)
         {
             controller_->computeCommand(t, q, v, stepperState_.uCommandLast);
 

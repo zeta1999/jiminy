@@ -48,8 +48,8 @@ controller = wdc_jiminy.exo_controller()
 
 Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
                20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0])
-Kd = np.array([250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
-               250.0, 150.0, 100.0, 100.0, 150.0, 100.0])
+Kd = np.array([225.0, 135.0, 100.0, 100.0, 135.0, 100.0,
+               225.0, 135.0, 100.0, 100.0, 135.0, 100.0])
 pid_controller_py = pid_feedforward(model, controller, trajectory_data, Kp, Kd)
 
 controller.initialize(model, pid_controller_py.compute_command)

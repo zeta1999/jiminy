@@ -9,10 +9,14 @@
 
 #include "jiminy/core/Utilities.h"
 #include "jiminy/core/TelemetrySender.h"
+#include "jiminy/core/Engine.h" // Required to get access to MIN_TIME_STEP and MAX_TIME_STEP
 
 
 namespace jiminy
 {
+    extern float64_t const MIN_TIME_STEP;
+    extern float64_t const MAX_TIME_STEP;
+
     // ************************* Timer **************************
 
     Timer::Timer(void) :
@@ -293,7 +297,7 @@ namespace jiminy
            quaternions on SO3 automatically. Note that the time difference must
            not be too small to avoid failure. */
 
-        dt = std::max(1e-5, dt);
+        dt = std::max(MIN_TIME_STEP, dt);
         vectorN_t qNext(q.size());
         pinocchio::integrate(model, q, v*dt, qNext);
         qDot = (qNext - q) / dt;

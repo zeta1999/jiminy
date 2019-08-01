@@ -21,8 +21,9 @@
 namespace jiminy
 {
     std::string const ENGINE_OBJECT_NAME("HighLevelController");
-    float64_t const MIN_TIME_STEP_MAX(1e-5);
-    extern float64_t const MAX_TIME_STEP_MAX; // Must be external to be accessible by multiple .cpp
+
+    extern float64_t const MIN_TIME_STEP;
+    extern float64_t const MAX_TIME_STEP;
 
     using namespace boost::numeric::odeint;
 
@@ -93,7 +94,7 @@ namespace jiminy
 
         void initialize(Model & model)
         {
-            initialize(model, vectorN_t::Zero(model.nx()), MIN_TIME_STEP_MAX);
+            initialize(model, vectorN_t::Zero(model.nx()), MIN_TIME_STEP);
         }
 
         void initialize(Model           & model,

@@ -1,8 +1,9 @@
-#include "jiminy/core/Engine.h" // Required to get access to MAX_TIME_STEP_MAX
+#include "jiminy/core/Engine.h" // Required to get access to MIN_TIME_STEP and MAX_TIME_STEP
 
 namespace jiminy
 {
-    extern float64_t const MAX_TIME_STEP_MAX;
+    extern float64_t const MIN_TIME_STEP;
+    extern float64_t const MAX_TIME_STEP;
 
     template <typename T>
     float64_t AbstractSensorTpl<T>::delayMax_(0);
@@ -283,7 +284,7 @@ namespace jiminy
 
         /* Make sure at least the requested delay plus the maximum time step
            is available to handle the case where the solver goes back in time */
-        float64_t const timeMin = t - delayMax_ - MAX_TIME_STEP_MAX;
+        float64_t const timeMin = t - delayMax_ - MAX_TIME_STEP;
 
         // Internal buffer memory management
         if (t + std::numeric_limits<float64_t>::epsilon() > dataHolder_->time_.back())
