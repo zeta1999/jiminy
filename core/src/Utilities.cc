@@ -5,12 +5,18 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+#include "pinocchio/algorithm/joint-configuration.hpp"
+
 #include "jiminy/core/Utilities.h"
 #include "jiminy/core/TelemetrySender.h"
+#include "jiminy/core/Engine.h" // Required to get access to MIN_TIME_STEP and MAX_TIME_STEP
 
 
 namespace jiminy
 {
+    extern float64_t const MIN_TIME_STEP;
+    extern float64_t const MAX_TIME_STEP;
+
     // ************************* Timer **************************
 
     Timer::Timer(void) :
@@ -280,6 +286,22 @@ namespace jiminy
     }
 
     // ********************** Pinocchio utilities **********************
+
+    void computePositionDerivative(pinocchio::Model            model,
+                                   Eigen::Ref<vectorN_t const> q,
+                                   Eigen::Ref<vectorN_t const> v,
+                                   Eigen::Ref<vectorN_t>       qDot,
+                                   float64_t                   dt)
+    {
+        /* Hack to compute the configuration vector derivative, including the
+           quaternions on SO3 automatically. Note that the time difference must
+           not be too small to avoid failure. */
+
+        dt = std::max(MIN_TIME_STEP, dt);
+        vectorN_t qNext(q.size());
+        pinocchio::integrate(model, q, v*dt, qNext);
+        qDot = (qNext - q) / dt;
+    }
 
     result_t getJointNameFromPositionId(pinocchio::Model const & model,
                                         int32_t          const & idIn,
@@ -923,7 +945,7 @@ namespace jiminy
         return out;
     }
 
-    vectorN_t clamp(Eigen::Ref<vectorN_t const> const & data,
+    vectorN_t clamp(Eigen::Ref<vectorN_t const>         data,
                     float64_t                   const & minThr,
                     float64_t                   const & maxThr)
     {

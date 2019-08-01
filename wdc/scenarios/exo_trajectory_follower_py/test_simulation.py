@@ -48,8 +48,8 @@ controller = wdc_jiminy.exo_controller()
 
 Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
                20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0])
-Kd = np.array([250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
-               250.0, 150.0, 100.0, 100.0, 150.0, 100.0])
+Kd = np.array([225.0, 135.0, 100.0, 100.0, 135.0, 100.0,
+               225.0, 135.0, 100.0, 100.0, 135.0, 100.0])
 pid_controller_py = pid_feedforward(model, controller, trajectory_data, Kp, Kd)
 
 controller.initialize(model, pid_controller_py.compute_command)
@@ -103,7 +103,7 @@ model_options["dynamics"]["centerOfMassPositionBodiesBiasStd"] = 0.0
 model_options["dynamics"]["relativePositionBodiesBiasStd"] = 0.0
 model_options["dynamics"]["enableFlexibleModel"] = True
 model_options["dynamics"]["flexibleJointsNames"] = ["RightTransverseHipJoint"]
-model_options["dynamics"]["flexibleJointsStiffness"] = [np.array([[1.0e4, 1.0e4, 1.0e4]]).T]
+model_options["dynamics"]["flexibleJointsStiffness"] = [np.array([[1.0e5, 1.0e5, 1.0e5]]).T]
 model_options["dynamics"]["flexibleJointsDamping"] = [np.array([[1.0e1, 1.0e1, 1.0e1]]).T]
 
 # for sensorOptions in sensors_options['ImuSensor'].values():

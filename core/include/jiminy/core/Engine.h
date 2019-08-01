@@ -21,8 +21,9 @@
 namespace jiminy
 {
     std::string const ENGINE_OBJECT_NAME("HighLevelController");
-    float64_t const MIN_TIME_STEP_MAX(1e-5);
-    extern float64_t const MAX_TIME_STEP_MAX; // Must be external to be accessible by multiple .cpp
+
+    extern float64_t const MIN_TIME_STEP;
+    extern float64_t const MAX_TIME_STEP;
 
     using namespace boost::numeric::odeint;
 
@@ -93,7 +94,7 @@ namespace jiminy
 
         void initialize(Model & model)
         {
-            initialize(model, vectorN_t::Zero(model.nx()), MIN_TIME_STEP_MAX);
+            initialize(model, vectorN_t::Zero(model.nx()), MIN_TIME_STEP);
         }
 
         void initialize(Model           & model,
@@ -101,7 +102,7 @@ namespace jiminy
                         float64_t const & dt_init)
         {
             // Initialize the ode stepper state buffers
-            iterLast = 0;
+            iterLast = -1;
             tLast = 0.0;
             qLast = x_init.head(model.nq());
             vLast = x_init.tail(model.nv());
@@ -116,6 +117,7 @@ namespace jiminy
             dt = dt_init;
             x = x_init;
             dxdt = vectorN_t::Zero(model.nx());
+            computePositionDerivative(model.pncModel_, qLast, vLast, dxdt.head(model.nq()));
             uControl = vectorN_t::Zero(model.nv());
 
             fext = pinocchio::container::aligned_vector<pinocchio::Force>(
@@ -385,7 +387,8 @@ namespace jiminy
                        bool const & resetDynamicForceRegister = false);
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
-        result_t step(float64_t end_time = -1); // Naming for consistency with OdeInt. Pass-by-value on purpose.
+        result_t step(float64_t const & dtDesired = -1,
+                      float64_t         t_end = -1);
 
         void registerForceImpulse(std::string const & frameName,
                                   float64_t   const & t,

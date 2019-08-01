@@ -664,11 +664,10 @@ namespace python
                                    (bp::arg("self"), "model", "controller", "callback_handle"))
                 .def("simulate", &Engine::simulate,
                                  (bp::arg("self"), "x_init", "end_time"))
-                .def("step", &PyEngineVisitor::step)
+                .def("step", &PyEngineVisitor::step,
+                             (bp::arg("self"), bp::arg("dt_desired")=-1))
                 .def("reset", &PyEngineVisitor::reset,
                               (bp::arg("self"), "x_init"))
-                .add_property("stepper_state", bp::make_function(&Engine::getStepperState,
-                                               bp::return_internal_reference<>()))
                 .def("get_log", &PyEngineVisitor::getLog)
                 .def("write_log", &PyEngineVisitor::writeLog,
                                   (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
@@ -680,6 +679,11 @@ namespace python
                 .def("get_options", &PyEngineVisitor::getOptions,
                                     bp::return_value_policy<bp::return_by_value>())
                 .def("set_options", &PyEngineVisitor::setOptions)
+
+                .add_property("stepper_state", bp::make_function(&Engine::getStepperState,
+                                               bp::return_internal_reference<>()))
+                .add_property("model", bp::make_function(&Engine::getModel,
+                                       bp::return_internal_reference<>()))
                 ;
         }
 
@@ -711,10 +715,11 @@ namespace python
             return self.reset(x_init);
         }
 
-        static result_t step(Engine          & self)
+        static result_t step(Engine          & self,
+                             float64_t const & dtDesired)
         {
             // Only way to handle C++ default values
-            return self.step();
+            return self.step(dtDesired);
         }
 
         static void writeLog(Engine            & self,

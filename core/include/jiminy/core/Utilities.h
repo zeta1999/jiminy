@@ -81,6 +81,12 @@ namespace jiminy
 
     // ******************** Pinocchio utilities *********************
 
+    void computePositionDerivative(pinocchio::Model            model,
+                                   Eigen::Ref<vectorN_t const> q,
+                                   Eigen::Ref<vectorN_t const> v,
+                                   Eigen::Ref<vectorN_t>       qDot,
+                                   float64_t                   dt = 1e-5);
+
     // Pinocchio joint types
     enum class joint_t : int32_t
     {
@@ -155,7 +161,7 @@ namespace jiminy
                            float64_t const & ma,
                            float64_t const & r);
 
-    vectorN_t clamp(Eigen::Ref<vectorN_t const> const & data,
+    vectorN_t clamp(Eigen::Ref<vectorN_t const>         data,
                     float64_t                   const & minThr = -INF,
                     float64_t                   const & maxThr = +INF);
 

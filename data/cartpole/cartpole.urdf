@@ -80,7 +80,7 @@
     <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
     <parent link="cart"/>
     <child link="pole"/>
-    <limit effort="1000.0" lower="-1.57" upper="1.57" velocity="1000"/>
+    <limit effort="1000.0" lower="-10" upper="10" velocity="1000"/>
   </joint>
 
 </robot>

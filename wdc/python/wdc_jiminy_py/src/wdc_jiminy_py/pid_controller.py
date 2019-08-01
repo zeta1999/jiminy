@@ -78,12 +78,12 @@ class pid_feedforward:
     def __init__(self, model, controller, trajectory_data_ref, Kp=None, Kd=None):
         # Set the PID controller gains
         if Kp is None:
-            Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0,
-                           20000.0, 10000.0, 10000.0, 10000.0, 15000.0, 10000.0])
+            Kp = np.array([20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0,
+                        20000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0])
         self.Kp = Kp
         if Kd is None:
-            Kd = np.array([250.0, 150.0, 100.0, 100.0, 150.0, 100.0,
-                           250.0, 150.0, 100.0, 100.0, 150.0, 100.0])
+            Kd = np.array([225.0, 135.0, 100.0, 100.0, 135.0, 100.0,
+                        225.0, 135.0, 100.0, 100.0, 135.0, 100.0])
         self.Kd = Kd
 
         # Generate the reference trajectory

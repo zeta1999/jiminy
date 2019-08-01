@@ -40,8 +40,17 @@ include_directories(SYSTEM /opt/install/GCC/include/eigen3/)
 include_directories(SYSTEM /usr/include/python2.7/)
 include_directories(SYSTEM /usr/local/lib/python2.7/dist-packages/numpy/core/include/)
 
+# Python install helper
+function(deploy_python_gym_package TARGET_NAME)
+    install (CODE "EXECUTE_PROCESS (COMMAND pip install -e .
+                                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_NAME})")
+endfunction()
+
 # Sub-project name(s)
 add_subdirectory(core)
 add_subdirectory(python)
 add_subdirectory(scenarios)
 add_subdirectory(wdc)
+
+# Install native python packages
+deploy_python_gym_package(gym_jiminy)
