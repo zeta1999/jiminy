@@ -81,11 +81,11 @@ namespace jiminy
 
     // ******************** Pinocchio utilities *********************
 
-    void computePositionDerivative(pinocchio::Model            model,
-                                   Eigen::Ref<vectorN_t const> q,
-                                   Eigen::Ref<vectorN_t const> v,
-                                   Eigen::Ref<vectorN_t>       qDot,
-                                   float64_t                   dt = 1e-5);
+    void computePositionDerivative(pinocchio::Model            const & model,
+                                   Eigen::Ref<vectorN_t const>         q,
+                                   Eigen::Ref<vectorN_t const>         v,
+                                   Eigen::Ref<vectorN_t>               qDot,
+                                   float64_t                           dt = 1e-5); // Make a copy
 
     // Pinocchio joint types
     enum class joint_t : int32_t

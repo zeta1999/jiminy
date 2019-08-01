@@ -287,11 +287,11 @@ namespace jiminy
 
     // ********************** Pinocchio utilities **********************
 
-    void computePositionDerivative(pinocchio::Model            model,
-                                   Eigen::Ref<vectorN_t const> q,
-                                   Eigen::Ref<vectorN_t const> v,
-                                   Eigen::Ref<vectorN_t>       qDot,
-                                   float64_t                   dt)
+    void computePositionDerivative(pinocchio::Model            const & model,
+                                   Eigen::Ref<vectorN_t const>         q,
+                                   Eigen::Ref<vectorN_t const>         v,
+                                   Eigen::Ref<vectorN_t>               qDot,
+                                   float64_t                           dt)
     {
         /* Hack to compute the configuration vector derivative, including the
            quaternions on SO3 automatically. Note that the time difference must
