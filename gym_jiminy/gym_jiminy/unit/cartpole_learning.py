@@ -1,5 +1,5 @@
-import __builtin__
 import time
+import sys
 import random
 import gym
 import numpy as np
@@ -8,7 +8,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 
-from gym_jiminy.unit.score_logger import ScoreLogger
+from gym_jiminy.unit import ScoreLogger
 
 
 ENV_NAME = "gym_jiminy:jiminy-cartpole-v0"
@@ -24,7 +24,13 @@ EXPLORATION_MIN = 0.01
 EXPLORATION_DECAY = 0.995
 
 
-print_function = getattr(__builtin__, 'print')
+if (sys.version_info < (3, 0)):
+    import __builtin__
+    print_function = getattr(__builtin__, 'print')
+else:
+    import builtins
+    print_function = builtins.print
+
 
 class DQNSolver:
     def __init__(self, observation_space, action_space):
@@ -85,7 +91,7 @@ def cartpole():
             dqn_solver.remember(state, action, reward, state_next, terminal)
             state = state_next
             if terminal:
-                print "Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step)
+                print("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step))
                 score_logger.add_score(step, run)
                 break
             dqn_solver.experience_replay()
