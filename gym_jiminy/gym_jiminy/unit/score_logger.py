@@ -14,7 +14,7 @@ SCORES_PNG_PATH = dirname + "/scores/scores.png"
 SOLVED_CSV_PATH = dirname + "/scores/solved.csv"
 SOLVED_PNG_PATH = dirname + "/scores/solved.png"
 
-AVERAGE_SCORE_TO_SOLVE = 195
+AVERAGE_SCORE_TO_SOLVE = 800
 CONSECUTIVE_RUNS_TO_SOLVE = 100
 
 

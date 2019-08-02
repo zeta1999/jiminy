@@ -18,6 +18,18 @@
 #include "jiminy/python/Jiminy.h"
 
 
+#if PY_VERSION_HEX >= 0x03000000
+    static void* init_numpy() {
+        import_array();
+        return NULL;
+    }
+#else
+    static void init_numpy() {
+        import_array();
+    }
+#endif
+
+
 namespace jiminy
 {
 namespace python
@@ -28,7 +40,7 @@ namespace python
     {
         // Requirement to create Py arrays and Eigen variables
         eigenpy::enableEigenPy();
-        import_array();
+        init_numpy();
 
         // Interfaces for result_t enum
         bp::enum_<result_t>("result_t")
