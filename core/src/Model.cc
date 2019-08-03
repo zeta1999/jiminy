@@ -412,6 +412,11 @@ namespace jiminy
         if (returnCode == result_t::SUCCESS)
         {
             pncData_ = pinocchio::Data(pncModel_);
+            pinocchio::forwardKinematics(pncModel_,
+                                         pncData_,
+                                         vectorN_t::Zero(pncModel_.nq),
+                                         vectorN_t::Zero(pncModel_.nv));
+            pinocchio::framesForwardKinematics(pncModel_, pncData_);
         }
 
         return returnCode;

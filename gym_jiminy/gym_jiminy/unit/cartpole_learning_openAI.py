@@ -7,7 +7,7 @@ from stable_baselines.common.policies import MlpPolicy
 from stable_baselines import PPO2
 
 import jiminy_py
-from gym_jiminy.unit import SubprocVecEnvLock
+from gym_jiminy.common import SubprocVecEnvLock
 
 # multiprocess environment
 nb_cpu = 4

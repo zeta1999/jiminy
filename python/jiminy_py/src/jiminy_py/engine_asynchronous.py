@@ -1,4 +1,5 @@
 import os
+import signal
 from collections import OrderedDict
 import tempfile
 
@@ -24,16 +25,17 @@ class engine_asynchronous(object):
             self._send_command, self._internal_dynamics, len(self._sensors_types))
         self._controller.initialize(model)
 
-        # Instantiate the Jiminy engine
+        # Instantiate the Jiminy engine (model and controller are pass-by-reference)
         self._engine = jiminy.engine()
-        self._engine.initialize(model, self._controller) # model and controller are pass-by-reference
-        self.reset()
+        self._engine.initialize(model, self._controller)
 
         self.is_gepetto_available = False
         self._client = None
         self._viewer_proc = None
         self._id = None
         self._rb = None
+
+        self.reset()
 
     def _send_command(self, t, q, v, *args):
         for k, sensor_type in enumerate(self._observation):
@@ -51,11 +53,11 @@ class engine_asynchronous(object):
         self._engine.set_options(engine_options)
 
     def reset(self, x0=None, reset_random_generator=False):
-        self._state = None
         if (x0 is None):
             x0 = np.zeros((self._engine.model.nx, 1))
         if (int(self._engine.reset(x0)) != 1):
             raise ValueError("Reset of engine failed.")
+        self._state = x0[:,0]
 
     def step(self, action_next=None):
         if (action_next is not None):
@@ -76,11 +78,11 @@ class engine_asynchronous(object):
                                                         self._engine.model.urdf_path, [],
                                                         pin.GeometryType.COLLISION)
                 visual_model = pin.buildGeomFromUrdf(self._engine.model.pinocchio_model,
-                                                    self._engine.model.urdf_path, [],
-                                                    pin.GeometryType.VISUAL)
+                                                     self._engine.model.urdf_path, [],
+                                                     pin.GeometryType.VISUAL)
                 self._rb.__init__(model=self._engine.model.pinocchio_model,
-                                collision_model=collision_model,
-                                visual_model=visual_model)
+                                  collision_model=collision_model,
+                                  visual_model=visual_model)
                 self.is_gepetto_available = True
 
             # Load model in gepetto viewer if needed
@@ -95,8 +97,13 @@ class engine_asynchronous(object):
                 self._rb.loadDisplayModel(self._id + '/' + "robot")
 
             # Update viewer
-            jiminy_py.update_gepetto_viewer(self._rb, self._engine.model.pinocchio_data,
+            jiminy_py.update_gepetto_viewer(self._rb,
+                                            self._engine.model.pinocchio_data,
                                             self._client, True)
+        except:
+            self.is_gepetto_available = False
+            self._client = None
+            self._viewer_proc = None
         finally:
             if (lock is not None):
                 lock.release()
@@ -104,6 +111,8 @@ class engine_asynchronous(object):
     def close(self):
         if (self._viewer_proc is not None):
             os.killpg(os.getpgid(self._viewer_proc.pid), signal.SIGTERM)
+            self.is_gepetto_available = False
+            self._client = None
             self._viewer_proc = None
 
     @property

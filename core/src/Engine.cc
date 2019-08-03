@@ -346,6 +346,13 @@ namespace jiminy
         // Initialize the stepper internal state
         stepperState_.initialize(*model_, x0, dt);
 
+        // Compute the forward kinematics
+        pinocchio::forwardKinematics(model_->pncModel_,
+                                     model_->pncData_,
+                                     stepperState_.qLast,
+                                     stepperState_.vLast);
+        pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
+
         // Initialize the external contact forces
         std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
         for(uint32_t i=0; i < contactFramesIdx.size(); i++)

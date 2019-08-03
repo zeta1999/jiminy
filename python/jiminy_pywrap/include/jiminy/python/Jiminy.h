@@ -286,14 +286,23 @@ namespace python
         {
             cl
                 .def("initialize", &PyModelVisitor::initialize,
-                                   (bp::arg("self"), "urdf_path", "contacts", "motors", "has_freeflyer"))
+                                   (bp::arg("self"), "urdf_path",
+                                    bp::arg("contacts") = std::vector<std::string>(),
+                                    bp::arg("motors") = std::vector<std::string>(),
+                                    bp::arg("had_freeflyer") = false))
 
                 .def("add_imu_sensor", &PyModelVisitor::createAndAddSensor<ImuSensor>,
-                                       (bp::arg("self"), "sensor_name", "frame_name"))
+                                       (bp::arg("self"),
+                                        bp::arg("sensor_name") = std::string(),
+                                        "frame_name"))
                 .def("add_force_sensor", &PyModelVisitor::createAndAddSensor<ForceSensor>,
-                                         (bp::arg("self"), "sensor_name", "frame_name"))
+                                         (bp::arg("self"),
+                                          bp::arg("sensor_name") = std::string(),
+                                          "frame_name"))
                 .def("add_encoder_sensor", &PyModelVisitor::createAndAddSensor<EncoderSensor>,
-                                           (bp::arg("self"), "sensor_name", "motor_name"))
+                                           (bp::arg("self"),
+                                            bp::arg("sensor_name") = std::string(),
+                                            "joint_name"))
                 .def("remove_sensor", &Model::removeSensor,
                                       (bp::arg("self"), "sensor_type", "sensor_name"))
                 .def("remove_sensors", &Model::removeSensors,
@@ -353,22 +362,27 @@ namespace python
         /// \brief      Initialize the model
         ///////////////////////////////////////////////////////////////////////////////
         static result_t initialize(Model             & self,
-                               std::string const & urdfPath,
-                               bp::list    const & contactFramesNamesPy,
-                               bp::list    const & motorsNamesPy,
-                               bool        const & hasFreeflyer)
+                                   std::string const & urdfPath,
+                                   bp::list    const & contactFramesNamesPy,
+                                   bp::list    const & motorsNamesPy,
+                                   bool        const & hadFreeflyer)
         {
             std::vector<std::string> contactFramesNames = listPyToStdVector<std::string>(contactFramesNamesPy);
             std::vector<std::string> motorsNames = listPyToStdVector<std::string>(motorsNamesPy);
-            return self.initialize(urdfPath, contactFramesNames, motorsNames, hasFreeflyer);
+            return self.initialize(urdfPath, contactFramesNames, motorsNames, hadFreeflyer);
         }
 
         template<typename TSensor>
         static result_t createAndAddSensor(Model             & self,
-                                           std::string const & sensorName,
+                                           std::string         sensorName,
                                            std::string const & name)
         {
             result_t returnCode = result_t::SUCCESS;
+
+            if (sensorName.empty())
+            {
+                sensorName = name;
+            }
 
             std::shared_ptr<TSensor> sensor;
             returnCode = self.addSensor(sensorName, sensor);
