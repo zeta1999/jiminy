@@ -25,13 +25,13 @@ model.learn(total_timesteps=1000000)
 # del model
 # model = PPO2.load("ppo2_cartpole")
 
-# Enjoy trained agent
+# Enjoy a trained agent
 t_end = 20 # duration of the simulations in seconds
 obs = env.reset()
 for _ in range(int(t_end/dt)):
     action, _states = model.predict(obs)
     obs, rewards, dones, info = env.step(action)
-    env.render('rgb_array')
+    env.remotes[0].send(('render',((), {'mode': 'rgb_array'})))
+    env.remotes[0].recv()
     time.sleep(dt)
 
-env.close()

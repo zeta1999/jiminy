@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(name = 'wdc_jiminy_py',
-      version = '0.6',
-      description = 'Package containing python-native methods.',
+      version = '0.8',
+      description = 'Package containing python-native helper methods for Jiminy Wandercraft Closed Source.',
       author = 'Alexis Duburcq',
       packages=find_packages('src'),
       package_dir={'': 'src'},

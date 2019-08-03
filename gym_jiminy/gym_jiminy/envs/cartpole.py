@@ -3,11 +3,10 @@ Classic cart-pole system simulated using Jiminy Engine
 """
 
 import os
-import math
+from math import pi
 import numpy as np
 
-import gym
-from gym import spaces, logger
+from gym import core, spaces, logger
 from gym.utils import seeding
 
 import jiminy
@@ -15,7 +14,7 @@ from jiminy_py import engine_asynchronous
 from gym_jiminy.common import RenderOutMock
 
 
-class JiminyCartPoleEnv(gym.Env):
+class JiminyCartPoleEnv(core.Env):
     """
     Description:
         A pole is attached by an un-actuated joint to a cart.
@@ -62,14 +61,14 @@ class JiminyCartPoleEnv(gym.Env):
         self.force_mag = 40.0
 
         # Angle at which to fail the episode
-        self.theta_threshold_radians = 25 * math.pi / 180
+        self.theta_threshold_radians = 25 * pi / 180
         self.x_threshold = 0.75
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds
         high = np.array([self.x_threshold * 2,
                          self.theta_threshold_radians * 2,
-                         np.finfo(np.float32).max,
-                         np.finfo(np.float32).max])
+                         np.finfo(np.float64).max,
+                         np.finfo(np.float64).max])
 
 
         self.action_space = spaces.Discrete(2) # action can be either 0 or 1
@@ -144,31 +143,32 @@ class JiminyCartPoleEnv(gym.Env):
     def step(self, action):
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
 
-         # Bypass check and use direct assignment to max out the performances
-        # self.engine_py.step(np.array([[action * self.force_mag]]))
+        # Bypass 'self.engine_py.step' method and use direct assignment to max out the performances
         if action == 1:
             self.engine_py._action[0] = self.force_mag
         else:
             self.engine_py._action[0] = -self.force_mag
-        self.engine_py.step()
+        self.engine_py.step(dt_desired=self.dt)
         self.state = self.engine_py.state
-        x, theta, x_dot, theta_dot = self.state
 
-        done =  x < -self.x_threshold \
-                or x > self.x_threshold \
-                or theta < -self.theta_threshold_radians \
-                or theta > self.theta_threshold_radians
-
-        if not done:
+        # Check the terminal condition and compute reward
+        terminal = self._terminal()
+        if not terminal:
             reward = 1.0
         elif self.steps_beyond_done is None:
-            # Pole just fell!
             self.steps_beyond_done = 0
             reward = 1.0
         else:
             if self.steps_beyond_done == 0:
-                logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
+                logger.warn("You are calling 'step()' even though this environment has already returned terminal = True. You should always call 'reset()' once you receive 'terminal = True' -- any further steps are undefined behavior.")
             self.steps_beyond_done += 1
             reward = 0.0
 
-        return self.state, reward, done, {}
+        return self.state, reward, terminal, {}
+
+    def _terminal(self):
+        x, theta, x_dot, theta_dot = self.state
+        return        x < -self.x_threshold \
+               or     x >  self.x_threshold \
+               or theta < -self.theta_threshold_radians \
+               or theta >  self.theta_threshold_radians

@@ -1,15 +1,13 @@
-import os
-import signal
 from collections import OrderedDict
 import tempfile
-
 import numpy as np
+
+import libpinocchio_pywrap as pin
+from pinocchio.robot_wrapper import RobotWrapper
 
 import jiminy
 import jiminy_py
 
-import libpinocchio_pywrap as pin
-from pinocchio.robot_wrapper import RobotWrapper
 
 class engine_asynchronous(object):
     def __init__(self, model):
@@ -18,7 +16,7 @@ class engine_asynchronous(object):
         self._sensors_types = model.get_sensors_options().keys()
         self._state = np.zeros((model.nx, 1))
         self._observation = OrderedDict((sensor_type,[]) for sensor_type in self._sensors_types)
-        self._action = np.zeros((len(model.motors_names), 1))
+        self._action = np.zeros((len(model.motors_names), ))
 
         # Instantiate the Jiminy controller
         self._controller = jiminy.controller_functor(
@@ -59,11 +57,11 @@ class engine_asynchronous(object):
             raise ValueError("Reset of engine failed.")
         self._state = x0[:,0]
 
-    def step(self, action_next=None):
+    def step(self, action_next=None, dt_desired=-1):
         if (action_next is not None):
             self.action = action_next
         self._state = None
-        return self._engine.step()
+        return self._engine.step(dt_desired)
 
     def render(self, lock=None):
         if (lock is not None):
@@ -110,10 +108,10 @@ class engine_asynchronous(object):
 
     def close(self):
         if (self._viewer_proc is not None):
-            os.killpg(os.getpgid(self._viewer_proc.pid), signal.SIGTERM)
-            self.is_gepetto_available = False
-            self._client = None
-            self._viewer_proc = None
+            self._viewer_proc.terminate()
+        self.is_gepetto_available = False
+        self._client = None
+        self._viewer_proc = None
 
     @property
     def state(self):
