@@ -1,5 +1,5 @@
-import __builtin__
 import time
+import sys
 import random
 import gym
 import numpy as np
@@ -8,7 +8,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 
-from gym_jiminy.unit.score_logger import ScoreLogger
+from gym_jiminy.unit import ScoreLogger
 
 
 ENV_NAME = "gym_jiminy:jiminy-cartpole-v0"
@@ -21,10 +21,16 @@ BATCH_SIZE = 20
 
 EXPLORATION_MAX = 1.0
 EXPLORATION_MIN = 0.01
-EXPLORATION_DECAY = 0.995
+EXPLORATION_DECAY = 0.999
 
 
-print_function = getattr(__builtin__, 'print')
+if (sys.version_info < (3, 0)):
+    import __builtin__
+    print_function = getattr(__builtin__, 'print')
+else:
+    import builtins
+    print_function = builtins.print
+
 
 class DQNSolver:
     def __init__(self, observation_space, action_space):
@@ -73,21 +79,19 @@ def cartpole():
     while True:
         run += 1
         state = env.reset()
-        state = np.reshape(state, [1, observation_space])
+        state = np.reshape(state, [1, observation_space]) # Reshape BY REFERENCE !
         step = 0
         while True:
-            elapsed = []
             step += 1
-            env.render()
-            t = time.time()
+            # env.render()
             action = dqn_solver.act(state)
             state_next, reward, terminal, info = env.step(action)
             reward = reward if not terminal else -reward
-            state_next = np.reshape(state_next, [1, observation_space])
+            state_next = np.reshape(state_next, [1, observation_space]) # Reshape BY REFERENCE !
             dqn_solver.remember(state, action, reward, state_next, terminal)
             state = state_next
             if terminal:
-                print "Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step)
+                print("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step))
                 score_logger.add_score(step, run)
                 break
             dqn_solver.experience_replay()

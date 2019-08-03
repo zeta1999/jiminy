@@ -62,6 +62,9 @@ namespace jiminy
 
         // Initialize the engine-specific telemetry sender
         telemetrySender_.configureObject(telemetryData_, ENGINE_OBJECT_NAME);
+
+        // Initialize the random number generators
+        resetRandGenerators(engineOptions_->stepper.randomSeed);
     }
 
     Engine::~Engine(void)
@@ -117,9 +120,6 @@ namespace jiminy
 
     void Engine::reset(bool const & resetDynamicForceRegister)
     {
-        // Initialize the random number generators
-        resetRandGenerators(engineOptions_->stepper.randomSeed);
-
         // Reset the dynamic force register if requested
         if (resetDynamicForceRegister)
         {
@@ -264,6 +264,7 @@ namespace jiminy
 
 
     result_t Engine::reset(vectorN_t const & x_init,
+                           bool      const & resetRandomNumbers,
                            bool      const & resetDynamicForceRegister)
     {
         if (!getIsInitialized())
@@ -279,6 +280,12 @@ namespace jiminy
         {
             std::cout << "Error - Engine::reset - Size of x_init inconsistent with model size." << std::endl;
             return result_t::ERROR_BAD_INPUT;
+        }
+
+        // Reset the random number generators
+        if (resetRandomNumbers)
+        {
+            resetRandGenerators(engineOptions_->stepper.randomSeed);
         }
 
         // Reset the model, controller, engine, and registered impulse forces if requested
@@ -384,7 +391,7 @@ namespace jiminy
         }
 
         // Reset the model, controller, and engine
-        returnCode = reset(x_init, false);
+        returnCode = reset(x_init, true, false);
 
         // Integration loop based on boost::numeric::odeint::detail::integrate_times
         while (true)

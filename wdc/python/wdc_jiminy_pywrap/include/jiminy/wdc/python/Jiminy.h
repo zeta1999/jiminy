@@ -56,8 +56,12 @@ namespace python
                                    (bp::arg("self"), "sensor_type", "sensor_name"),
                                    bp::return_value_policy<bp::reference_existing_object>())
 
-                .add_property("pinocchio_model", &PyModelVisitor::getPinocchioModel)
                 .add_property("frames_names", &PyModelVisitor::getFramesNames)
+
+                .add_property("pinocchio_model", bp::make_getter(&Model::pncModel_,
+                                                 bp::return_internal_reference<>()))
+                .add_property("pinocchio_data", bp::make_getter(&Model::pncData_,
+                                                bp::return_internal_reference<>()))
 
                 .add_property("is_initialized", bp::make_function(&Model::getIsInitialized,
                                                 bp::return_value_policy<bp::copy_const_reference>()))

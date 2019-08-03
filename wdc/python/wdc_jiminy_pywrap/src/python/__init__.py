@@ -1,15 +1,23 @@
 ###############################################################################
-## @brief             Entry point for jiminy_pywrap python module.
+## @brief             Entry point for wdc_jiminy_pywrap python module.
 ##
 ## @copyright         Wandercraft
 ###############################################################################
 
-from jiminy import *
+import os as _os # private import
+import sys as _sys
 
-from wdc.redirect_stdio import RedirectStdErr as _RedirectStdErr
-with _RedirectStdErr():
-    from .libwdc_jiminy_pywrap import *
+if (_sys.version_info > (3, 0)):
+    from contextlib import redirect_stderr as _redirect_stderr
+    with open(_os.devnull, 'w') as stderr, _redirect_stderr(stderr):
+        from jiminy import *  # Load jiminy module since wdc_jiminy is built on top of it
+        from .libwdc_jiminy_pywrap import *
+else:
+    with open(_os.devnull, 'w') as stderr:
+        old_target = _sys.stderr
+        _sys.stderr = stderr
 
-# We remove the NONBLOCK flag which is set on stdin file by the logger when importing a wdc C++ library.
-from wdc.redirect_stdio import reset_stdin_flag as _reset_stdin_flag
-_reset_stdin_flag()
+        from jiminy import *
+        from .libwdc_jiminy_pywrap import *
+
+        _sys.stderr = old_target

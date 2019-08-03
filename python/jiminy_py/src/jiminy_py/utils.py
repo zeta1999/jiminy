@@ -210,7 +210,7 @@ def extract_state_from_simulation_log(log_header, log_data, urdf_path, pinocchio
             "pinocchio_model": pinocchio_model}
 
 ## @brief   Display robot evolution in Gepetto viewer.
-lo = Lock()
+lock = Lock()
 def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None,
                       speed_ratio=1.0, window_name='python-pinocchio', scene_name='world'):
     # Load robots in gepetto viewer
@@ -260,7 +260,7 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None,
 
     # Animate the robot
     def display_robot(rb, evolution_robot, speed_ratio, xyz_offset=None):
-        global lo # Share the same lock on each thread (python 2 does not support `nonlocal` keyword)
+        global lock # Share the same lock on each thread (python 2 does not support `nonlocal` keyword)
 
         t = [s.t for s in evolution_robot]
         i = 0
@@ -272,7 +272,7 @@ def play_trajectories(trajectory_data, xyz_offset=None, urdf_rgba=None,
                 q[:3] += xyz_offset
             else:
                 q = s.q
-            with lo: # It is necessary to use lock since corbaserver does not support multiple connection simultaneously.
+            with lock: # It is necessary to use lock since corbaserver does not support multiple connection simultaneously.
                 rb.display(q)
             t_simu = (time.time() - init_time) * speed_ratio
             i = bisect_right(t, t_simu)
@@ -336,3 +336,36 @@ def get_gepetto_client(open_if_needed=False):
                         print("Impossible to open Gepetto-viewer")
 
     return None, None
+
+def _getViewerNodeName(rb, geometry_object, geometry_type):
+    if geometry_type is pin.GeometryType.VISUAL:
+        return rb.viewerVisualGroupName + '/' + geometry_object.name
+    elif geometry_type is pin.GeometryType.COLLISION:
+        return rb.viewerCollisionGroupName + '/' + geometry_object.name
+
+def _updateGeometryPlacements(rb, data, visual=False):
+    if visual:
+        geom_model = rb.visual_model
+        geom_data = rb.visual_data
+    else:
+        geom_model = rb.collision_model
+        geom_data = rb.collision_data
+
+    pin.updateGeometryPlacements(rb.model, data, geom_model, geom_data)
+
+def update_gepetto_viewer(rb, data, client, auto_refresh):
+    if rb.display_collisions:
+        client.gui.applyConfigurations (
+                [ _getViewerNodeName(rb, collision,pin.GeometryType.COLLISION) for collision in rb.collision_model.geometryObjects ],
+                [ pin.se3ToXYZQUATtuple(rb.collision_data.oMg[rb.collision_model.getGeometryId(collision.name)]) for collision in rb.collision_model.geometryObjects ]
+        )
+
+    if rb.display_visuals:
+        _updateGeometryPlacements(rb, data, visual=True)
+        client.gui.applyConfigurations (
+                [ _getViewerNodeName(rb, visual,pin.GeometryType.VISUAL) for visual in rb.visual_model.geometryObjects ],
+                [ pin.se3ToXYZQUATtuple(rb.visual_data.oMg[rb.visual_model.getGeometryId(visual.name)]) for visual in rb.visual_model.geometryObjects ]
+        )
+
+    if auto_refresh:
+        client.gui.refresh()

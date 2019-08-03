@@ -309,8 +309,12 @@ namespace python
                                             bp::return_value_policy<bp::return_by_value>())
                 .def("set_sensors_options", &PyModelVisitor::setSensorsOptions)
 
-                .add_property("pinocchio_model", &PyModelVisitor::getPinocchioModel)
                 .add_property("frames_names", &PyModelVisitor::getFramesNames)
+
+                .add_property("pinocchio_model", bp::make_getter(&Model::pncModel_,
+                                                 bp::return_internal_reference<>()))
+                .add_property("pinocchio_data", bp::make_getter(&Model::pncData_,
+                                                bp::return_internal_reference<>()))
 
                 .add_property("is_initialized", bp::make_function(&Model::getIsInitialized,
                                                 bp::return_value_policy<bp::copy_const_reference>()))
@@ -388,11 +392,6 @@ namespace python
             std::shared_ptr<AbstractSensorBase> sensor;
             self.getSensor(sensorType, sensorName, sensor);
             return sensor.get();
-        }
-
-        static pinocchio::Model getPinocchioModel(Model & self)
-        {
-            return self.pncModel_;
         }
 
         static std::vector<std::string> getFramesNames(Model & self)
@@ -667,7 +666,7 @@ namespace python
                 .def("step", &PyEngineVisitor::step,
                              (bp::arg("self"), bp::arg("dt_desired")=-1))
                 .def("reset", &PyEngineVisitor::reset,
-                              (bp::arg("self"), "x_init"))
+                              (bp::arg("self"), "x_init", bp::arg("reset_random_generator")=false))
                 .def("get_log", &PyEngineVisitor::getLog)
                 .def("write_log", &PyEngineVisitor::writeLog,
                                   (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
@@ -709,10 +708,11 @@ namespace python
         }
 
         static result_t reset(Engine          & self,
-                              vectorN_t const & x_init)
+                              vectorN_t const & x_init,
+                              bool      const & resetRandomNumbers)
         {
             // Only way to handle C++ default values
-            return self.reset(x_init);
+            return self.reset(x_init, resetRandomNumbers);
         }
 
         static result_t step(Engine          & self,

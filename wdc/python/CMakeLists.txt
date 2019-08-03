@@ -10,13 +10,6 @@ function(deploy_python_package TARGET_NAME)
                                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_NAME})")
 endfunction()
 
-# Set Python version
-set(PYTHON_VERSION_MAJOR 2)
-set(PYTHON_VERSION_MINOR 7)
-set(PYTHON_VERSION ${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR})
-set(PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
-set(PYTHON_SITELIB lib/python${PYTHON_VERSION}/site-packages)
-
 # Compile and install python bindings
 add_subdirectory(wdc_jiminy_pywrap)
 

@@ -273,7 +273,7 @@ namespace jiminy
         configHolder_t getDefaultStepperOptions()
         {
             configHolder_t config;
-            config["randomSeed"] = 0;
+            config["randomSeed"] = 0U;
             config["odeSolver"] = std::string("runge_kutta_dopri5"); // ["runge_kutta_dopri5", "explicit_euler"]
             config["tolAbs"] = 1.0e-5;
             config["tolRel"] = 1.0e-4;
@@ -287,7 +287,7 @@ namespace jiminy
 
         struct stepperOptions_t
         {
-            int32_t     const randomSeed;
+            uint32_t    const randomSeed;
             std::string const odeSolver;
             float64_t   const tolAbs;
             float64_t   const tolRel;
@@ -297,7 +297,7 @@ namespace jiminy
             float64_t   const controllerUpdatePeriod;
 
             stepperOptions_t(configHolder_t const & options) :
-            randomSeed(boost::get<int32_t>(options.at("randomSeed"))),
+            randomSeed(boost::get<uint32_t>(options.at("randomSeed"))),
             odeSolver(boost::get<std::string>(options.at("odeSolver"))),
             tolAbs(boost::get<float64_t>(options.at("tolAbs"))),
             tolRel(boost::get<float64_t>(options.at("tolRel"))),
@@ -384,6 +384,7 @@ namespace jiminy
         void updateTelemetry(void);
 
         result_t reset(vectorN_t const & x_init,
+                       bool const & resetRandomNumbers = false,
                        bool const & resetDynamicForceRegister = false);
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);

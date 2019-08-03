@@ -9,6 +9,7 @@
 #include <eigenpy/eigenpy.hpp>
 
 #include <boost/python.hpp>
+#include <boost/python/numpy.hpp>
 
 // Define the maximum number of sensor types that can accept the 'ControllerFunctor' Python bindings
 #define  PYTHON_CONTROLLER_FUNCTOR_MAX_SENSOR_TYPES 6
@@ -16,6 +17,18 @@
 #include "jiminy/core/Types.h"
 #include "jiminy/python/Utilities.h"
 #include "jiminy/python/Jiminy.h"
+
+
+#if PY_VERSION_HEX >= 0x03000000
+    static void* initNumpyC() {
+        import_array();
+        return NULL;
+    }
+#else
+    static void initNumpyC() {
+        import_array();
+    }
+#endif
 
 
 namespace jiminy
@@ -26,9 +39,10 @@ namespace python
 
     BOOST_PYTHON_MODULE(libjiminy_pywrap)
     {
-        // Requirement to create Py arrays and Eigen variables
+        // Requirement to handle numpy::ndarray, and create PyArrays<->Eigen automatic converters
         eigenpy::enableEigenPy();
-        import_array();
+        bp::numpy::initialize();
+        initNumpyC();
 
         // Interfaces for result_t enum
         bp::enum_<result_t>("result_t")

@@ -44,13 +44,14 @@ class engine_asynchronous(object):
     def _internal_dynamics(self, t, q, v, *args):
         pass
 
-    def seed(self, seed=None):
-        if (seed is not None):
-            engine_options = self._engine.get_options()
-            engine_options["stepper"]["randomSeed"] = seed
-            self._engine.set_options(engine_options)
+    def seed(self, seed):
+        engine_options = self._engine.get_options()
+        engine_options["stepper"]["randomSeed"] = np.array(seed, dtype=np.dtype('uint32'))
+        self.reset(x0=None, reset_random_generator=True)
+        self._engine.set_options(engine_options)
 
-    def reset(self, x0=None):
+    def reset(self, x0=None, reset_random_generator=False):
+        self._state = None
         if (x0 is None):
             x0 = np.zeros((self._engine.model.nx, 1))
         if (int(self._engine.reset(x0)) != 1):
@@ -59,38 +60,46 @@ class engine_asynchronous(object):
     def step(self, action_next=None):
         if (action_next is not None):
             self.action = action_next
+        self._state = None
         return self._engine.step()
 
-    def render(self):
-        # Instantiate the Gepetto model and viewer client if necessary
-        if (not self.is_gepetto_available):
-            self._client, self._viewer_proc = jiminy_py.get_gepetto_client(True)
-            self._id = next(tempfile._get_candidate_names())
-            self._rb = RobotWrapper()
-            collision_model = pin.buildGeomFromUrdf(self._engine.model.pinocchio_model,
+    def render(self, lock=None):
+        if (lock is not None):
+            lock.acquire()
+        try:
+            # Instantiate the Gepetto model and viewer client if necessary
+            if (not self.is_gepetto_available):
+                self._client, self._viewer_proc = jiminy_py.get_gepetto_client(True)
+                self._id = next(tempfile._get_candidate_names())
+                self._rb = RobotWrapper()
+                collision_model = pin.buildGeomFromUrdf(self._engine.model.pinocchio_model,
+                                                        self._engine.model.urdf_path, [],
+                                                        pin.GeometryType.COLLISION)
+                visual_model = pin.buildGeomFromUrdf(self._engine.model.pinocchio_model,
                                                     self._engine.model.urdf_path, [],
-                                                    pin.GeometryType.COLLISION)
-            visual_model = pin.buildGeomFromUrdf(self._engine.model.pinocchio_model,
-                                                 self._engine.model.urdf_path, [],
-                                                 pin.GeometryType.VISUAL)
-            self._rb.__init__(model=self._engine.model.pinocchio_model,
-                              collision_model=collision_model,
-                              visual_model=visual_model)
-            self.is_gepetto_available = True
+                                                    pin.GeometryType.VISUAL)
+                self._rb.__init__(model=self._engine.model.pinocchio_model,
+                                collision_model=collision_model,
+                                visual_model=visual_model)
+                self.is_gepetto_available = True
 
-        # Load model in gepetto viewer if needed
-        if not self._id in self._client.gui.getSceneList():
-            self._client.gui.createSceneWithFloor(self._id)
-            window_id = self._client.gui.createWindow("jiminy")
-            self._client.gui.addSceneToWindow(self._id, window_id)
-            self._client.gui.createGroup(self._id + '/' + self._id)
-            self._client.gui.addLandmark(self._id + '/' + self._id, 0.1)
+            # Load model in gepetto viewer if needed
+            if not self._id in self._client.gui.getSceneList():
+                self._client.gui.createSceneWithFloor(self._id)
+                window_id = self._client.gui.createWindow("jiminy")
+                self._client.gui.addSceneToWindow(self._id, window_id)
+                self._client.gui.createGroup(self._id + '/' + self._id)
+                self._client.gui.addLandmark(self._id + '/' + self._id, 0.1)
 
-            self._rb.initDisplay("jiminy", self._id, loadModel=False)
-            self._rb.loadDisplayModel(self._id + '/' + "robot")
+                self._rb.initDisplay("jiminy", self._id, loadModel=False)
+                self._rb.loadDisplayModel(self._id + '/' + "robot")
 
-        # Refresh viewer if needed
-        self._rb.display(self.state)
+            # Update viewer
+            jiminy_py.update_gepetto_viewer(self._rb, self._engine.model.pinocchio_data,
+                                            self._client, True)
+        finally:
+            if (lock is not None):
+                lock.release()
 
     def close(self):
         if (self._viewer_proc is not None):
@@ -99,7 +108,10 @@ class engine_asynchronous(object):
 
     @property
     def state(self):
-        return self._engine.stepper_state.x
+        if (self._state is None):
+            # Get x by value, then convert the matrix column into an actual 1D array by reference
+            self._state = self._engine.stepper_state.x.A1
+        return self._state
 
     @property
     def observation(self):

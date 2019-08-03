@@ -13,6 +13,23 @@ import jiminy
 from jiminy_py import *
 
 
+class RenderMockOut:
+    def __init__(self):
+        self.mock = np.array([[[]]])
+
+    def __array__(self):
+        return self.mock
+
+    def __iter__(self):
+        return iter(self.mock)
+
+    def __len__(self):
+        return len(self.mock)
+
+    def __getitem__(self, key):
+        return self.mock.__getitem__(key)
+
+
 class JiminyCartPoleEnv(gym.Env):
     """
     Description:
@@ -21,9 +38,9 @@ class JiminyCartPoleEnv(gym.Env):
     Observation:
         Type: Box(4)
         Num	Observation                Min         Max
-        0	Cart Position             -5.0         5.0
+        0	Cart Position             -1.5         1.5
         1	Cart Velocity             -Inf         Inf
-        2	Pole Angle                -45 deg      45 deg
+        2	Pole Angle                -50 deg      50 deg
         3	Pole Velocity At Tip      -Inf         Inf
 
     Actions:
@@ -39,8 +56,8 @@ class JiminyCartPoleEnv(gym.Env):
     Starting State:
         All observations are assigned a uniform random value in [-0.05..0.05]
     Episode Termination:
-        Pole Angle is more than 12 degrees
-        Cart Position is more than 2.4 (center of the cart reaches the edge of the display)
+        Pole Angle is more than 25 degrees
+        Cart Position is more than 75 cm
         Episode length is greater than 200
     Solved Requirements:
         Considered solved when the average reward is greater than or equal to 195.0 over 100 consecutive trials.
@@ -64,6 +81,8 @@ class JiminyCartPoleEnv(gym.Env):
 
         ########################### Configuration the simulation ################################
 
+        self.dt = 2.0e-3 # The time step of the 'step' method
+
         model_options = self.model.get_model_options()
         sensors_options = self.model.get_sensors_options()
         engine_options = self.engine_py.get_engine_options()
@@ -77,9 +96,9 @@ class JiminyCartPoleEnv(gym.Env):
         engine_options["telemetry"]["enableEnergy"] = False
 
         engine_options["stepper"]["solver"] = "runge_kutta_dopri5" # ["runge_kutta_dopri5", "explicit_euler"]
-        engine_options["stepper"]["iterMax"] = -1
-        engine_options["stepper"]["sensorsUpdatePeriod"] = 1.0e-3
-        engine_options["stepper"]["controllerUpdatePeriod"] = 1.0e-3
+        engine_options["stepper"]["iterMax"] = -1 #Infinite number of iteration
+        engine_options["stepper"]["sensorsUpdatePeriod"] = self.dt
+        engine_options["stepper"]["controllerUpdatePeriod"] = self.dt
 
         self.model.set_model_options(model_options)
         self.model.set_sensors_options(sensors_options)
@@ -89,40 +108,42 @@ class JiminyCartPoleEnv(gym.Env):
         ########################### Configuration the learning ################################
 
         # Force mag of the action
-        self.force_mag = 10.0
+        self.force_mag = 40.0
 
         # Angle at which to fail the episode
-        self.theta_threshold_radians = 12 * math.pi / 180
-        self.x_threshold = 2.4
+        self.theta_threshold_radians = 25 * math.pi / 180
+        self.x_threshold = 0.75
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds
         high = np.array([self.x_threshold * 2,
-                         np.finfo(np.float32).max,
                          self.theta_threshold_radians * 2,
+                         np.finfo(np.float32).max,
                          np.finfo(np.float32).max])
 
-        self.action_space = spaces.Discrete(2)
+        self.action_space = spaces.Discrete(2) # action can be either 0 or 1
         self.observation_space = spaces.Box(-high, high, dtype=np.float32)
 
         self.seed()
         self.viewer = None
-        self.state = None
 
         self.steps_beyond_done = None
 
     def seed(self, seed=None):
-        self.engine_py.seed(seed)
         self.np_random, seed = seeding.np_random(seed)
+        self.engine_py.seed(seed)
         return [seed]
 
     def reset(self):
-        self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,1))
-        self.engine_py.reset(self.state)
+        state = self.np_random.uniform(low=-1, high=1, size=(4,1)) * np.array([[0.5, 0.15, 0.1, 0.1]]).T
+        self.engine_py.reset(state)
         self.steps_beyond_done = None
-        return np.array(self.state)
+        return self.engine_py.state
 
-    def render(self, mode='human'):
-        self.engine_py.render()
+    def render(self, lock=None, mode='human'):
+        self.engine_py.render(lock)
+        if (self.viewer is None):
+            self.viewer = self.engine_py._client
+        return RenderMockOut()
 
     def close(self):
         self.engine_py.close()
@@ -130,15 +151,19 @@ class JiminyCartPoleEnv(gym.Env):
     def step(self, action):
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
 
-        self.engine_py.step(np.array([[action * self.force_mag]]))
-
-        x, x_dot, theta, theta_dot = self.engine_py.state
+         # Bypass check and use direct assignment to max out the performances
+        # self.engine_py.step(np.array([[action * self.force_mag]]))
+        if action == 1:
+            self.engine_py._action[0] = self.force_mag
+        else:
+            self.engine_py._action[0] = -self.force_mag
+        self.engine_py.step()
+        x, theta, x_dot, theta_dot = self.engine_py.state
 
         done =  x < -self.x_threshold \
                 or x > self.x_threshold \
                 or theta < -self.theta_threshold_radians \
                 or theta > self.theta_threshold_radians
-        done = bool(done)
 
         if not done:
             reward = 1.0
@@ -152,4 +177,4 @@ class JiminyCartPoleEnv(gym.Env):
             self.steps_beyond_done += 1
             reward = 0.0
 
-        return np.array(self.engine_py.state), reward, done, {}
+        return self.engine_py.state, reward, done, {}

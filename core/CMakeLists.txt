@@ -33,8 +33,8 @@ add_library(${PROJECT_NAME} STATIC ${SRC})
 
 # Set include directory
 target_include_directories(${PROJECT_NAME} PUBLIC
-    $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+    "$<INSTALL_INTERFACE:include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
 )
 
 # Link with other libraries

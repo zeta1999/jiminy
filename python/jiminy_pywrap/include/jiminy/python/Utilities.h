@@ -3,6 +3,8 @@
 
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
+#include <boost/python/numpy/ndarray.hpp>
+
 
 namespace jiminy
 {
@@ -161,6 +163,10 @@ namespace python
             {
                 configPy[name] = boost::get<int32_t>(config.at(name));
             }
+            else if (optionType == typeid(uint32_t))
+            {
+                configPy[name] = boost::get<uint32_t>(config.at(name));
+            }
             else if (optionType == typeid(float64_t))
             {
                 configPy[name] = boost::get<float64_t>(config.at(name));
@@ -302,7 +308,9 @@ namespace python
         for (uint32_t i = 0; i < options.size(); i++)
         {
             std::string const name = options[i];
-            const std::type_info & optionType = config[name].type();
+            std::type_info const & optionType = config[name].type();
+            std::string const & optionTypePyStr =
+                bp::extract<std::string>(configPy[name].attr("__class__").attr("__name__"));
 
             if (optionType == typeid(bool_t))
             {
@@ -310,7 +318,29 @@ namespace python
             }
             else if (optionType == typeid(int32_t))
             {
-                boost::get<int32_t>(config.at(name)) = bp::extract<int32_t>(configPy[name]);
+                if (optionTypePyStr != "ndarray")
+                {
+                    boost::get<int32_t>(config.at(name)) = bp::extract<int32_t>(configPy[name]);
+                }
+                else
+                {
+                    bp::numpy::ndarray dataPy = bp::extract<bp::numpy::ndarray>(configPy[name]);
+                    int32_t const & data = *reinterpret_cast<int32_t *>(dataPy.get_data());
+                    boost::get<int32_t>(config.at(name)) = data;
+                }
+            }
+            else if (optionType == typeid(uint32_t))
+            {
+                if (optionTypePyStr != "ndarray")
+                {
+                    boost::get<uint32_t>(config.at(name)) = bp::extract<uint32_t>(configPy[name]);
+                }
+                else
+                {
+                    bp::numpy::ndarray dataPy = bp::extract<bp::numpy::ndarray>(configPy[name]);
+                    uint32_t const & data = *reinterpret_cast<uint32_t *>(dataPy.get_data());
+                    boost::get<uint32_t>(config.at(name)) = data;
+                }
             }
             else if (optionType == typeid(float64_t))
             {
