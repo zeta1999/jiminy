@@ -23,7 +23,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC core eigenpy ${BOOST_PYTHON_LIB})
+target_link_libraries(${PROJECT_NAME} PUBLIC core eigenpy "${BOOST_PYTHON_LIB}")
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${NUMPY_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
 
 # Activate c++14

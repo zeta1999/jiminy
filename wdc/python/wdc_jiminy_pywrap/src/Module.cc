@@ -9,17 +9,18 @@
 #include <eigenpy/eigenpy.hpp>
 
 #include <boost/python.hpp>
+#include <boost/python/numpy.hpp>
 
 #include "jiminy/wdc/python/Jiminy.h"
 
 
 #if PY_VERSION_HEX >= 0x03000000
-    static void* init_numpy() {
+    static void* initNumpyC() {
         import_array();
         return NULL;
     }
 #else
-    static void init_numpy() {
+    static void initNumpyC() {
         import_array();
     }
 #endif
@@ -33,9 +34,10 @@ namespace python
 
     BOOST_PYTHON_MODULE(libwdc_jiminy_pywrap)
     {
-        // Requirement to create Py arrays and Eigen variables
+        // Requirement to handle numpy::ndarray, and create PyArrays<->Eigen automatic converters
         eigenpy::enableEigenPy();
-        init_numpy();
+        bp::numpy::initialize();
+        initNumpyC();
 
         jiminy::wdc::python::PyExoModelVisitor::expose();
         jiminy::wdc::python::PyExoControllerVisitor::expose();

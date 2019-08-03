@@ -56,9 +56,11 @@ endif(EXISTS ${PYTHON_ROOT}/include/python${PYTHON_VERSION})
 set(NUMPY_INCLUDE_DIRS ${PYTHON_ROOT}/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include)
 
 if(${PYTHON_VERSION_MAJOR} EQUAL 3)
-    set(BOOST_PYTHON_LIB boost_python3)
+    set(BOOST_PYTHON_LIB "boost_numpy3")
+    list(APPEND BOOST_PYTHON_LIB "boost_python3")
 else(${PYTHON_VERSION_MAJOR} EQUAL 3)
-    set(BOOST_PYTHON_LIB boost_python)
+    set(BOOST_PYTHON_LIB "boost_numpy")
+    list(APPEND BOOST_PYTHON_LIB "boost_python")
 endif(${PYTHON_VERSION_MAJOR} EQUAL 3)
 
 # Add missing include & lib directory(ies)

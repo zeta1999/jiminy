@@ -108,7 +108,7 @@ class JiminyCartPoleEnv(gym.Env):
         ########################### Configuration the learning ################################
 
         # Force mag of the action
-        self.force_mag = 200.0
+        self.force_mag = 40.0
 
         # Angle at which to fail the episode
         self.theta_threshold_radians = 25 * math.pi / 180
@@ -116,8 +116,8 @@ class JiminyCartPoleEnv(gym.Env):
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds
         high = np.array([self.x_threshold * 2,
-                         np.finfo(np.float32).max,
                          self.theta_threshold_radians * 2,
+                         np.finfo(np.float32).max,
                          np.finfo(np.float32).max])
 
         self.action_space = spaces.Discrete(2) # action can be either 0 or 1
@@ -129,8 +129,8 @@ class JiminyCartPoleEnv(gym.Env):
         self.steps_beyond_done = None
 
     def seed(self, seed=None):
-        self.engine_py.seed(seed)
         self.np_random, seed = seeding.np_random(seed)
+        self.engine_py.seed(seed)
         return [seed]
 
     def reset(self):

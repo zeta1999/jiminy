@@ -666,7 +666,7 @@ namespace python
                 .def("step", &PyEngineVisitor::step,
                              (bp::arg("self"), bp::arg("dt_desired")=-1))
                 .def("reset", &PyEngineVisitor::reset,
-                              (bp::arg("self"), "x_init"))
+                              (bp::arg("self"), "x_init", bp::arg("reset_random_generator")=false))
                 .def("get_log", &PyEngineVisitor::getLog)
                 .def("write_log", &PyEngineVisitor::writeLog,
                                   (bp::arg("self"), "filename", bp::arg("isModeBinary")=false))
@@ -708,10 +708,11 @@ namespace python
         }
 
         static result_t reset(Engine          & self,
-                              vectorN_t const & x_init)
+                              vectorN_t const & x_init,
+                              bool      const & resetRandomNumbers)
         {
             // Only way to handle C++ default values
-            return self.reset(x_init);
+            return self.reset(x_init, resetRandomNumbers);
         }
 
         static result_t step(Engine          & self,

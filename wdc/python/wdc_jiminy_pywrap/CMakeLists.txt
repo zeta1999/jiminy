@@ -17,7 +17,7 @@ file(GLOB_RECURSE ${PROJECT_NAME}_PYTHON_SOURCES "src/python/*.py")
 add_library(${PROJECT_NAME} SHARED ${SRC})
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC jiminy_pywrap wdc_core eigenpy ${BOOST_PYTHON_LIB})
+target_link_libraries(${PROJECT_NAME} PUBLIC jiminy_pywrap wdc_core eigenpy "${BOOST_PYTHON_LIB}")
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${NUMPY_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
 
 # Activate c++14

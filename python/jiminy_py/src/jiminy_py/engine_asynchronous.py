@@ -44,13 +44,13 @@ class engine_asynchronous(object):
     def _internal_dynamics(self, t, q, v, *args):
         pass
 
-    def seed(self, seed=None):
-        if (seed is not None):
-            engine_options = self._engine.get_options()
-            engine_options["stepper"]["randomSeed"] = seed
-            self._engine.set_options(engine_options)
+    def seed(self, seed):
+        engine_options = self._engine.get_options()
+        engine_options["stepper"]["randomSeed"] = np.array(seed, dtype=np.dtype('uint32'))
+        self.reset(x0=None, reset_random_generator=True)
+        self._engine.set_options(engine_options)
 
-    def reset(self, x0=None):
+    def reset(self, x0=None, reset_random_generator=False):
         self._state = None
         if (x0 is None):
             x0 = np.zeros((self._engine.model.nx, 1))
