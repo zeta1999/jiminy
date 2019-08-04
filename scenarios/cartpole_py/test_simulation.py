@@ -1,13 +1,13 @@
+import os
+import time
 from math import *
+import numpy as np
 
 import jiminy
+from jiminy_py import engine_asynchronous
 
-from jiminy_py import *
 
 urdf_path = os.path.join(os.environ["HOME"], "wdc_workspace/src/jiminy/data/cartpole/cartpole.urdf")
-
-dt = 1e-3 # The time step of the 'step' method
-
 contacts = []
 motors = ["slider_to_cart"]
 model = jiminy.model()
@@ -28,10 +28,10 @@ engine_options["telemetry"]["enableAcceleration"] = False
 engine_options["telemetry"]["enableCommand"] = False
 engine_options["telemetry"]["enableEnergy"] = False
 
-engine_options["stepper"]["solver"] = "runge_kutta_dopri5" # ["runge_kutta_dopri5", "explicit_euler"]
+engine_options["stepper"]["solver"] = "runge_kutta_dopri5"
 engine_options["stepper"]["iterMax"] = -1
-engine_options["stepper"]["sensorsUpdatePeriod"] = dt
-engine_options["stepper"]["controllerUpdatePeriod"] = dt
+engine_options["stepper"]["sensorsUpdatePeriod"] = 1e-3
+engine_options["stepper"]["controllerUpdatePeriod"] = 1e-3
 
 model.set_model_options(model_options)
 model.set_sensors_options(sensors_options)
@@ -43,4 +43,4 @@ engine_py.reset()
 for i in range(10000):
     engine_py.step(np.array([[0.001]]))
     engine_py.render()
-    time.sleep(dt)
+    time.sleep(1e-3)
