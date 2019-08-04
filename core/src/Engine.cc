@@ -1018,20 +1018,21 @@ namespace jiminy
                                   vectorN_t const & v,
                                   vectorN_t       & u)
     {
-        // Do NOT make sure the output is Zero !
+        // Do NOT reinitialize the output to Zero !
 
-        // Enforce the bounds of the actuated joints of the model
-        Model::jointOptions_t const & mdlJointOptions = model_->mdlOptions_->joints;
+        // Enforce the position limit (ONLY for the motors !)
         Engine::jointOptions_t const & engineJointOptions = engineOptions_->joints;
 
         std::vector<int32_t> const & motorsPositionIdx = model_->getMotorsPositionIdx();
         std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
+        vectorN_t const & lowerPositionLimit = model_->getLowerPositionLimit();
+        vectorN_t const & upperPositionLimit = model_->getUpperPositionLimit();
         for (uint32_t i = 0; i < motorsPositionIdx.size(); i++)
         {
             float64_t const qJoint = q(motorsPositionIdx[i]);
             float64_t const vJoint = v(motorsVelocityIdx[i]);
-            float64_t const qJointMin = mdlJointOptions.boundsMin(i);
-            float64_t const qJointMax = mdlJointOptions.boundsMax(i);
+            float64_t const qJointMin = lowerPositionLimit[motorsPositionIdx[i]];
+            float64_t const qJointMax = upperPositionLimit[motorsPositionIdx[i]];
 
             float64_t forceJoint = 0;
             float64_t qJointError = 0;

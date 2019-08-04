@@ -36,6 +36,9 @@ namespace jiminy
     flexibleJointsNames_(),
     flexibleJointsPositionIdx_(),
     flexibleJointsVelocityIdx_(),
+    lowerPositionLimit_(),
+    upperPositionLimit_(),
+    velocityLimit_(),
     positionFieldNames_(),
     velocityFieldNames_(),
     accelerationFieldNames_(),
@@ -417,6 +420,22 @@ namespace jiminy
                                          vectorN_t::Zero(pncModel_.nq),
                                          vectorN_t::Zero(pncModel_.nv));
             pinocchio::framesForwardKinematics(pncModel_, pncData_);
+        }
+
+        // Update the position and velocity limits
+        if (returnCode == result_t::SUCCESS)
+        {
+            lowerPositionLimit_ = pncModel_.lowerPositionLimit;
+            upperPositionLimit_ = pncModel_.upperPositionLimit;
+            if (!mdlOptions_->joints.boundsFromUrdf)
+            {
+                for (uint32_t i=0; i < motorsNames_.size(); ++i)
+                {
+                    lowerPositionLimit_[motorsPositionIdx_[i]] = mdlOptions_->joints.boundsMin[i];
+                    upperPositionLimit_[motorsPositionIdx_[i]] = mdlOptions_->joints.boundsMax[i];
+                }
+            }
+            velocityLimit_ = pncModel_.velocityLimit;
         }
 
         return returnCode;
@@ -831,25 +850,14 @@ namespace jiminy
         flexibleJointsPositionIdx_.clear();
         flexibleJointsVelocityIdx_.clear();
 
+        // Make sure the user-defined position limit has the right dimension
         if (isInitialized_)
         {
             configHolder_t & jointOptionsHolder =
                 boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
             vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMin"));
             vectorN_t & boundsMax = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMax"));
-
-            // Make sure the bounds of the pinocchio model are the right ones
-            if (boost::get<bool>(jointOptionsHolder.at("boundsFromUrdf")))
-            {
-                boundsMin = vectorN_t::Zero(motorsNames_.size());
-                boundsMax = vectorN_t::Zero(motorsNames_.size());
-                for (uint32_t i=0; i < motorsNames_.size(); ++i)
-                {
-                    boundsMin[i] = pncModel_.lowerPositionLimit[motorsPositionIdx_[i]];
-                    boundsMax[i] = pncModel_.upperPositionLimit[motorsPositionIdx_[i]];
-                }
-            }
-            else
+            if (!boost::get<bool>(jointOptionsHolder.at("boundsFromUrdf")))
             {
                 if((int32_t) motorsNames_.size() != boundsMin.size()
                 || (uint32_t) motorsNames_.size() != boundsMax.size())
@@ -1019,9 +1027,24 @@ namespace jiminy
         return positionFieldNames_;
     }
 
+    vectorN_t const & Model::getLowerPositionLimit(void) const
+    {
+        return lowerPositionLimit_;
+    }
+
+    vectorN_t const & Model::getUpperPositionLimit(void) const
+    {
+        return upperPositionLimit_;
+    }
+
     std::vector<std::string> const & Model::getVelocityFieldNames(void) const
     {
         return velocityFieldNames_;
+    }
+
+    vectorN_t const & Model::getVelocityLimit(void) const
+    {
+        return velocityLimit_;
     }
 
     std::vector<std::string> const & Model::getAccelerationFieldNames(void) const
