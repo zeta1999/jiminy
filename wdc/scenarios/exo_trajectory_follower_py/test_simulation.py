@@ -18,8 +18,9 @@ from wdc_jiminy_py import *
 
 ################################## User parameters #######################################
 
-urdf_path = os.path.join(os.environ["HOME"], "wdc_workspace/src/jiminy/wdc/data/atalante_with_patient/atalante_with_patient.urdf")
-neural_network_path = os.path.join(os.environ["HOME"], "wdc_workspace/src/wandercode/test_data/data/trajectories/generic_walk_network_v5-4.json")
+wdc_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+urdf_path = os.path.join(wdc_root_dir, "data/atalante_with_patient/atalante_with_patient.urdf")
+neural_network_path = os.path.join(wdc_root_dir, "data/atalante_with_patient/generic_walk_network_v5-4.json")
 traj_features = {"steplength":  16,
                  "duration":    0.95,
                  "stairheight": 0.0}

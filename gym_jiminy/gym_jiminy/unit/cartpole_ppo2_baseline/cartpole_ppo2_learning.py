@@ -27,7 +27,7 @@ model = PPO2(MlpPolicy, env,
 # model = PPO2.load("cartpole_ppo2_baseline.pkl")
 
 # Run the learning process
-model.learn(total_timesteps=10000, log_interval=2, reset_num_timesteps=False)
+model.learn(total_timesteps=400000, log_interval=5, reset_num_timesteps=False)
 
 # Save the model if desired
 # model.save("cartpole_ppo2_baseline.pkl")
@@ -39,7 +39,7 @@ t_end = 20
 
 # Get the time step of Jiminy
 env.remotes[0].send(('get_attr','dt'))
-dt = env.remotes
+dt = env.remotes[0].recv()
 
 # Run the simulation in real-time
 obs = env.reset()
