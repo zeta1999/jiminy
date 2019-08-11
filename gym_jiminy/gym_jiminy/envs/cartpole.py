@@ -84,6 +84,15 @@ class JiminyCartPoleEnv(RobotJiminyEnv):
         engine_py.set_engine_options(engine_options)
         engine_py.set_controller_options(ctrl_options)
 
+        ####################### Define some problem-specific variables #########################
+
+        # Torque magnitude of the action
+        self.force_mag = 40.0
+
+        # Angle at which to fail the episode
+        self.theta_threshold_radians = 25 * pi / 180
+        self.x_threshold = 0.75
+
         ######################### Configure the learning environment ###########################
 
         # The time step of the 'step' method
@@ -93,24 +102,20 @@ class JiminyCartPoleEnv(RobotJiminyEnv):
 
         ####################### Define some problem-specific variables #########################
 
-        # Force mag of the action
-        self.force_mag = 40.0
-
-        # Angle at which to fail the episode
-        self.theta_threshold_radians = 25 * pi / 180
-        self.x_threshold = 0.75
-
-        # Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds
+        # Bounds of the observation space.
+        # Note that the Angle limit set to 2 * theta_threshold_radians
+        # so failing observation is still within bounds
         high = np.array([self.x_threshold * 2,
                          self.theta_threshold_radians * 2,
                          np.finfo(np.float64).max,
                          np.finfo(np.float64).max])
 
-        # Overwrite some parameters of RobotEnv
-        self.obs_random_low = -np.array([0.5, 0.15, 0.1, 0.1])
-        self.obs_random_high = np.array([0.5, 0.15, 0.1, 0.1])
+        self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float64)
 
-        self.action_space = spaces.Discrete(2) # The action can be either 0 or 1
+        self.state_random_high = np.array([0.5, 0.15, 0.1, 0.1])
+        self.state_random_low = -self.state_random_high
+
+        self.action_space = spaces.Discrete(2) # Force using a discrete action space
 
     def step(self, action):
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
@@ -124,21 +129,24 @@ class JiminyCartPoleEnv(RobotJiminyEnv):
         self.state = self.engine_py.state
 
         # Check the terminal condition and compute reward
-        terminal = self._terminal()
-        if not terminal:
-            reward = 1.0
+        done = self._is_success()
+        reward = 0.0
+        if not done:
+            reward += 1.0
         elif self.steps_beyond_done is None:
             self.steps_beyond_done = 0
-            reward = 1.0
+            reward += 1.0
         else:
             if self.steps_beyond_done == 0:
-                logger.warn("You are calling 'step()' even though this environment has already returned terminal = True. You should always call 'reset()' once you receive 'terminal = True' -- any further steps are undefined behavior.")
+                logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
             self.steps_beyond_done += 1
-            reward = 0.0
 
-        return self.state, reward, terminal, {}
+        return self.state, reward, done, {}
 
-    def _terminal(self):
+    def _get_obs(self):
+        return self.state
+
+    def _is_success(self):
         x, theta, x_dot, theta_dot = self.state
         return        x < -self.x_threshold \
                or     x >  self.x_threshold \

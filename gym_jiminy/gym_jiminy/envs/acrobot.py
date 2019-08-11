@@ -50,47 +50,23 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
     }
 
     def __init__(self):
-        ############################### Configure the learning #################################
-
-        # The time step of the 'step' method
-        self.dt = 2.0e-3
-
-        self.MAX_VEL_1 = 4 * pi # <= Should implement velocity bounds in Jiminy
-        self.MAX_VEL_2 = 9 * pi
-
-        self.AVAIL_TORQUE = [-1.0, 0.0, +1.0]
-
-        self.torque_noise_max = 0.0
-
-        # Force mag of the action
-        self.torque_mag = 40.0
-
-        high = np.array([1.0, 1.0, 1.0, 1.0, self.MAX_VEL_1, self.MAX_VEL_2])
-
-        # self.action_space = spaces.Discrete(3)
-        # self.observation_space = spaces.Dict(dict(
-        #     desired_goal=,
-        #     achieved_goal=,
-        #     observation=spaces.Box(low=-high, high=high, dtype=np.float64),
-        # ))
-
-        ############################# Initialize the simulation ################################
+        ################################# Initialize Jiminy ####################################
 
         cur_dir = os.path.dirname(os.path.realpath(__file__))
         urdf_path = os.path.join(cur_dir, "../../../data/double_pendulum/double_pendulum.urdf")
         motors = ["SecondPendulumJoint"]
-        self.model = jiminy.model()
+        self.model = jiminy.model() # Model has to be an attribute of the class to avoid it being garbage collected
         self.model.initialize(urdf_path, motors=motors)
         self.model.add_encoder_sensor(joint_name="PendulumJoint")
         self.model.add_encoder_sensor(joint_name="SecondPendulumJoint")
-        self.engine_py = engine_asynchronous(self.model)
+        engine_py = engine_asynchronous(self.model)
 
-        ############################# Configure the simulation #################################
+        ################################# Configure Jiminy #####################################
 
         model_options = self.model.get_model_options()
         sensors_options = self.model.get_sensors_options()
-        engine_options = self.engine_py.get_engine_options()
-        ctrl_options = self.engine_py.get_controller_options()
+        engine_options = engine_py.get_engine_options()
+        ctrl_options = engine_py.get_controller_options()
 
         model_options["telemetry"]["enableEncoderSensors"] = False
         engine_options["telemetry"]["enableConfiguration"] = False
@@ -100,84 +76,149 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
         engine_options["telemetry"]["enableEnergy"] = False
 
         engine_options["stepper"]["solver"] = "runge_kutta_dopri5" # ["runge_kutta_dopri5", "explicit_euler"]
-        engine_options["stepper"]["iterMax"] = -1 #Infinite number of iteration
-        engine_options["stepper"]["sensorsUpdatePeriod"] = self.dt
-        engine_options["stepper"]["controllerUpdatePeriod"] = self.dt
 
         self.model.set_model_options(model_options)
         self.model.set_sensors_options(sensors_options)
-        self.engine_py.set_engine_options(engine_options)
-        self.engine_py.set_controller_options(ctrl_options)
+        engine_py.set_engine_options(engine_options)
+        engine_py.set_controller_options(ctrl_options)
 
-        ################################### Miscellaneous ######################################
+        ####################### Define some problem-specific variables #########################
 
-        self._tipIdx = self.engine_py._engine.model.pinocchio_model.getFrameId("SecondPendulumMass")
-        self._tipPosZMax = self.engine_py._engine.model.pinocchio_data.oMf[self._tipIdx].translation.A1[2]
+        # Max velocity of the joints
+        self.MAX_VEL_1 = 4 * pi
+        self.MAX_VEL_2 = 4 * pi
 
-        self.state = None
-        self.viewer = None
-        self.steps_beyond_done = None
+        # Torque magnitude of the action
+        # self.AVAIL_TORQUE = [-1.0, 0.0, +1.0]
 
-        self.seed()
+        # Force mag of the action
+        self.torque_mag = np.array([08.0])
 
-    def reset(self):
-        stateOpenAI = self.np_random.uniform(low=-1, high=1, size=(4,)) * np.array([0.2, 0.2, 1.0, 1.0])
-        alpha1, alpha2, alpha1_dot, alpha2_dot  = stateOpenAI
-        theta1 = alpha1 - pi
-        theta2 = alpha2 - pi
-        theta1_dot = alpha1_dot
-        theta2_dot = alpha2_dot
-        stateJiminy = np.array([[theta1, theta2, theta1_dot, theta2_dot]]).T
-        self.engine_py.reset(stateJiminy)
-        self.steps_beyond_done = None
-        self.state = self.engine_py.state
-        return self._get_ob()
+        # Noise standard deviation added to the action
+        self.torque_noise_max = 0.0
+
+        # Angle at which to fail the episode
+        self.theta_threshold_radians = 25 * pi / 180
+        self.x_threshold = 0.75
+
+        # Internal parameters to generate sample goals and compute the terminal condition
+        self._tipIdx = engine_py._engine.model.pinocchio_model.getFrameId("SecondPendulumMass")
+        self._tipPosZMax = engine_py._engine.model.pinocchio_data.oMf[self._tipIdx].translation.A1[2]
+
+        ######################### Configure the learning environment ###########################
+
+        # The time step of the 'step' method
+        dt = 2.0e-3
+
+        super(JiminyAcrobotEnv, self).__init__("acrobot", engine_py, dt)
+
+        ###################### Overwrite some problem-generic variables ########################
+
+        # Update the velocity bounds of the model
+        model_options = self.model.get_model_options()
+        model_options["joints"]["velocityLimit"] = [self.MAX_VEL_1, self.MAX_VEL_2]
+        model_options["joints"]["velocityLimitFromUrdf"] = False
+        self.model.set_model_options(model_options)
+
+        # Update the observation space (which is different from the state space in this case)
+        high = np.array([1.0, 1.0, 1.0, 1.0, self.MAX_VEL_1, self.MAX_VEL_2])
+
+        self.observation_space = spaces.Dict(dict(
+            desired_goal=self.observation_space['desired_goal'],
+            achieved_goal=self.observation_space['achieved_goal'],
+            observation=spaces.Box(low=-high, high=high, dtype=np.float64)
+        ))
+
+        self.state_random_high = np.array([0.2 - pi, 0.2 - pi, 1.0, 1.0])
+        self.state_random_low = np.array([-0.2 - pi, -0.2 - pi, -1.0, -1.0])
+
+        # self.action_space = spaces.Discrete(3) # Force using a discrete action space
+        self.action_space = spaces.Box(low=-self.torque_mag,
+                                       high=self.torque_mag,
+                                       dtype=np.float64)
 
     def step(self, a):
-        torque = self.AVAIL_TORQUE[a]
+        # torque = self.AVAIL_TORQUE[a] * self.torque_mag
+        torque = a
 
         # Add noise to the force action
         if self.torque_noise_max > 0:
             torque += self.np_random.uniform(-self.torque_noise_max, self.torque_noise_max)
 
         # Bypass 'self.engine_py.step' method and use direct assignment to max out the performances
-        self.engine_py._action[0] = torque * self.torque_mag
+        self.engine_py._action[0] = torque
         self.engine_py.step(dt_desired=self.dt)
         self.state = self.engine_py.state
 
-        # Check the terminal condition and compute reward
-        terminal = self._terminal()
-        if not terminal:
-            reward = -1.0
-        elif self.steps_beyond_done is None:
-            self.steps_beyond_done = 0
-            reward = 0.0
-        else:
-            if self.steps_beyond_done == 0:
-                logger.warn("You are calling 'step()' even though this environment has already returned terminal = True. You should always call 'reset()' once you receive 'terminal = True' -- any further steps are undefined behavior.")
-            self.steps_beyond_done += 1
-            reward = 0.0
+        # Get information
+        info, obs = self._get_info()
+        done = info['is_success']
 
-        # Penalize the reward and terminate if the velocity to exceed the limits
-        _, _, theta1_dot, theta2_dot  = self.state
-        if theta1_dot < -self.MAX_VEL_1 or self.MAX_VEL_1 < theta1_dot \
-        or theta2_dot < -self.MAX_VEL_2 or self.MAX_VEL_2 < theta2_dot:
-            reward += -1e4
-            terminal = True
+        # Make sure the simulation is not already over
+        if done:
+            if self.steps_beyond_done is None:
+                self.steps_beyond_done = 0
+            else:
+                if self.steps_beyond_done == 0:
+                    logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
+                self.steps_beyond_done += 1
 
-        return self._get_ob(), reward, terminal, {}
+        # Compute the reward
+        reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
 
-    def _get_ob(self):
+        return obs, reward, done, info
+
+    def _get_info(self):
+        # Get observation about the current state
+        obs = self._get_obs()
+
+        # Check the terminal condition
+        done = self._is_success(obs['achieved_goal'], self.goal)
+
+        # Generate info dict
+        info = {'is_success': done}
+
+        return info, obs
+
+    def compute_reward(self, achieved_goal, desired_goal, info):
+        # Must NOT use info, since it is not available while using HER (Experience Replay)
+
+        reward = 0.0
+
+        # Recompute the info if not available
+        done = self._is_success(achieved_goal, desired_goal)
+
+        # Get a negative reward till success
+        if not done:
+            reward += -1.0
+
+        return reward
+
+    def _get_achieved_goal(self):
+        return self.engine_py._engine.model.pinocchio_data.oMf[self._tipIdx].translation.A1[[2]]
+
+    def _is_success(self, achieved_goal, desired_goal):
+        return achieved_goal > desired_goal
+
+    def _sample_goal(self):
+        """Samples a new goal and returns it.
+        """
+        return self.np_random.uniform(low=0, high=self._tipPosZMax, size=(1,))
+
+    def _get_obs(self):
         theta1, theta2, theta1_dot, theta2_dot  = self.state
         theta1_dot = min(max(theta1_dot, -self.MAX_VEL_1), self.MAX_VEL_1)
         theta2_dot = min(max(theta2_dot, -self.MAX_VEL_2), self.MAX_VEL_2)
-        return np.array([cos(theta1 + pi),
-                         sin(theta1 + pi),
-                         cos(theta2 + pi),
-                         sin(theta2 + pi),
-                         theta1_dot,
-                         theta2_dot])
+        observation = np.array([cos(theta1 + pi),
+                                sin(theta1 + pi),
+                                cos(theta2 + pi),
+                                sin(theta2 + pi),
+                                theta1_dot,
+                                theta2_dot])
 
-    def _terminal(self):
-        tipPosZ = self.engine_py._engine.model.pinocchio_data.oMf[self._tipIdx].translation.A1[2]
-        return tipPosZ > 0.9*self._tipPosZMax
+        achieved_goal = self._get_achieved_goal()
+        return {
+            'observation': observation,
+            'achieved_goal': achieved_goal.copy(),
+            'desired_goal': self.goal.copy(),
+        }

@@ -27,20 +27,20 @@ class RobotJiminyEnv(core.Env):
         self.dt = dt
 
         motors_position_idx = self.engine_py._engine.model.motors_position_idx
-        joint_lower_position_limit = self.engine_py._engine.model.position_lower_limit
-        joint_upper_position_limit = self.engine_py._engine.model.position_upper_limit
-        joint_velocity_limit = self.engine_py._engine.model.velocity_limit
+        joint_position_limit_upper = self.engine_py._engine.model.position_limit_upper.A1
+        joint_position_limit_lower = self.engine_py._engine.model.position_limit_lower.A1
+        joint_velocity_limit = self.engine_py._engine.model.velocity_limit.A1
 
-        action_low = joint_lower_position_limit[motors_position_idx].A1
-        action_high = joint_upper_position_limit[motors_position_idx].A1
-        self.action_space = spaces.Box(action_low, action_high, dtype=np.float64)
+        action_high = joint_position_limit_upper[motors_position_idx]
+        action_low = joint_position_limit_lower[motors_position_idx]
+        self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float64)
 
-        obs_low = np.concatenate((joint_lower_position_limit.A1, -joint_velocity_limit.A1))
-        obs_high = np.concatenate((joint_upper_position_limit.A1, joint_velocity_limit.A1))
-        self.observation_space = spaces.Box(obs_low, obs_high, dtype=np.float64)
+        obs_high = np.concatenate((joint_position_limit_upper, joint_velocity_limit))
+        obs_low = np.concatenate((joint_position_limit_lower, -joint_velocity_limit))
+        self.observation_space = spaces.Box(low=obs_low, high=obs_high, dtype=np.float64)
 
-        self.obs_random_low = -0.1 * np.ones(self.observation_space.shape)
-        self.obs_random_high = 0.1 * np.ones(self.observation_space.shape)
+        self.state_random_high = 0.1 * np.ones(self.observation_space.shape)
+        self.state_random_low = -self.state_random_high
         self.state = None
         self.viewer = None
         self.steps_beyond_done = None
@@ -64,12 +64,13 @@ class RobotJiminyEnv(core.Env):
         return [seed]
 
     def reset(self):
-        self.state = self.np_random.uniform(low=self.obs_random_low, high=self.obs_random_high)
+        self.state = self.np_random.uniform(low=self.state_random_low,
+                                            high=self.state_random_high)
         self.engine_py.reset(np.expand_dims(self.state, axis=-1))
         self.steps_beyond_done = None
-        return self.state
+        return self._get_obs()
 
-    def render(self, lock=None, mode='human'):
+    def render(self, mode='rgb_array', lock=None):
         self.engine_py.render(lock)
         if (self.viewer is None):
             self.viewer = self.engine_py._client
@@ -79,6 +80,10 @@ class RobotJiminyEnv(core.Env):
         if (self.viewer is not None):
             self.engine_py.close()
 
+    def _get_obs(self):
+        """Returns the observation.
+        """
+        raise NotImplementedError()
 
 class RobotJiminyGoalEnv(RobotJiminyEnv, core.GoalEnv):
     """
@@ -86,4 +91,28 @@ class RobotJiminyGoalEnv(RobotJiminyEnv, core.GoalEnv):
     These environments create single-player scenes and behave like normal Gym goal-environments.
     """
 
-    pass
+    def __init__(self, robot_name, engine_py, dt):
+        super(RobotJiminyGoalEnv, self).__init__(robot_name, engine_py, dt)
+
+        self.goal = self._sample_goal()
+        obs = self._get_obs()
+
+        self.observation_space = spaces.Dict(dict(
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype=np.float64),
+            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype=np.float64),
+            observation=self.observation_space
+        ))
+
+    def reset(self):
+        # Attempt to reset the simulator. Since we randomize initial conditions, it
+        # is possible to get into a state with numerical issues (e.g. due to penetration or
+        # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
+        # In this case, we just keep randomizing until we eventually achieve a valid initial
+        # configuration.
+        self.goal = self._sample_goal().copy()
+        return super(RobotJiminyGoalEnv, self).reset()
+
+    def _sample_goal(self):
+        """Samples a new goal and returns it.
+        """
+        raise NotImplementedError()
