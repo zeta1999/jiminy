@@ -39,7 +39,8 @@ namespace wdc
         // Initialize base Model (cannot use custom bounds so far)
         configHolder_t & jointConfig = boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
         configHolder_t jointConfigOld = jointConfig;
-        boost::get<bool>(jointConfig.at("boundsFromUrdf")) = true;
+        boost::get<bool>(jointConfig.at("positionLimitFromUrdf")) = true;
+        boost::get<bool>(jointConfig.at("velocityLimitFromUrdf")) = true;
         returnCode = Model::initialize(urdfPath, contactFramesNames_, motorsNames_); // The joint names are unknown at this point
         boost::get<configHolder_t>(mdlOptionsHolder_.at("joints")) = jointConfigOld; // Be careful, the reference jointConfig may become invalid after calling 'initialize' method.
         isInitialized_ = true;

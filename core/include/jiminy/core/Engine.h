@@ -384,8 +384,8 @@ namespace jiminy
         void updateTelemetry(void);
 
         result_t reset(vectorN_t const & x_init,
-                       bool const & resetRandomNumbers = false,
-                       bool const & resetDynamicForceRegister = false);
+                       bool      const & resetRandomNumbers = false,
+                       bool      const & resetDynamicForceRegister = false);
         result_t simulate(vectorN_t const & x_init,
                           float64_t const & end_time);
         result_t step(float64_t const & dtDesired = -1,

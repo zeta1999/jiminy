@@ -949,7 +949,7 @@ namespace jiminy
                     float64_t                   const & minThr,
                     float64_t                   const & maxThr)
     {
-        return data.unaryExpr([&minThr, &maxThr](float64_t x) -> float64_t
+        return data.unaryExpr([&minThr, &maxThr](float64_t const & x) -> float64_t
                               {
                                   return std::min(std::max(x, minThr), maxThr);
                               });

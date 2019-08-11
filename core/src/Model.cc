@@ -36,8 +36,8 @@ namespace jiminy
     flexibleJointsNames_(),
     flexibleJointsPositionIdx_(),
     flexibleJointsVelocityIdx_(),
-    lowerPositionLimit_(),
-    upperPositionLimit_(),
+    positionLimitMin_(),
+    positionLimitMax_(),
     velocityLimit_(),
     positionFieldNames_(),
     velocityFieldNames_(),
@@ -425,17 +425,24 @@ namespace jiminy
         // Update the position and velocity limits
         if (returnCode == result_t::SUCCESS)
         {
-            lowerPositionLimit_ = pncModel_.lowerPositionLimit;
-            upperPositionLimit_ = pncModel_.upperPositionLimit;
-            if (!mdlOptions_->joints.boundsFromUrdf)
+            positionLimitMin_ = pncModel_.lowerPositionLimit;
+            positionLimitMax_ = pncModel_.upperPositionLimit;
+            if (!mdlOptions_->joints.positionLimitFromUrdf)
             {
-                for (uint32_t i=0; i < motorsNames_.size(); ++i)
+                for (uint32_t i=0; i < rigidJointsNames_.size(); ++i)
                 {
-                    lowerPositionLimit_[motorsPositionIdx_[i]] = mdlOptions_->joints.boundsMin[i];
-                    upperPositionLimit_[motorsPositionIdx_[i]] = mdlOptions_->joints.boundsMax[i];
+                    positionLimitMin_[rigidJointsPositionIdx_[i]] = mdlOptions_->joints.positionLimitMin[i];
+                    positionLimitMax_[rigidJointsPositionIdx_[i]] = mdlOptions_->joints.positionLimitMax[i];
                 }
             }
             velocityLimit_ = pncModel_.velocityLimit;
+            if (!mdlOptions_->joints.velocityLimitFromUrdf)
+            {
+                for (uint32_t i=0; i < rigidJointsNames_.size(); ++i)
+                {
+                    velocityLimit_[rigidJointsVelocityIdx_[i]] = mdlOptions_->joints.velocityLimit[i];
+                }
+            }
         }
 
         return returnCode;
@@ -855,14 +862,27 @@ namespace jiminy
         {
             configHolder_t & jointOptionsHolder =
                 boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
-            vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMin"));
-            vectorN_t & boundsMax = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMax"));
-            if (!boost::get<bool>(jointOptionsHolder.at("boundsFromUrdf")))
+            if (!boost::get<bool>(jointOptionsHolder.at("positionLimitFromUrdf")))
             {
-                if((int32_t) motorsNames_.size() != boundsMin.size()
-                || (uint32_t) motorsNames_.size() != boundsMax.size())
+                vectorN_t & positionLimitMin = boost::get<vectorN_t>(jointOptionsHolder.at("positionLimitMin"));
+                if((int32_t) rigidJointsNames_.size() != positionLimitMin.size())
                 {
-                    std::cout << "Error - Model::setOptions - Wrong vector size for boundsMin or boundsMax." << std::endl;
+                    std::cout << "Error - Model::setOptions - Wrong vector size for positionLimitMin." << std::endl;
+                    returnCode = result_t::ERROR_BAD_INPUT;
+                }
+                vectorN_t & positionLimitMax = boost::get<vectorN_t>(jointOptionsHolder.at("positionLimitMax"));
+                if((uint32_t) rigidJointsNames_.size() != positionLimitMax.size())
+                {
+                    std::cout << "Error - Model::setOptions - Wrong vector size for positionLimitMax." << std::endl;
+                    returnCode = result_t::ERROR_BAD_INPUT;
+                }
+            }
+            if (!boost::get<bool>(jointOptionsHolder.at("velocityLimitFromUrdf")))
+            {
+                vectorN_t & velocityLimit = boost::get<vectorN_t>(jointOptionsHolder.at("velocityLimit"));
+                if((int32_t) rigidJointsNames_.size() != velocityLimit.size())
+                {
+                    std::cout << "Error - Model::setOptions - Wrong vector size for velocityLimit." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
                 }
             }
@@ -1027,14 +1047,14 @@ namespace jiminy
         return positionFieldNames_;
     }
 
-    vectorN_t const & Model::getLowerPositionLimit(void) const
+    vectorN_t const & Model::getPositionLimitMin(void) const
     {
-        return lowerPositionLimit_;
+        return positionLimitMin_;
     }
 
-    vectorN_t const & Model::getUpperPositionLimit(void) const
+    vectorN_t const & Model::getPositionLimitMax(void) const
     {
-        return upperPositionLimit_;
+        return positionLimitMax_;
     }
 
     std::vector<std::string> const & Model::getVelocityFieldNames(void) const

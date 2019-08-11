@@ -81,9 +81,9 @@ namespace python
                                                      bp::return_value_policy<bp::copy_const_reference>()))
                 .add_property("position_fieldnames", bp::make_function(&Model::getPositionFieldNames,
                                                      bp::return_value_policy<bp::copy_const_reference>()))
-                .add_property("position_upper_limit", bp::make_function(&Model::getLowerPositionLimit,
+                .add_property("position_limit_upper", bp::make_function(&Model::getPositionLimitMin,
                                                       bp::return_value_policy<bp::copy_const_reference>()))
-                .add_property("position_lower_limit", bp::make_function(&Model::getUpperPositionLimit,
+                .add_property("position_limit_lower", bp::make_function(&Model::getPositionLimitMax,
                                                       bp::return_value_policy<bp::copy_const_reference>()))
                 .add_property("velocity_fieldnames", bp::make_function(&Model::getVelocityFieldNames,
                                                      bp::return_value_policy<bp::copy_const_reference>()))

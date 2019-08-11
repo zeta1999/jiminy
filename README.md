@@ -26,6 +26,9 @@ sudo apt install -y robotpkg-py27-pinocchio robotpkg-py27-qt4-gepetto-viewer-cor
 ### [Python 3.6 only] dependencies installation procedure
 sudo apt install -y robotpkg-py36-pinocchio robotpkg-py36-qt4-gepetto-viewer-corba
 
+## Matplotlib dependencies
+sudo apt install -y python3-tk 
+
 ## Tensorflow 1.13 with GPU support dependencies (Cuda 10.1 and CuDNN 7.6)
 Amazing tutorial: https://medium.com/better-programming/install-tensorflow-1-13-on-ubuntu-18-04-with-gpu-support-239b36d29070
 

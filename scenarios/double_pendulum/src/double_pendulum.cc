@@ -71,7 +71,8 @@ int main(int argc, char *argv[])
 
     Model model;
     configHolder_t mdlOptions = model.getOptions();
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("joints")).at("boundsFromUrdf")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("joints")).at("positionLimitFromUrdf")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("joints")).at("velocityLimitFromUrdf")) = true;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath, contacts, motorNames, false);
 
