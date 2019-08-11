@@ -29,7 +29,7 @@ def _worker(remote, parent_remote, env_fn_wrapper, lock=None):
                 observation = env.reset()
                 remote.send(observation)
             elif cmd == 'render':
-                remote.send(env.render(lock, *data[0], **data[1]))
+                remote.send(env.render(*data[0], lock=lock, **data[1]))
             elif cmd == 'close':
                 remote.close()
                 break

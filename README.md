@@ -27,7 +27,7 @@ sudo apt install -y robotpkg-py27-pinocchio robotpkg-py27-qt4-gepetto-viewer-cor
 sudo apt install -y robotpkg-py36-pinocchio robotpkg-py36-qt4-gepetto-viewer-corba
 
 ## Matplotlib dependencies
-sudo apt install -y python3-tk 
+sudo apt install -y python3-tk
 
 ## Tensorflow 1.13 with GPU support dependencies (Cuda 10.1 and CuDNN 7.6)
 Amazing tutorial: https://medium.com/better-programming/install-tensorflow-1-13-on-ubuntu-18-04-with-gpu-support-239b36d29070
@@ -37,3 +37,8 @@ pip install gym[atari,box2d,classic_control]
 
 ## [Python 3 only] Open AI Gym Stable-Baseline
 pip install gym[atari,box2d,classic_control]
+
+## [Python 3 only] Coach dependencies
+sudo apt install -y python-opencv
+sudo apt install -y libsdl-dev libsdl-image1.2-dev libsdl-mixer1.2-dev libsdl-ttf2.0-dev libsmpeg-dev libportmidi-dev libavformat-dev libswscale-dev libjpeg-dev  libtiff-dev libsdl1.2-dev libnotify-dev freeglut3 freeglut3-dev libsm-dev libgtk2.0-dev libgtk-3-dev libwebkitgtk-dev libgtk-3-dev libwebkitgtk-3.0-dev libgstreamer-plugins-base1.0-dev
+pip install rl_coach

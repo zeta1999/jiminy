@@ -92,7 +92,7 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
         # self.AVAIL_TORQUE = [-1.0, 0.0, +1.0]
 
         # Force mag of the action
-        self.torque_mag = np.array([08.0])
+        self.torque_mag = np.array([10.0])
 
         # Noise standard deviation added to the action
         self.torque_noise_max = 0.0
@@ -129,8 +129,8 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
             observation=spaces.Box(low=-high, high=high, dtype=np.float64)
         ))
 
-        self.state_random_high = np.array([0.2 - pi, 0.2 - pi, 1.0, 1.0])
-        self.state_random_low = np.array([-0.2 - pi, -0.2 - pi, -1.0, -1.0])
+        self.state_random_high = np.array([ 0.2 - pi,  0.2,  1.0,  1.0])
+        self.state_random_low  = np.array([-0.2 - pi, -0.2, -1.0, -1.0])
 
         # self.action_space = spaces.Discrete(3) # Force using a discrete action space
         self.action_space = spaces.Box(low=-self.torque_mag,
@@ -203,7 +203,7 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
     def _sample_goal(self):
         """Samples a new goal and returns it.
         """
-        return self.np_random.uniform(low=0, high=self._tipPosZMax, size=(1,))
+        return self.np_random.uniform(low=-0.8*self._tipPosZMax, high=self._tipPosZMax, size=(1,))
 
     def _get_obs(self):
         theta1, theta2, theta1_dot, theta2_dot  = self.state
