@@ -71,7 +71,11 @@ class RobotJiminyEnv(core.Env):
         return self._get_obs()
 
     def render(self, mode='rgb_array', lock=None):
-        self.engine_py.render(lock)
+        # Do not suport Multi-Rendering RGB output because it is not
+        # possible to create window in new tabs programmatically in
+        # Gepetto viewer.
+
+        self.engine_py.render(return_rgb_array=False, lock=lock)
         if (self.viewer is None):
             self.viewer = self.engine_py._client
         return RenderOutMock()

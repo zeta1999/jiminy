@@ -353,7 +353,7 @@ def _updateGeometryPlacements(rb, data, visual=False):
 
     pin.updateGeometryPlacements(rb.model, data, geom_model, geom_data)
 
-def update_gepetto_viewer(rb, data, client, auto_refresh):
+def update_gepetto_viewer(rb, data, client):
     if rb.display_collisions:
         client.gui.applyConfigurations (
                 [ _getViewerNodeName(rb, collision,pin.GeometryType.COLLISION) for collision in rb.collision_model.geometryObjects ],
@@ -367,5 +367,4 @@ def update_gepetto_viewer(rb, data, client, auto_refresh):
                 [ pin.se3ToXYZQUATtuple(rb.visual_data.oMg[rb.visual_model.getGeometryId(visual.name)]) for visual in rb.visual_model.geometryObjects ]
         )
 
-    if auto_refresh:
-        client.gui.refresh()
+    client.gui.refresh()

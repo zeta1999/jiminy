@@ -147,7 +147,7 @@ class JiminyAcrobotGoalEnv(RobotJiminyGoalEnv):
     def _sample_goal(self):
         """Samples a new goal and returns it.
         """
-        return self.np_random.uniform(low=-0.5*self._tipPosZMax, high=self._tipPosZMax, size=(1,))
+        return self.np_random.uniform(low=-0.5*self._tipPosZMax, high=0.98*self._tipPosZMax, size=(1,))
 
     def step(self, a):
         if self.continuous:
@@ -234,16 +234,30 @@ class JiminyAcrobotGoalEnv(RobotJiminyGoalEnv):
 
 
 class JiminyAcrobotEnv(JiminyAcrobotGoalEnv):
-    def __init__(self, continuous=True):
+    def __init__(self, continuous=True, enableGoalEnv=False):
+        self.enableGoalEnv = enableGoalEnv
+
         super(JiminyAcrobotEnv, self).__init__(continuous)
-        self.observation_space = self.observation_space['observation']
+
+        if not self.enableGoalEnv:
+            self.observation_space = self.observation_space['observation']
 
     def _sample_goal(self):
-        return np.array([0.8*self._tipPosZMax])
+        if self.enableGoalEnv:
+            return super(JiminyAcrobotEnv, self)._sample_goal()
+        else:
+            return np.array([0.8*self._tipPosZMax])
 
     def reset(self):
-        return super(JiminyAcrobotEnv, self).reset()['observation']
+        obs = super(JiminyAcrobotEnv, self).reset()
+        if self.enableGoalEnv:
+            return obs
+        else:
+            return obs['observation']
 
     def step(self, a):
         obs, reward, done, info = super(JiminyAcrobotEnv, self).step(a)
-        return obs['observation'], reward, done, info
+        if self.enableGoalEnv:
+            return obs, reward, done, info
+        else:
+            return obs['observation'], reward, done, info

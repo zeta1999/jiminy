@@ -1,6 +1,8 @@
-from collections import OrderedDict
+import os
 import tempfile
 import numpy as np
+from PIL import Image
+from collections import OrderedDict
 
 import libpinocchio_pywrap as pin
 from pinocchio.robot_wrapper import RobotWrapper
@@ -29,6 +31,7 @@ class engine_asynchronous(object):
 
         self.is_gepetto_available = False
         self._client = None
+        self._window_id = None
         self._viewer_proc = None
         self._id = None
         self._rb = None
@@ -63,7 +66,9 @@ class engine_asynchronous(object):
         self._state = None
         return self._engine.step(dt_desired)
 
-    def render(self, lock=None):
+    def render(self, return_rgb_array=False, lock=None):
+        rgb_array = None
+
         if (lock is not None):
             lock.acquire()
         try:
@@ -86,18 +91,28 @@ class engine_asynchronous(object):
             # Load model in gepetto viewer if needed
             if not self._id in self._client.gui.getSceneList():
                 self._client.gui.createSceneWithFloor(self._id)
-                window_id = self._client.gui.createWindow("jiminy")
-                self._client.gui.addSceneToWindow(self._id, window_id)
+                self._window_id = self._client.gui.createWindow("jiminy")
+                self._client.gui.addSceneToWindow(self._id, self._window_id)
                 self._client.gui.createGroup(self._id + '/' + self._id)
                 self._client.gui.addLandmark(self._id + '/' + self._id, 0.1)
 
                 self._rb.initDisplay("jiminy", self._id, loadModel=False)
                 self._rb.loadDisplayModel(self._id + '/' + "robot")
 
+                self._client.gui.setCameraTransform(self._window_id,
+                                                    [0.0, 9.0, 2e-5, 0.0, 1.0, 1.0, 0.0])
+
             # Update viewer
             jiminy_py.update_gepetto_viewer(self._rb,
                                             self._engine.model.pinocchio_data,
-                                            self._client, True)
+                                            self._client)
+
+            # return rgb array if needed
+            if return_rgb_array:
+                png_path = os.path.join("/tmp", self._id + ".png")
+                self._client.gui.captureFrame(self._window_id, png_path)
+                rgb_array = np.array(Image.open(png_path))[:,:,:-1]
+                os.remove(png_path)
         except:
             self.is_gepetto_available = False
             self._client = None
@@ -105,6 +120,7 @@ class engine_asynchronous(object):
         finally:
             if (lock is not None):
                 lock.release()
+            return rgb_array
 
     def close(self):
         if (self._viewer_proc is not None):
