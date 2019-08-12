@@ -9,3 +9,8 @@ register(
     id='jiminy-acrobot-v0',
     entry_point='gym_jiminy.envs:JiminyAcrobotEnv',
 )
+
+register(
+    id='jiminy-acrobot-goal-v0',
+    entry_point='gym_jiminy.envs:JiminyAcrobotGoalEnv',
+)

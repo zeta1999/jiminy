@@ -3,6 +3,7 @@ import time
 
 import gym
 
+from gym.wrappers import FlattenDictWrapper
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines import PPO2
 
@@ -11,7 +12,7 @@ from gym_jiminy.common import SubprocVecEnvLock
 
 ### Create a multiprocess environment
 nb_cpu = 4
-env = SubprocVecEnvLock([lambda: gym.make("gym_jiminy:jiminy-cartpole-v0") for _ in range(nb_cpu)])
+env = SubprocVecEnvLock([lambda: gym.make("gym_jiminy:jiminy-acrobot-v0") for _ in range(nb_cpu)])
 
 ### Create the model or load one
 
@@ -27,7 +28,9 @@ model = PPO2(MlpPolicy, env,
 # model = PPO2.load("cartpole_ppo2_baseline.pkl")
 
 # Run the learning process
-model.learn(total_timesteps=400000, log_interval=5, reset_num_timesteps=False)
+model.learn(total_timesteps=1000000,
+            log_interval=5,
+            reset_num_timesteps=False)
 
 # Save the model if desired
 # model.save("cartpole_ppo2_baseline.pkl")

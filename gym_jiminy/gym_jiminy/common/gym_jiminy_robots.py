@@ -95,8 +95,8 @@ class RobotJiminyGoalEnv(RobotJiminyEnv, core.GoalEnv):
         super(RobotJiminyGoalEnv, self).__init__(robot_name, engine_py, dt)
 
         self.goal = self._sample_goal()
-        obs = self._get_obs()
 
+        obs = self._get_obs()
         self.observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype=np.float64),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype=np.float64),
@@ -104,11 +104,6 @@ class RobotJiminyGoalEnv(RobotJiminyEnv, core.GoalEnv):
         ))
 
     def reset(self):
-        # Attempt to reset the simulator. Since we randomize initial conditions, it
-        # is possible to get into a state with numerical issues (e.g. due to penetration or
-        # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
-        # In this case, we just keep randomizing until we eventually achieve a valid initial
-        # configuration.
         self.goal = self._sample_goal().copy()
         return super(RobotJiminyGoalEnv, self).reset()
 

@@ -11,10 +11,10 @@ from gym.utils import seeding
 
 import jiminy
 from jiminy_py import engine_asynchronous
-from gym_jiminy.common import RobotJiminyGoalEnv
+from gym_jiminy.common import RobotJiminyEnv, RobotJiminyGoalEnv
 
 
-class JiminyAcrobotEnv(RobotJiminyGoalEnv):
+class JiminyAcrobotGoalEnv(RobotJiminyGoalEnv):
     """
     Acrobot is a 2-link pendulum with only the second joint actuated.
     Initially, both links point downwards. The goal is to swing the
@@ -49,7 +49,11 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
         'render.modes': ['human'],
     }
 
-    def __init__(self):
+    def __init__(self, continuous=True):
+        ############################ Backup the input arguments ################################
+
+        self.continuous = continuous
+
         ################################# Initialize Jiminy ####################################
 
         cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -89,7 +93,8 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
         self.MAX_VEL_2 = 4 * pi
 
         # Torque magnitude of the action
-        # self.AVAIL_TORQUE = [-1.0, 0.0, +1.0]
+        if not self.continuous:
+            self.AVAIL_TORQUE = [-1.0, 0.0, +1.0]
 
         # Force mag of the action
         self.torque_mag = np.array([10.0])
@@ -110,7 +115,7 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
         # The time step of the 'step' method
         dt = 2.0e-3
 
-        super(JiminyAcrobotEnv, self).__init__("acrobot", engine_py, dt)
+        super(JiminyAcrobotGoalEnv, self).__init__("acrobot", engine_py, dt)
 
         ###################### Overwrite some problem-generic variables ########################
 
@@ -132,14 +137,23 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
         self.state_random_high = np.array([ 0.2 - pi,  0.2,  1.0,  1.0])
         self.state_random_low  = np.array([-0.2 - pi, -0.2, -1.0, -1.0])
 
-        # self.action_space = spaces.Discrete(3) # Force using a discrete action space
-        self.action_space = spaces.Box(low=-self.torque_mag,
-                                       high=self.torque_mag,
-                                       dtype=np.float64)
+        if self.continuous:
+            self.action_space = spaces.Box(low=-self.torque_mag,
+                                           high=self.torque_mag,
+                                           dtype=np.float64)
+        else:
+            self.action_space = spaces.Discrete(3)
+
+    def _sample_goal(self):
+        """Samples a new goal and returns it.
+        """
+        return self.np_random.uniform(low=-0.5*self._tipPosZMax, high=self._tipPosZMax, size=(1,))
 
     def step(self, a):
-        # torque = self.AVAIL_TORQUE[a] * self.torque_mag
-        torque = a
+        if self.continuous:
+            torque = a
+        else:
+            torque = self.AVAIL_TORQUE[a] * self.torque_mag
 
         # Add noise to the force action
         if self.torque_noise_max > 0:
@@ -198,12 +212,7 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
         return self.engine_py._engine.model.pinocchio_data.oMf[self._tipIdx].translation.A1[[2]]
 
     def _is_success(self, achieved_goal, desired_goal):
-        return achieved_goal > desired_goal
-
-    def _sample_goal(self):
-        """Samples a new goal and returns it.
-        """
-        return self.np_random.uniform(low=-0.8*self._tipPosZMax, high=self._tipPosZMax, size=(1,))
+        return bool(achieved_goal > desired_goal)
 
     def _get_obs(self):
         theta1, theta2, theta1_dot, theta2_dot  = self.state
@@ -222,3 +231,19 @@ class JiminyAcrobotEnv(RobotJiminyGoalEnv):
             'achieved_goal': achieved_goal.copy(),
             'desired_goal': self.goal.copy(),
         }
+
+
+class JiminyAcrobotEnv(JiminyAcrobotGoalEnv):
+    def __init__(self, continuous=True):
+        super(JiminyAcrobotEnv, self).__init__(continuous)
+        self.observation_space = self.observation_space['observation']
+
+    def _sample_goal(self):
+        return np.array([0.8*self._tipPosZMax])
+
+    def reset(self):
+        return super(JiminyAcrobotEnv, self).reset()['observation']
+
+    def step(self, a):
+        obs, reward, done, info = super(JiminyAcrobotEnv, self).step(a)
+        return obs['observation'], reward, done, info

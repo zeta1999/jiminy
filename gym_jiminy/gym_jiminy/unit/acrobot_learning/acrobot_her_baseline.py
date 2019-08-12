@@ -3,13 +3,16 @@ import time
 
 import gym
 
-from stable_baselines.sac.policies import FeedForwardPolicy # Using 'sac' policies instead of the 'common' ones
-from stable_baselines import SAC, HER
+from stable_baselines.deepq.policies import FeedForwardPolicy # Using 'sac' policies instead of the 'common' ones
+from stable_baselines import HER, DQN, SAC, DDPG, TD3
 
 import jiminy_py
 
+# Select the model class
+model_class = DQN
+
 # Create a single-process environment
-env = gym.make("gym_jiminy:jiminy-acrobot-v0")
+env = gym.make("gym_jiminy:jiminy-acrobot-goal-v0", continuous=model_class in [DDPG, SAC, TD3])
 
 ### Create the model or load one
 
@@ -28,11 +31,11 @@ n_sampled_goal = 4
 tensorboard_data_path = os.path.dirname(os.path.realpath(__file__))
 
 # Create the 'model' according to the chosen algorithm
-model = HER(CustomPolicy, env, SAC,
+model = HER(CustomPolicy, env, model_class,
             n_sampled_goal=n_sampled_goal,
             goal_selection_strategy='future', buffer_size=int(1e6),
             learning_rate=1e-3, gamma=0.95, batch_size=256,
-            tensorboard_log=tensorboard_data_path)
+            tensorboard_log=tensorboard_data_path, verbose=1)
 
 # Load a model if desired
 # model = HER.load("ppo2_cartpole", env=env, policy=CustomPolicy)

@@ -40,9 +40,7 @@ env_params = GymVectorEnvironment(level='gym_jiminy.envs.cartpole:JiminyCartPole
 ################
 #   Learning   #
 ################
-graph_manager = BasicRLGraphManager(
-    agent_params=agent_params,
-    env_params=env_params,
-    schedule_params=SimpleSchedule()
-)
+graph_manager = BasicRLGraphManager(agent_params=agent_params,
+                                    env_params=env_params,
+                                    schedule_params=SimpleSchedule())
 graph_manager.improve()

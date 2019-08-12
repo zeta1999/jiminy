@@ -27,7 +27,9 @@ model = PPO2(MlpPolicy, env,
 # model = PPO2.load("cartpole_ppo2_baseline.pkl")
 
 # Run the learning process
-model.learn(total_timesteps=400000, log_interval=5, reset_num_timesteps=False)
+model.learn(total_timesteps=400000,
+            log_interval=5,
+            reset_num_timesteps=False)
 
 # Save the model if desired
 # model.save("cartpole_ppo2_baseline.pkl")
