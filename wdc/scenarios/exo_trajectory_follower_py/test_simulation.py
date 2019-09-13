@@ -20,7 +20,10 @@ from wdc_jiminy_py import *
 
 wdc_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 urdf_path = os.path.join(wdc_root_dir, "data/atalante_with_patient/atalante_with_patient.urdf")
-neural_network_path = os.path.join(wdc_root_dir, "data/atalante_with_patient/generic_walk_network_v5-4.json")
+# neural_network_path = os.path.join(wdc_root_dir, "data/atalante_with_patient/generic_walk_network_v5-4.json")
+# before the new neural network is merged
+neural_network_path = os.path.join(wdc_root_dir, "data/atalante_with_patient/generic_walk_network_v5-4_OLD.json")
+
 traj_features = {"steplength":  16,
                  "duration":    0.95,
                  "stairheight": 0.0}

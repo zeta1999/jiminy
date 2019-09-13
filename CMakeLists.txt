@@ -24,6 +24,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(GNUInstallDirs)
 
+# custom cmake module path
+list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
+
 # Release type
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
@@ -53,7 +56,9 @@ if(EXISTS ${PYTHON_ROOT}/include/python${PYTHON_VERSION})
 else(EXISTS ${PYTHON_ROOT}/include/python${PYTHON_VERSION})
     list(APPEND PYTHON_INCLUDE_DIRS ${PYTHON_ROOT}/include/python${PYTHON_VERSION}m)
 endif(EXISTS ${PYTHON_ROOT}/include/python${PYTHON_VERSION})
-set(NUMPY_INCLUDE_DIRS ${PYTHON_ROOT}/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include)
+
+# Find Numpy and add it as a dependency
+find_package(NumPy REQUIRED)
 
 if(${PYTHON_VERSION_MAJOR} EQUAL 3)
     set(BOOST_PYTHON_LIB "boost_numpy3")
@@ -65,9 +70,9 @@ endif(${PYTHON_VERSION_MAJOR} EQUAL 3)
 
 # Add missing include & lib directory(ies)
 link_directories(SYSTEM /opt/openrobots/lib)
-link_directories(SYSTEM /opt/install/GCC/lib)
-include_directories(SYSTEM /opt/install/GCC/include/)
-include_directories(SYSTEM /opt/install/GCC/include/eigen3/)
+link_directories(SYSTEM /opt/install/pc/lib)
+include_directories(SYSTEM /opt/install/pc/include/)
+include_directories(SYSTEM /opt/install/pc/include/eigen3/)
 
 # Python install helper
 function(deploy_python_gym_package TARGET_NAME)
