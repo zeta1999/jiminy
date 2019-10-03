@@ -5,10 +5,10 @@
 #include <vector>
 #include <random>
 
-#include "jiminy/core/Types.h"
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
+#include "jiminy/core/Types.h"
 
 namespace jiminy
 {

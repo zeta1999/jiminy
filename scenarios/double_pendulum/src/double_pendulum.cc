@@ -13,10 +13,10 @@
 #include <getopt.h>
 #include <string>
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/Utilities.h"
 #include "jiminy/core/Engine.h"
 #include "jiminy/core/ControllerFunctor.h"
+#include "jiminy/core/Types.h"
 
 
 using namespace jiminy;

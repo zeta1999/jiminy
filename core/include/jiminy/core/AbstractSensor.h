@@ -1,10 +1,10 @@
 #ifndef SIMU_ABSTRACT_SENSOR_H
 #define SIMU_ABSTRACT_SENSOR_H
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/Utilities.h"
 #include "jiminy/core/TelemetrySender.h"
 #include "jiminy/core/Model.h"
+#include "jiminy/core/Types.h"
 
 namespace jiminy
 {

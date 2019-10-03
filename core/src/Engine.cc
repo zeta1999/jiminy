@@ -2,9 +2,6 @@
 #include <cmath>
 #include <algorithm>
 
-#include <boost/algorithm/clamp.hpp>
-#include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
-
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/frames.hpp"
@@ -19,6 +16,9 @@
 #include "jiminy/core/AbstractSensor.h"
 #include "jiminy/core/Model.h"
 #include "jiminy/core/Engine.h"
+
+#include <boost/algorithm/clamp.hpp>
+#include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
 
 
 namespace jiminy

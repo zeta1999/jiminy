@@ -8,8 +8,8 @@
 #include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include "jiminy/core/Utilities.h"
-#include "jiminy/core/TelemetrySender.h"
 #include "jiminy/core/Engine.h" // Required to get access to MIN_TIME_STEP and MAX_TIME_STEP
+#include "jiminy/core/TelemetrySender.h"
 
 
 namespace jiminy

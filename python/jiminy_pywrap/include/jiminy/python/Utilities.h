@@ -1,8 +1,10 @@
 #ifndef SIMU_PYTHON_UTILITIES_H
 #define SIMU_PYTHON_UTILITIES_H
 
+#include <eigenpy/eigenpy.hpp>
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
+#include <boost/python/numpy.hpp>
 #include <boost/python/numpy/ndarray.hpp>
 
 

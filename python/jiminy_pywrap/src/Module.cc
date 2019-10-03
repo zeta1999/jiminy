@@ -6,18 +6,16 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <eigenpy/eigenpy.hpp>
-
-#include <boost/python.hpp>
-#include <boost/python/numpy.hpp>
-
 // Define the maximum number of sensor types that can accept the 'ControllerFunctor' Python bindings
 #define  PYTHON_CONTROLLER_FUNCTOR_MAX_SENSOR_TYPES 6
 
-#include "jiminy/core/Types.h"
-#include "jiminy/python/Utilities.h"
 #include "jiminy/python/Jiminy.h"
+#include "jiminy/python/Utilities.h"
+#include "jiminy/core/Types.h"
 
+#include <eigenpy/eigenpy.hpp>
+#include <boost/python.hpp>
+#include <boost/python/numpy.hpp>
 
 #if PY_VERSION_HEX >= 0x03000000
     static void* initNumpyC() {

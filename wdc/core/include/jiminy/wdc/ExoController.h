@@ -1,8 +1,8 @@
 #ifndef WDC_EXO_CONTROLLER_H
 #define WDC_EXO_CONTROLLER_H
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/AbstractController.h"
+#include "jiminy/core/Types.h"
 
 
 namespace jiminy

@@ -7,15 +7,14 @@
 #ifndef WDC_SIMULATOR_PYTHON_H
 #define WDC_SIMULATOR_PYTHON_H
 
-#include <boost/weak_ptr.hpp>
-
-#include <boost/python.hpp>
-#include <boost/python/def.hpp>
-#include <boost/python/dict.hpp>
-
 #include "jiminy/wdc/ExoModel.h"
 #include "jiminy/wdc/ExoController.h"
 #include "jiminy/python/Jiminy.h"
+
+#include <boost/weak_ptr.hpp>
+#include <boost/python.hpp>
+#include <boost/python/def.hpp>
+#include <boost/python/dict.hpp>
 
 
 namespace jiminy

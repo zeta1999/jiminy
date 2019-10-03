@@ -10,11 +10,11 @@
 #include <time.h>
 #include <cmath>
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/Sensor.h"
 #include "jiminy/core/Engine.h"
 #include "jiminy/wdc/ExoModel.h"
 #include "jiminy/wdc/ExoController.h"
+#include "jiminy/core/Types.h"
 
 
 using namespace jiminy;

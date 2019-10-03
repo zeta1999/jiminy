@@ -7,16 +7,16 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
-#include <boost/numeric/odeint.hpp>
-#include <boost/numeric/odeint/external/eigen/eigen_algebra.hpp>
 
 #include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/algorithm/energy.hpp"
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/Model.h"
 #include "jiminy/core/TelemetrySender.h"
+#include "jiminy/core/Types.h"
 
+#include <boost/numeric/odeint.hpp>
+#include <boost/numeric/odeint/external/eigen/eigen_algebra.hpp>
 
 namespace jiminy
 {

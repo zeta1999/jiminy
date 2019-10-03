@@ -7,10 +7,10 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
-#include <boost/circular_buffer.hpp>
-
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/frames.hpp"
+
+#include <boost/circular_buffer.hpp>
 
 #include "jiminy/core/Types.h"
 

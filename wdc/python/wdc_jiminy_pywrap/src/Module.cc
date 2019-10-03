@@ -6,12 +6,11 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <eigenpy/eigenpy.hpp>
+#include "jiminy/wdc/python/Jiminy.h"
 
+#include <eigenpy/eigenpy.hpp>
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
-
-#include "jiminy/wdc/python/Jiminy.h"
 
 
 #if PY_VERSION_HEX >= 0x03000000

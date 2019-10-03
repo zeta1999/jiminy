@@ -7,21 +7,21 @@
 
 #include <cassert>
 
+#include "jiminy/core/Engine.h"
+#include "jiminy/core/AbstractSensor.h"
+#include "jiminy/core/Sensor.h"
+#include "jiminy/core/Model.h"
+#include "jiminy/core/AbstractController.h"
+#include "jiminy/core/ControllerFunctor.h"
+#include "jiminy/core/Types.h"
+#include "jiminy/python/Utilities.h"
+
 #include <boost/weak_ptr.hpp>
 #include <boost/preprocessor.hpp>
 
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/dict.hpp>
-
-#include "jiminy/core/Types.h"
-#include "jiminy/core/Engine.h"
-#include "jiminy/core/Model.h"
-#include "jiminy/core/AbstractSensor.h"
-#include "jiminy/core/Sensor.h"
-#include "jiminy/core/AbstractController.h"
-#include "jiminy/core/ControllerFunctor.h"
-#include "jiminy/python/Utilities.h"
 
 
 namespace jiminy
