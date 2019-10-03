@@ -51,7 +51,7 @@ class RobotJiminyEnv(core.Env):
 
         engine_options = self.engine_py.get_engine_options()
 
-        engine_options["stepper"]["iterMax"] = -1 #Infinite number of iteration
+        engine_options["stepper"]["iterMax"] = -1 # Infinite number of iterations
         engine_options["stepper"]["sensorsUpdatePeriod"] = self.dt
         engine_options["stepper"]["controllerUpdatePeriod"] = self.dt
 

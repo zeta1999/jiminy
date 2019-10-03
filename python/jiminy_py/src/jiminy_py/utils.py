@@ -355,16 +355,20 @@ def _updateGeometryPlacements(rb, data, visual=False):
 
 def update_gepetto_viewer(rb, data, client):
     if rb.display_collisions:
-        client.gui.applyConfigurations (
-                [ _getViewerNodeName(rb, collision,pin.GeometryType.COLLISION) for collision in rb.collision_model.geometryObjects ],
-                [ pin.se3ToXYZQUATtuple(rb.collision_data.oMg[rb.collision_model.getGeometryId(collision.name)]) for collision in rb.collision_model.geometryObjects ]
+        client.gui.applyConfigurations(
+            [_getViewerNodeName(rb, collision,pin.GeometryType.COLLISION)
+             for collision in rb.collision_model.geometryObjects ],
+            [pin.se3ToXYZQUATtuple(rb.collision_data.oMg[rb.collision_model.getGeometryId(collision.name)])
+             for collision in rb.collision_model.geometryObjects ]
         )
 
     if rb.display_visuals:
         _updateGeometryPlacements(rb, data, visual=True)
-        client.gui.applyConfigurations (
-                [ _getViewerNodeName(rb, visual,pin.GeometryType.VISUAL) for visual in rb.visual_model.geometryObjects ],
-                [ pin.se3ToXYZQUATtuple(rb.visual_data.oMg[rb.visual_model.getGeometryId(visual.name)]) for visual in rb.visual_model.geometryObjects ]
+        client.gui.applyConfigurations(
+            [_getViewerNodeName(rb, visual,pin.GeometryType.VISUAL)
+                for visual in rb.visual_model.geometryObjects ],
+            [pin.se3ToXYZQUATtuple(rb.visual_data.oMg[rb.visual_model.getGeometryId(visual.name)])
+                for visual in rb.visual_model.geometryObjects ]
         )
 
     client.gui.refresh()

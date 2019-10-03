@@ -12,54 +12,72 @@ The data of the simulation can be exported in CSV format, or directely read from
 
 Python2.7 and Python3 bindings have been written using the open-source library [Boost Python](https://github.com/boostorg/python).
 
-The Machine Learning library [Open AI Gym](https://github.com/openai/gym) is fully supported. Abstract environments and examples for toy models are available. Note that Python3 is not a requirement to use openAI Gym. Nevertheless, most Machine Learning Python packages that implements many standard reinforcement learning algorithms only support Python3,  such as [openAI Gym Baseline](https://github.com/hill-a/stable-baselines), which is based on the open-source Machine Learning framework [Tensorflow](https://github.com/tensorflow/tensorflow) for level-level computation.
-
 ## Dependencies
 
-### Robotpkg dependencies
+### Robotpkg
 
 #### Add the repository
+```bash
 sudo sh -c "echo 'deb [arch=amd64] http://robotpkg.openrobots.org/packages/debian/pub bionic robotpkg' >> /etc/apt/sources.list.d/robotpkg.list" && \
 curl http://robotpkg.openrobots.org/packages/debian/robotpkg.key | sudo apt-key add -
 sudo apt update
+```
 
-#### [Python 2.7 only] installation procedure
+#### [Python 2.7 only] Installation procedure
 ```bash
 sudo apt install -y robotpkg-py27-pinocchio robotpkg-py27-qt4-gepetto-viewer-corba
-pip install numba
 ```
 
-#### [Python 3.6 only] dependencies installation procedure
+#### [Python 3.6 only] Installation procedure
 ```bash
 sudo apt install -y robotpkg-py36-pinocchio robotpkg-py36-qt4-gepetto-viewer-corba
+```
+
+### Python dependencies
+
+#### [Python 2.7 only] Installation procedure
+```bash
 pip install numba
 ```
 
-### Matplotlib dependencies
-sudo apt install -y python3-tk
-
-### Tensorflow 1.13 with GPU support dependencies (Cuda 10.1 and CuDNN 7.6)
-Amazing tutorial: https://medium.com/better-programming/install-tensorflow-1-13-on-ubuntu-18-04-with-gpu-support-239b36d29070
-
-### Open AI Gym along with some toy models
-pip install gym[atari,box2d,classic_control]
-
-### [Python 3 only] Open AI Gym Stable-Baseline
-pip install gym[atari,box2d,classic_control]
-
-### [Python 3 only] Coach dependencies
-sudo apt install -y python-opencv
-sudo apt install -y libsdl-dev libsdl-image1.2-dev libsdl-mixer1.2-dev libsdl-ttf2.0-dev libsmpeg-dev libportmidi-dev libavformat-dev libswscale-dev libjpeg-dev  libtiff-dev libsdl1.2-dev libnotify-dev freeglut3 freeglut3-dev libsm-dev libgtk2.0-dev libgtk-3-dev libwebkitgtk-dev libgtk-3-dev libwebkitgtk-3.0-dev libgstreamer-plugins-base1.0-dev
-pip install rl_coach
-
-## Installation (WDC)
-
-In the docker environment:
+#### [Python 3.6 only] Installation procedure
 ```bash
-# the environment does not make any sense here, put it in the default one
-cd ~/wdc_workspace/build/pc/
+sudo apt install -y python3-tk
+pip install numba
+```
+
+## Installation Procedure 
+
+```bash
 mkdir jiminy && cd jiminy
 cmake ~/wdc_workspace/src/jiminy -DCMAKE_INSTALL_PREFIX=/install
 make && make install
 ```
 
+# Jiminy learning
+
+## Description
+
+The Machine Learning library [Open AI Gym](https://github.com/openai/gym) is fully supported. Abstract environments and examples for toy models are available. Note that Python3 is not a requirement to use openAI Gym. Nevertheless, most Machine Learning Python packages that implements many standard reinforcement learning algorithms only support Python3,  such as [openAI Gym Baseline](https://github.com/hill-a/stable-baselines), which is based on the open-source Machine Learning framework [Tensorflow](https://github.com/tensorflow/tensorflow) for level-level computation.
+
+## Dependencies [Python 3.6 only]
+
+### Tensorflow 1.13 with GPU support dependencies (Cuda 10.1 and CuDNN 7.6)
+Amazing tutorial: https://medium.com/better-programming/install-tensorflow-1-13-on-ubuntu-18-04-with-gpu-support-239b36d29070
+
+### Open AI Gym along with some toy models
+```bash
+pip install gym[atari,box2d,classic_control]
+```
+
+### Open AI Gym Stable-Baseline
+```bash
+pip install gym[atari,box2d,classic_control]
+```
+
+### Coach dependencies
+```bash
+sudo apt install -y python-opencv
+sudo apt install -y libsdl-dev libsdl-image1.2-dev libsdl-mixer1.2-dev libsdl-ttf2.0-dev libsmpeg-dev libportmidi-dev libavformat-dev libswscale-dev libjpeg-dev  libtiff-dev libsdl1.2-dev libnotify-dev freeglut3 freeglut3-dev libsm-dev libgtk2.0-dev libgtk-3-dev libwebkitgtk-dev libgtk-3-dev libwebkitgtk-3.0-dev libgstreamer-plugins-base1.0-dev
+pip install rl_coach
+```

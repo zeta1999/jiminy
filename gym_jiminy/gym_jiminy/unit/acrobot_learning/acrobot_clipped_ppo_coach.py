@@ -37,7 +37,7 @@ agent_params.network_wrappers['main'].learning_rate = 0.001
 #  Environment #
 ################
 env_params = GymVectorEnvironment(level='gym_jiminy.envs.acrobot:JiminyAcrobotEnv')
-env_params.additional_simulator_parameters = {'continuous': False, 'enableGoalEnv': False}
+env_params.additional_simulator_parameters = {'continuous': True, 'enableGoalEnv': False}
 
 ################
 #   Learning   #

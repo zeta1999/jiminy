@@ -125,13 +125,14 @@ class JiminyAcrobotGoalEnv(RobotJiminyGoalEnv):
         model_options["joints"]["velocityLimitFromUrdf"] = False
         self.model.set_model_options(model_options)
 
-        # Update the observation space (which is different from the state space in this case)
-        high = np.array([1.0, 1.0, 1.0, 1.0, self.MAX_VEL_1, self.MAX_VEL_2])
+        # Update the goal spaces and the observation space (which is different from the state space in this case)
+        goal_high = np.array([self._tipPosZMax])
+        obs_high = np.array([1.0, 1.0, 1.0, 1.0, self.MAX_VEL_1, self.MAX_VEL_2])
 
         self.observation_space = spaces.Dict(dict(
-            desired_goal=self.observation_space['desired_goal'],
-            achieved_goal=self.observation_space['achieved_goal'],
-            observation=spaces.Box(low=-high, high=high, dtype=np.float64)
+            desired_goal=spaces.Box(low=-goal_high, high=goal_high, dtype=np.float64),
+            achieved_goal=spaces.Box(low=-goal_high, high=goal_high, dtype=np.float64),
+            observation=spaces.Box(low=-obs_high, high=obs_high, dtype=np.float64)
         ))
 
         self.state_random_high = np.array([ 0.2 - pi,  0.2,  1.0,  1.0])
@@ -147,7 +148,7 @@ class JiminyAcrobotGoalEnv(RobotJiminyGoalEnv):
     def _sample_goal(self):
         """Samples a new goal and returns it.
         """
-        return self.np_random.uniform(low=-0.5*self._tipPosZMax, high=0.98*self._tipPosZMax, size=(1,))
+        return self.np_random.uniform(low=-0.2*self._tipPosZMax, high=0.98*self._tipPosZMax, size=(1,))
 
     def step(self, a):
         if self.continuous:
@@ -246,7 +247,7 @@ class JiminyAcrobotEnv(JiminyAcrobotGoalEnv):
         if self.enableGoalEnv:
             return super(JiminyAcrobotEnv, self)._sample_goal()
         else:
-            return np.array([0.8*self._tipPosZMax])
+            return np.array([0.95*self._tipPosZMax])
 
     def reset(self):
         obs = super(JiminyAcrobotEnv, self).reset()

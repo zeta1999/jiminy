@@ -9,6 +9,6 @@ register(
 register(
     id='jiminy-acrobot-v0',
     entry_point='gym_jiminy.envs:JiminyAcrobotEnv',
-    max_episode_steps=10000,
-    reward_threshold=-1000.0
+    max_episode_steps=12000,
+    reward_threshold=-3000.0
 )
