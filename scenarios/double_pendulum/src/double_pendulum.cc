@@ -13,10 +13,10 @@
 #include <getopt.h>
 #include <string>
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/Utilities.h"
 #include "jiminy/core/Engine.h"
 #include "jiminy/core/ControllerFunctor.h"
+#include "jiminy/core/Types.h"
 
 
 using namespace jiminy;
@@ -71,7 +71,8 @@ int main(int argc, char *argv[])
 
     Model model;
     configHolder_t mdlOptions = model.getOptions();
-    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("joints")).at("boundsFromUrdf")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("joints")).at("positionLimitFromUrdf")) = true;
+    boost::get<bool>(boost::get<configHolder_t>(mdlOptions.at("joints")).at("velocityLimitFromUrdf")) = true;
     model.setOptions(mdlOptions);
     model.initialize(urdfPath, contacts, motorNames, false);
 
@@ -95,7 +96,7 @@ int main(int argc, char *argv[])
     boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("iterMax")) = 100000U; // -1 for infinity
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("sensorsUpdatePeriod")) = 1.0e-3;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("controllerUpdatePeriod")) = 1.0e-3;
-    boost::get<int32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("randomSeed")) = 0U; // Use time(nullptr) for random seed.
+    boost::get<uint32_t>(boost::get<configHolder_t>(simuOptions.at("stepper")).at("randomSeed")) = 0U; // Use time(nullptr) for random seed.
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("stiffness")) = 1e6;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("damping")) = 2000.0;
     boost::get<float64_t>(boost::get<configHolder_t>(simuOptions.at("contacts")).at("dryFrictionVelEps")) = 0.01;

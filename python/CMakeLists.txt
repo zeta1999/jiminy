@@ -1,8 +1,8 @@
 # Minimum version required
-cmake_minimum_required (VERSION 3.10)
+cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(python)
+project(${LIBRARY_NAME}_python VERSION ${BUILD_VERSION})
 
 # Python install helper
 function(deploy_python_package TARGET_NAME)
@@ -11,7 +11,7 @@ function(deploy_python_package TARGET_NAME)
 endfunction()
 
 # Compile and install python bindings
-add_subdirectory(jiminy_pywrap)
+add_subdirectory(${LIBRARY_NAME}_pywrap)
 
 # Install native python packages
-deploy_python_package(jiminy_py)
+deploy_python_package(${LIBRARY_NAME}_py)

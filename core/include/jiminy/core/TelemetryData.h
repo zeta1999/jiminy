@@ -12,8 +12,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/TelemetrySender.h"
+#include "jiminy/core/Types.h"
 
 
 namespace jiminy

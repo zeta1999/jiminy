@@ -36,6 +36,9 @@ namespace jiminy
     flexibleJointsNames_(),
     flexibleJointsPositionIdx_(),
     flexibleJointsVelocityIdx_(),
+    positionLimitMin_(),
+    positionLimitMax_(),
+    velocityLimit_(),
     positionFieldNames_(),
     velocityFieldNames_(),
     accelerationFieldNames_(),
@@ -412,6 +415,34 @@ namespace jiminy
         if (returnCode == result_t::SUCCESS)
         {
             pncData_ = pinocchio::Data(pncModel_);
+            pinocchio::forwardKinematics(pncModel_,
+                                         pncData_,
+                                         vectorN_t::Zero(pncModel_.nq),
+                                         vectorN_t::Zero(pncModel_.nv));
+            pinocchio::framesForwardKinematics(pncModel_, pncData_);
+        }
+
+        // Update the position and velocity limits
+        if (returnCode == result_t::SUCCESS)
+        {
+            positionLimitMin_ = pncModel_.lowerPositionLimit;
+            positionLimitMax_ = pncModel_.upperPositionLimit;
+            if (!mdlOptions_->joints.positionLimitFromUrdf)
+            {
+                for (uint32_t i=0; i < rigidJointsNames_.size(); ++i)
+                {
+                    positionLimitMin_[rigidJointsPositionIdx_[i]] = mdlOptions_->joints.positionLimitMin[i];
+                    positionLimitMax_[rigidJointsPositionIdx_[i]] = mdlOptions_->joints.positionLimitMax[i];
+                }
+            }
+            velocityLimit_ = pncModel_.velocityLimit;
+            if (!mdlOptions_->joints.velocityLimitFromUrdf)
+            {
+                for (uint32_t i=0; i < rigidJointsNames_.size(); ++i)
+                {
+                    velocityLimit_[rigidJointsVelocityIdx_[i]] = mdlOptions_->joints.velocityLimit[i];
+                }
+            }
         }
 
         return returnCode;
@@ -826,30 +857,32 @@ namespace jiminy
         flexibleJointsPositionIdx_.clear();
         flexibleJointsVelocityIdx_.clear();
 
+        // Make sure the user-defined position limit has the right dimension
         if (isInitialized_)
         {
             configHolder_t & jointOptionsHolder =
                 boost::get<configHolder_t>(mdlOptionsHolder_.at("joints"));
-            vectorN_t & boundsMin = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMin"));
-            vectorN_t & boundsMax = boost::get<vectorN_t>(jointOptionsHolder.at("boundsMax"));
-
-            // Make sure the bounds of the pinocchio model are the right ones
-            if (boost::get<bool>(jointOptionsHolder.at("boundsFromUrdf")))
+            if (!boost::get<bool>(jointOptionsHolder.at("positionLimitFromUrdf")))
             {
-                boundsMin = vectorN_t::Zero(motorsNames_.size());
-                boundsMax = vectorN_t::Zero(motorsNames_.size());
-                for (uint32_t i=0; i < motorsNames_.size(); ++i)
+                vectorN_t & positionLimitMin = boost::get<vectorN_t>(jointOptionsHolder.at("positionLimitMin"));
+                if((int32_t) rigidJointsNames_.size() != positionLimitMin.size())
                 {
-                    boundsMin[i] = pncModel_.lowerPositionLimit[motorsPositionIdx_[i]];
-                    boundsMax[i] = pncModel_.upperPositionLimit[motorsPositionIdx_[i]];
+                    std::cout << "Error - Model::setOptions - Wrong vector size for positionLimitMin." << std::endl;
+                    returnCode = result_t::ERROR_BAD_INPUT;
+                }
+                vectorN_t & positionLimitMax = boost::get<vectorN_t>(jointOptionsHolder.at("positionLimitMax"));
+                if((uint32_t) rigidJointsNames_.size() != positionLimitMax.size())
+                {
+                    std::cout << "Error - Model::setOptions - Wrong vector size for positionLimitMax." << std::endl;
+                    returnCode = result_t::ERROR_BAD_INPUT;
                 }
             }
-            else
+            if (!boost::get<bool>(jointOptionsHolder.at("velocityLimitFromUrdf")))
             {
-                if((int32_t) motorsNames_.size() != boundsMin.size()
-                || (uint32_t) motorsNames_.size() != boundsMax.size())
+                vectorN_t & velocityLimit = boost::get<vectorN_t>(jointOptionsHolder.at("velocityLimit"));
+                if((int32_t) rigidJointsNames_.size() != velocityLimit.size())
                 {
-                    std::cout << "Error - Model::setOptions - Wrong vector size for boundsMin or boundsMax." << std::endl;
+                    std::cout << "Error - Model::setOptions - Wrong vector size for velocityLimit." << std::endl;
                     returnCode = result_t::ERROR_BAD_INPUT;
                 }
             }
@@ -1014,9 +1047,24 @@ namespace jiminy
         return positionFieldNames_;
     }
 
+    vectorN_t const & Model::getPositionLimitMin(void) const
+    {
+        return positionLimitMin_;
+    }
+
+    vectorN_t const & Model::getPositionLimitMax(void) const
+    {
+        return positionLimitMax_;
+    }
+
     std::vector<std::string> const & Model::getVelocityFieldNames(void) const
     {
         return velocityFieldNames_;
+    }
+
+    vectorN_t const & Model::getVelocityLimit(void) const
+    {
+        return velocityLimit_;
     }
 
     std::vector<std::string> const & Model::getAccelerationFieldNames(void) const

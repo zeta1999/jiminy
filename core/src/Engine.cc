@@ -2,9 +2,6 @@
 #include <cmath>
 #include <algorithm>
 
-#include <boost/algorithm/clamp.hpp>
-#include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
-
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/frames.hpp"
@@ -19,6 +16,9 @@
 #include "jiminy/core/AbstractSensor.h"
 #include "jiminy/core/Model.h"
 #include "jiminy/core/Engine.h"
+
+#include <boost/algorithm/clamp.hpp>
+#include <boost/numeric/odeint/iterator/n_step_iterator.hpp>
 
 
 namespace jiminy
@@ -345,6 +345,13 @@ namespace jiminy
 
         // Initialize the stepper internal state
         stepperState_.initialize(*model_, x0, dt);
+
+        // Compute the forward kinematics
+        pinocchio::forwardKinematics(model_->pncModel_,
+                                     model_->pncData_,
+                                     stepperState_.qLast,
+                                     stepperState_.vLast);
+        pinocchio::framesForwardKinematics(model_->pncModel_, model_->pncData_);
 
         // Initialize the external contact forces
         std::vector<int32_t> const & contactFramesIdx = model_->getContactFramesIdx();
@@ -913,6 +920,30 @@ namespace jiminy
         vectorN_t qDot(model_->nq());
         computePositionDerivative(model_->pncModel_, q, v, qDot, dt);
 
+        /* Velocity bounds are applied directly on the analytical acceleration
+           since it is always possible to enforce the desired acceleration under
+           the assumption of infinite torque.
+           Note that it behaves ALMOST like a friction force because the total
+           energy of the system decreases most of the time when active, BUT it
+           may happens that the energy slightly goes back up (but at a lower
+           energy level than initially). */
+        std::vector<int32_t> const & rigidJointsVelocityIdx = model_->getRigidJointsVelocityIdx();
+        vectorN_t const & velocityLimit = model_->getVelocityLimit();
+        for (uint32_t i = 0; i < rigidJointsVelocityIdx.size(); i++)
+        {
+            float64_t const & vJoint = v(rigidJointsVelocityIdx[i]);
+            float64_t & aJoint = a(rigidJointsVelocityIdx[i]);
+            float64_t const & vJointMax = velocityLimit[rigidJointsVelocityIdx[i]];
+            if (vJoint > vJointMax && aJoint > 0.0)
+            {
+                aJoint = 0.0;
+            }
+            else if (vJoint < -vJointMax && aJoint < 0.0)
+            {
+                aJoint = 0.0;
+            }
+        }
+
         // Fill up dxdt
         dxdt.resize(model_->nx());
         dxdt.head(model_->nq()) = qDot;
@@ -1011,20 +1042,21 @@ namespace jiminy
                                   vectorN_t const & v,
                                   vectorN_t       & u)
     {
-        // Do NOT make sure the output is Zero !
+        // Do NOT reinitialize the output to Zero !
 
-        // Enforce the bounds of the actuated joints of the model
-        Model::jointOptions_t const & mdlJointOptions = model_->mdlOptions_->joints;
+        // Enforce the position limit
         Engine::jointOptions_t const & engineJointOptions = engineOptions_->joints;
 
-        std::vector<int32_t> const & motorsPositionIdx = model_->getMotorsPositionIdx();
-        std::vector<int32_t> const & motorsVelocityIdx = model_->getMotorsVelocityIdx();
-        for (uint32_t i = 0; i < motorsPositionIdx.size(); i++)
+        std::vector<int32_t> const & rigidJointsPositionIdx = model_->getRigidJointsPositionIdx();
+        std::vector<int32_t> const & rigidJointsVelocityIdx = model_->getRigidJointsVelocityIdx();
+        vectorN_t const & positionLimitMin = model_->getPositionLimitMin();
+        vectorN_t const & positionLimitMax = model_->getPositionLimitMax();
+        for (uint32_t i = 0; i < rigidJointsPositionIdx.size(); i++)
         {
-            float64_t const qJoint = q(motorsPositionIdx[i]);
-            float64_t const vJoint = v(motorsVelocityIdx[i]);
-            float64_t const qJointMin = mdlJointOptions.boundsMin(i);
-            float64_t const qJointMax = mdlJointOptions.boundsMax(i);
+            float64_t const & qJoint = q(rigidJointsPositionIdx[i]);
+            float64_t const & vJoint = v(rigidJointsVelocityIdx[i]);
+            float64_t const & qJointMin = positionLimitMin[rigidJointsPositionIdx[i]];
+            float64_t const & qJointMax = positionLimitMax[rigidJointsPositionIdx[i]];
 
             float64_t forceJoint = 0;
             float64_t qJointError = 0;
@@ -1045,7 +1077,7 @@ namespace jiminy
             float64_t blendingLaw = std::tanh(2 * blendingFactor);
             forceJoint *= blendingLaw;
 
-            u(motorsVelocityIdx[i]) += forceJoint;
+            u(rigidJointsVelocityIdx[i]) += forceJoint;
         }
 
         // Compute the flexibilities

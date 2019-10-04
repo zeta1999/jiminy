@@ -1,8 +1,8 @@
 #ifndef SIMU_ABSTRACT_CONTROLLER_H
 #define SIMU_ABSTRACT_CONTROLLER_H
 
-#include "jiminy/core/Types.h"
 #include "jiminy/core/TelemetrySender.h"
+#include "jiminy/core/Types.h"
 
 
 namespace jiminy

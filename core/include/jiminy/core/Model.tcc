@@ -1,6 +1,5 @@
-#include "jiminy/core/Types.h"
 #include "jiminy/core/AbstractSensor.h"
-
+#include "jiminy/core/Types.h"
 
 namespace jiminy
 {

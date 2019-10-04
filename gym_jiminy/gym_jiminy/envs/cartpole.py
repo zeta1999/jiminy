@@ -3,34 +3,18 @@ Classic cart-pole system simulated using Jiminy Engine
 """
 
 import os
-import math
-import gym
-from gym import spaces, logger
-from gym.utils import seeding
+from math import pi
 import numpy as np
 
+from gym import core, spaces, logger
+from gym.utils import seeding
+
 import jiminy
-from jiminy_py import *
+from jiminy_py import engine_asynchronous
+from gym_jiminy.common import RobotJiminyEnv
 
 
-class RenderMockOut:
-    def __init__(self):
-        self.mock = np.array([[[]]])
-
-    def __array__(self):
-        return self.mock
-
-    def __iter__(self):
-        return iter(self.mock)
-
-    def __len__(self):
-        return len(self.mock)
-
-    def __getitem__(self, key):
-        return self.mock.__getitem__(key)
-
-
-class JiminyCartPoleEnv(gym.Env):
+class JiminyCartPoleEnv(RobotJiminyEnv):
     """
     Description:
         A pole is attached by an un-actuated joint to a cart.
@@ -68,27 +52,25 @@ class JiminyCartPoleEnv(gym.Env):
     }
 
     def __init__(self):
-        ############################# Initialize the simulation #################################
+        ################################# Initialize Jiminy ####################################
 
-        urdf_path = os.path.join(os.environ["HOME"], "wdc_workspace/src/jiminy/data/cartpole/cartpole.urdf")
-        contacts = []
+        cur_dir = os.path.dirname(os.path.realpath(__file__))
+        urdf_path = os.path.join(cur_dir, "../../../data/cartpole/cartpole.urdf")
         motors = ["slider_to_cart"]
-        self.model = jiminy.model()
-        self.model.initialize(urdf_path, contacts, motors, False)
-        self.model.add_encoder_sensor("slider", "slider_to_cart")
-        self.model.add_encoder_sensor("pole", "cart_to_pole")
-        self.engine_py = engine_asynchronous(self.model)
+        self.model = jiminy.model() # Model has to be an attribute of the class to avoid it being garbage collected
+        self.model.initialize(urdf_path, motors=motors)
+        self.model.add_encoder_sensor("Slider", "slider_to_cart")
+        self.model.add_encoder_sensor("Pole", "cart_to_pole")
+        engine_py = engine_asynchronous(self.model)
 
-        ########################### Configuration the simulation ################################
-
-        self.dt = 2.0e-3 # The time step of the 'step' method
+        ################################# Configure Jiminy #####################################
 
         model_options = self.model.get_model_options()
         sensors_options = self.model.get_sensors_options()
-        engine_options = self.engine_py.get_engine_options()
-        ctrl_options = self.engine_py.get_controller_options()
+        engine_options = engine_py.get_engine_options()
+        ctrl_options = engine_py.get_controller_options()
 
-        model_options["telemetry"]["enableImuSensors"] = False
+        model_options["telemetry"]["enableEncoderSensors"] = False
         engine_options["telemetry"]["enableConfiguration"] = False
         engine_options["telemetry"]["enableVelocity"] = False
         engine_options["telemetry"]["enableAcceleration"] = False
@@ -96,85 +78,77 @@ class JiminyCartPoleEnv(gym.Env):
         engine_options["telemetry"]["enableEnergy"] = False
 
         engine_options["stepper"]["solver"] = "runge_kutta_dopri5" # ["runge_kutta_dopri5", "explicit_euler"]
-        engine_options["stepper"]["iterMax"] = -1 #Infinite number of iteration
-        engine_options["stepper"]["sensorsUpdatePeriod"] = self.dt
-        engine_options["stepper"]["controllerUpdatePeriod"] = self.dt
 
         self.model.set_model_options(model_options)
         self.model.set_sensors_options(sensors_options)
-        self.engine_py.set_engine_options(engine_options)
-        self.engine_py.set_controller_options(ctrl_options)
+        engine_py.set_engine_options(engine_options)
+        engine_py.set_controller_options(ctrl_options)
 
-        ########################### Configuration the learning ################################
+        ####################### Define some problem-specific variables #########################
 
-        # Force mag of the action
+        # Torque magnitude of the action
         self.force_mag = 40.0
 
         # Angle at which to fail the episode
-        self.theta_threshold_radians = 25 * math.pi / 180
+        self.theta_threshold_radians = 25 * pi / 180
         self.x_threshold = 0.75
 
-        # Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds
+        ######################### Configure the learning environment ###########################
+
+        # The time step of the 'step' method
+        dt = 2.0e-3
+
+        super(JiminyCartPoleEnv, self).__init__("cartpole", engine_py, dt)
+
+        ####################### Define some problem-specific variables #########################
+
+        # Bounds of the observation space.
+        # Note that the Angle limit set to 2 * theta_threshold_radians
+        # so failing observation is still within bounds
         high = np.array([self.x_threshold * 2,
                          self.theta_threshold_radians * 2,
-                         np.finfo(np.float32).max,
-                         np.finfo(np.float32).max])
+                         np.finfo(np.float64).max,
+                         np.finfo(np.float64).max])
 
-        self.action_space = spaces.Discrete(2) # action can be either 0 or 1
-        self.observation_space = spaces.Box(-high, high, dtype=np.float32)
+        self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float64)
 
-        self.seed()
-        self.viewer = None
+        self.state_random_high = np.array([0.5, 0.15, 0.1, 0.1])
+        self.state_random_low = -self.state_random_high
 
-        self.steps_beyond_done = None
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        self.engine_py.seed(seed)
-        return [seed]
-
-    def reset(self):
-        state = self.np_random.uniform(low=-1, high=1, size=(4,1)) * np.array([[0.5, 0.15, 0.1, 0.1]]).T
-        self.engine_py.reset(state)
-        self.steps_beyond_done = None
-        return self.engine_py.state
-
-    def render(self, lock=None, mode='human'):
-        self.engine_py.render(lock)
-        if (self.viewer is None):
-            self.viewer = self.engine_py._client
-        return RenderMockOut()
-
-    def close(self):
-        self.engine_py.close()
+        self.action_space = spaces.Discrete(2) # Force using a discrete action space
 
     def step(self, action):
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
 
-         # Bypass check and use direct assignment to max out the performances
-        # self.engine_py.step(np.array([[action * self.force_mag]]))
+        # Bypass 'action' setter and use direct assignment to max out the performances
         if action == 1:
             self.engine_py._action[0] = self.force_mag
         else:
             self.engine_py._action[0] = -self.force_mag
-        self.engine_py.step()
-        x, theta, x_dot, theta_dot = self.engine_py.state
+        self.engine_py.step(dt_desired=self.dt)
+        self.state = self.engine_py.state
 
-        done =  x < -self.x_threshold \
-                or x > self.x_threshold \
-                or theta < -self.theta_threshold_radians \
-                or theta > self.theta_threshold_radians
-
+        # Check the terminal condition and compute reward
+        done = self._is_success()
+        reward = 0.0
         if not done:
-            reward = 1.0
+            reward += 1.0
         elif self.steps_beyond_done is None:
-            # Pole just fell!
             self.steps_beyond_done = 0
-            reward = 1.0
+            reward += 1.0
         else:
             if self.steps_beyond_done == 0:
                 logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
             self.steps_beyond_done += 1
-            reward = 0.0
 
-        return self.engine_py.state, reward, done, {}
+        return self.state, reward, done, {}
+
+    def _get_obs(self):
+        return self.state
+
+    def _is_success(self):
+        x, theta, x_dot, theta_dot = self.state
+        return        x < -self.x_threshold \
+               or     x >  self.x_threshold \
+               or theta < -self.theta_threshold_radians \
+               or theta >  self.theta_threshold_radians

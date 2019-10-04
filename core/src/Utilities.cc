@@ -8,8 +8,8 @@
 #include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include "jiminy/core/Utilities.h"
-#include "jiminy/core/TelemetrySender.h"
 #include "jiminy/core/Engine.h" // Required to get access to MIN_TIME_STEP and MAX_TIME_STEP
+#include "jiminy/core/TelemetrySender.h"
 
 
 namespace jiminy
@@ -949,7 +949,7 @@ namespace jiminy
                     float64_t                   const & minThr,
                     float64_t                   const & maxThr)
     {
-        return data.unaryExpr([&minThr, &maxThr](float64_t x) -> float64_t
+        return data.unaryExpr([&minThr, &maxThr](float64_t const & x) -> float64_t
                               {
                                   return std::min(std::max(x, minThr), maxThr);
                               });

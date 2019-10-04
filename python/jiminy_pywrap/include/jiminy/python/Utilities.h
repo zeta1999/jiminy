@@ -1,8 +1,10 @@
 #ifndef SIMU_PYTHON_UTILITIES_H
 #define SIMU_PYTHON_UTILITIES_H
 
+#include <eigenpy/eigenpy.hpp>
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
+#include <boost/python/numpy.hpp>
 #include <boost/python/numpy/ndarray.hpp>
 
 
@@ -352,8 +354,20 @@ namespace python
             }
             else if (optionType == typeid(vectorN_t))
             {
-                boost::get<vectorN_t>(config.at(name)) =
-                    listPyToEigenVector(bp::extract<bp::list>(configPy[name]));
+                if (optionTypePyStr != "ndarray")
+                {
+                    boost::get<vectorN_t>(config.at(name)) =
+                        listPyToEigenVector(bp::extract<bp::list>(configPy[name]));
+                }
+                else
+                {
+                    bp::numpy::ndarray dataPy = bp::extract<bp::numpy::ndarray>(configPy[name]);
+                    dataPy = dataPy.astype(bp::numpy::dtype::get_builtin<float64_t>());
+                    float64_t * dataPtr = reinterpret_cast<float64_t *>(dataPy.get_data());
+                    long int const * dataShape = dataPy.get_shape();
+                    Eigen::Map<vectorN_t> data(dataPtr, dataShape[0]);
+                    boost::get<vectorN_t>(config.at(name)) = data;
+                }
             }
             else if (optionType == typeid(matrixN_t))
             {
@@ -369,6 +383,7 @@ namespace python
             {
                 boost::get<std::vector<vectorN_t> >(config.at(name)) =
                     listPyToStdVector<vectorN_t>(bp::extract<bp::list>(configPy[name]));
+
             }
             else if (optionType == typeid(std::vector<matrixN_t>))
             {

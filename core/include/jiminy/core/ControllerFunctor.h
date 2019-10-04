@@ -1,9 +1,9 @@
 #ifndef WDC_CONTROLLER_FUNCTOR_H
 #define WDC_CONTROLLER_FUNCTOR_H
 
-#include "jiminy/core/Types.h"
+#include "jiminy/core/Model.h"
 #include "jiminy/core/AbstractController.h"
-
+#include "jiminy/core/Types.h"
 
 namespace jiminy
 {

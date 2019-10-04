@@ -9,3 +9,4 @@
 *.autosave
 *.slxc
 *.pyc
+*egg-info*

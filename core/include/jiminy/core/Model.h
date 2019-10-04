@@ -7,10 +7,10 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
-#include <boost/circular_buffer.hpp>
-
 #include "pinocchio/multibody/model.hpp"
 #include "pinocchio/algorithm/frames.hpp"
+
+#include <boost/circular_buffer.hpp>
 
 #include "jiminy/core/Types.h"
 
@@ -39,23 +39,29 @@ namespace jiminy
         virtual configHolder_t getDefaultJointOptions()
         {
             configHolder_t config;
-            config["boundsFromUrdf"] = true; // Must be true since boundsMin and boundsMax are undefined
-            config["boundsMin"] = vectorN_t();
-            config["boundsMax"] = vectorN_t();
+            config["positionLimitFromUrdf"] = true;
+            config["positionLimitMin"] = vectorN_t();
+            config["positionLimitMax"] = vectorN_t();
+            config["velocityLimitFromUrdf"] = true;
+            config["velocityLimit"] = vectorN_t();
 
             return config;
         };
 
         struct jointOptions_t
         {
-            bool      const boundsFromUrdf;
-            vectorN_t const boundsMin;
-            vectorN_t const boundsMax;
+            bool      const positionLimitFromUrdf;
+            vectorN_t const positionLimitMin;
+            vectorN_t const positionLimitMax;
+            bool      const velocityLimitFromUrdf;
+            vectorN_t const velocityLimit;
 
             jointOptions_t(configHolder_t const & options) :
-            boundsFromUrdf(boost::get<bool>(options.at("boundsFromUrdf"))),
-            boundsMin(boost::get<vectorN_t>(options.at("boundsMin"))),
-            boundsMax(boost::get<vectorN_t>(options.at("boundsMax")))
+            positionLimitFromUrdf(boost::get<bool>(options.at("positionLimitFromUrdf"))),
+            positionLimitMin(boost::get<vectorN_t>(options.at("positionLimitMin"))),
+            positionLimitMax(boost::get<vectorN_t>(options.at("positionLimitMax"))),
+            velocityLimitFromUrdf(boost::get<bool>(options.at("velocityLimitFromUrdf"))),
+            velocityLimit(boost::get<vectorN_t>(options.at("velocityLimit")))
             {
                 // Empty.
             }
@@ -190,6 +196,9 @@ namespace jiminy
         std::vector<std::string> const & getVelocityFieldNames(void) const;
         std::vector<std::string> const & getAccelerationFieldNames(void) const;
         std::vector<std::string> const & getMotorTorqueFieldNames(void) const;
+        vectorN_t const & getPositionLimitMin(void) const;
+        vectorN_t const & getPositionLimitMax(void) const;
+        vectorN_t const & getVelocityLimit(void) const;
 
         // Getter without keywords for consistency with pinocchio C++ API
         uint32_t const & nq(void) const;
@@ -236,6 +245,10 @@ namespace jiminy
         std::vector<std::string> flexibleJointsNames_;      // Name of the flexibility joints of the model
         std::vector<int32_t> flexibleJointsPositionIdx_;    // First indices of the flexibility joints in the configuration vector of the model
         std::vector<int32_t> flexibleJointsVelocityIdx_;    // First indices of the flexibility joints in the velocity vector of the model
+
+        vectorN_t positionLimitMin_;
+        vectorN_t positionLimitMax_;
+        vectorN_t velocityLimit_;
 
         std::vector<std::string> positionFieldNames_;       // Fieldnames of the elements in the configuration vector of the rigid model
         std::vector<std::string> velocityFieldNames_;       // Fieldnames of the elements in the velocity vector of the rigid model

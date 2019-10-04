@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(double_pendulum)
+project(${LIBRARY_NAME}_double_pendulum VERSION ${BUILD_VERSION})
 
 # Add sources
 set(SRC
@@ -19,7 +19,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC core)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${LIBRARY_NAME}_core)
 
 # Activate c++14
 set_target_properties(${PROJECT_NAME} PROPERTIES

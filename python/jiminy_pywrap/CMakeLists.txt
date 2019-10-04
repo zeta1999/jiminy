@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(jiminy_pywrap)
+project(${LIBRARY_NAME}_pywrap VERSION ${BUILD_VERSION})
 
 # Set the include directories.
 include_directories("include/")
@@ -15,6 +15,9 @@ file(GLOB_RECURSE ${PROJECT_NAME}_PYTHON_SOURCES "src/python/*.py")
 
 # Make library
 add_library(${PROJECT_NAME} SHARED ${SRC})
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    VERSION ${BUILD_VERSION}
+)
 
 # Set include directory
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -23,7 +26,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 # Link with other libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC core eigenpy "${BOOST_PYTHON_LIB}")
+target_link_libraries(${PROJECT_NAME} PUBLIC ${LIBRARY_NAME}_core eigenpy "${BOOST_PYTHON_LIB}")
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${NUMPY_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
 
 # Activate c++14
@@ -34,10 +37,29 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 # Install
-install(DIRECTORY "include/jiminy" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(TARGETS ${PROJECT_NAME}
-    DESTINATION "${PYTHON_SITELIB}/jiminy"
+install(DIRECTORY "include/${LIBRARY_NAME}"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 install(FILES ${${PROJECT_NAME}_PYTHON_SOURCES}
-    DESTINATION "${PYTHON_SITELIB}/jiminy"
+        DESTINATION "${PYTHON_SITELIB}/${LIBRARY_NAME}"
+)
+install(TARGETS ${PROJECT_NAME}
+        EXPORT  ${PROJECT_NAME}Config
+        DESTINATION "${PYTHON_SITELIB}/${LIBRARY_NAME}"
+)
+export(TARGETS ${PROJECT_NAME}
+       FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+)
+install(EXPORT
+        ${PROJECT_NAME}Config
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/${LIBRARY_NAME}/cmake"
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+    VERSION ${BUILD_VERSION}
+    COMPATIBILITY ExactVersion
+)
+install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/${LIBRARY_NAME}/cmake"
 )
